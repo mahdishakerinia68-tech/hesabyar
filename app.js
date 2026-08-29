@@ -1,4 +1,4 @@
-const KEY="hesabdar-v5";
+const KEY="hesabdar-v7";
 const defaultsExpense=["بنزین","غذا و رستوران","خرید خانه","خرید روزانه","قبض","اینترنت و شارژ","حمل‌ونقل","پوشاک","درمان","تفریح","هدیه","سایر"];
 const defaultsIncome=["حقوق","پاداش","واریز","فروش","دریافت از شخص","سایر"];
 let data=JSON.parse(localStorage.getItem(KEY)||"null")||{accounts:[],transactions:[],people:[],reminders:[],checks:[],expenseCats:defaultsExpense.map((name,i)=>({id:"e"+i,name})),incomeCats:defaultsIncome.map((name,i)=>({id:"i"+i,name})),pin:""};
