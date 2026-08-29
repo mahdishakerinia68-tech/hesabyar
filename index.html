@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111827">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="style.css">
+<title>حساب‌یار</title>
+</head>
+<body>
+<div class="app">
+<header><div><small>مدیریت مالی شخصی</small><h1>حساب‌یار</h1></div><button id="theme">☾</button></header>
+
+<main>
+<section id="home" class="page active">
+<div class="hero"><span>موجودی کل</span><strong id="balance">۰ تومان</strong></div>
+<div class="grid">
+<div class="card"><span>درآمد</span><b id="income">۰ تومان</b></div>
+<div class="card"><span>هزینه</span><b id="expense">۰ تومان</b></div>
+</div>
+<div class="section-head"><h2>آخرین تراکنش‌ها</h2><button onclick="openTx()">＋</button></div>
+<div id="recent"></div>
+</section>
+
+<section id="accounts" class="page">
+<div class="section-head"><h2>حساب‌ها</h2><button onclick="openAccount()">＋</button></div>
+<div id="accountList"></div>
+</section>
+
+<section id="transactions" class="page">
+<div class="section-head"><h2>تراکنش‌ها</h2><button onclick="openTx()">＋</button></div>
+<input id="search" class="search" placeholder="جستجو..." oninput="render()">
+<div id="txList"></div>
+</section>
+
+<section id="reports" class="page">
+<h2>گزارش‌ها</h2>
+<div class="card"><canvas id="chart" width="600" height="260"></canvas></div>
+<div id="reportStats"></div>
+</section>
+
+<section id="settings" class="page">
+<h2>تنظیمات</h2>
+<div class="card settings">
+<button onclick="exportData()">📤 خروجی اطلاعات</button>
+<button onclick="document.getElementById('import').click()">📥 ورود اطلاعات</button>
+<input hidden id="import" type="file" accept=".json" onchange="importData(event)">
+<button onclick="clearData()">🗑 پاک کردن اطلاعات</button>
+</div>
+<p class="hint">اطلاعات این نسخه روی همین دستگاه ذخیره می‌شود.</p>
+</section>
+</main>
+
+<nav>
+<button class="nav active" data-page="home">⌂<small>خانه</small></button>
+<button class="nav" data-page="accounts">▣<small>حساب‌ها</small></button>
+<button class="nav" data-page="transactions">☷<small>تراکنش‌ها</small></button>
+<button class="nav" data-page="reports">◔<small>گزارش</small></button>
+<button class="nav" data-page="settings">⚙<small>تنظیمات</small></button>
+</nav>
+</div>
+
+<div id="modal" class="modal hidden"><div class="sheet"><button class="close" onclick="closeModal()">×</button><div id="modalBody"></div></div></div>
+<script src="app.js"></script>
+</body></html>
