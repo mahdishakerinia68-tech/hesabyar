@@ -1,8 +1,19 @@
 const KEY="hesabdar-v11";
 const SYNC_KEY="hesabdar-firebase-config-v1";
 const SYNC_META_KEY="hesabdar-sync-meta-v1";
+// Firebase project configuration supplied for this app.
+// This is safe to ship in a web app; access is protected by Firebase Authentication + Firestore Rules.
+const DEFAULT_SYNC_CONFIG={
+  apiKey:"AIzaSyAj80ZFjd8nqVwgIIdPTbUbDXoCPwFSxh4",
+  authDomain:"hesabdari-fd3a3.firebaseapp.com",
+  projectId:"hesabdari-fd3a3",
+  storageBucket:"hesabdari-fd3a3.firebasestorage.app",
+  messagingSenderId:"1048332879407",
+  appId:"1:1048332879407:web:d1168138d754d28c8d68da",
+  measurementId:"G-562NVEJKZT"
+};
 let sync={app:null,auth:null,db:null,user:null,unsubscribe:null,ready:false,saving:false,queued:false};
-function syncConfig(){try{return JSON.parse(localStorage.getItem(SYNC_KEY)||"null")}catch{return null}}
+function syncConfig(){try{return JSON.parse(localStorage.getItem(SYNC_KEY)||"null")||DEFAULT_SYNC_CONFIG}catch{return DEFAULT_SYNC_CONFIG}}
 function syncMeta(){try{return JSON.parse(localStorage.getItem(SYNC_META_KEY)||"{}")}catch{return {}}}
 function setSyncStatus(t){const e=$("syncStatus");if(e)e.textContent=t||""}
 
@@ -61,7 +72,7 @@ async function syncSave(){
 function openSyncSettings(){
  const c=syncConfig()||{};
  openModal(`<h2>☁️ اتصال دو گوشی</h2><div class="form">
- <p class="hint">این بخش فقط تنظیمات اتصال را روی همین دستگاه ذخیره می‌کند. اطلاعات Firebase را از Project settings کپی کن.</p>
+ <p class="hint">اتصال Firebase این برنامه از قبل تنظیم شده است. فقط ایمیل و رمز حساب مشترک را وارد کن.</p>
  <input id="fbApiKey" placeholder="apiKey" value="${esc(c.apiKey||"")}">
  <input id="fbAuthDomain" placeholder="authDomain" value="${esc(c.authDomain||"")}">
  <input id="fbProjectId" placeholder="projectId" value="${esc(c.projectId||"")}">
