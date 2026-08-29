@@ -1,4 +1,4 @@
-const KEY="hesabdar-v10";
+const KEY="hesabdar-v11";
 const defaultsExpense=["بنزین","غذا و رستوران","خرید خانه","خرید روزانه","قبض","اینترنت و شارژ","حمل‌ونقل","پوشاک","درمان","تفریح","هدیه","سایر"];
 const defaultsIncome=["حقوق","پاداش","واریز","فروش","دریافت از شخص","سایر"];
 const $=id=>document.getElementById(id);
