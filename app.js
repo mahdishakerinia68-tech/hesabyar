@@ -53,9 +53,14 @@ document.querySelectorAll(".nav").forEach(b=>b.addEventListener("click",e=>{
  document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));
  const page=$(b.dataset.page);
  if(page)page.classList.add("active");
+ const menuModal=$("menuModal");
+ if(menuModal)menuModal.classList.add("hidden");
  render();
 }));
 $("theme").onclick=()=>document.body.classList.toggle("dark");
+$("menuBtn").onclick=()=>$("menuModal").classList.remove("hidden");
+function closeMenu(){$("menuModal").classList.add("hidden")}
+$("menuModal").addEventListener("click",e=>{if(e.target.id==="menuModal")closeMenu()});
 
 const modal=$("modal"),modalBody=$("modalBody");
 function openModal(html){modalBody.innerHTML=html;modal.classList.remove("hidden")}
