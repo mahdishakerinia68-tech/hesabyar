@@ -31,6 +31,7 @@ async function initSync(){
     sync.auth=firebase.auth(); sync.db=firebase.firestore();
     sync.auth.onAuthStateChanged(async user=>{
       sync.user=user;
+      fillSettingsSyncEmail();
       if(sync.unsubscribe){sync.unsubscribe();sync.unsubscribe=null}
       if(!user){sync.ready=false;setSyncStatus("☁️ اتصال تنظیم شده؛ وارد حساب همگام‌سازی شو.");return}
       sync.ready=true;
@@ -84,6 +85,32 @@ async function createSyncAccount(){
  if(!cfg.apiKey||!cfg.authDomain||!cfg.projectId||!cfg.appId)return alert("اول اطلاعات Firebase را کامل کن");
  localStorage.setItem(SYNC_KEY,JSON.stringify(cfg));
  try{await initSync();await sync.auth.createUserWithEmailAndPassword(email,pass);alert("حساب ساخته شد. همین ایمیل و رمز را روی گوشی دوم هم استفاده کن.")}catch(e){alert("ساخت حساب ناموفق: "+e.message)}}
+async function ensureSyncReady(){
+ const cfg=syncConfig();
+ if(!cfg||!cfg.apiKey||!cfg.authDomain||!cfg.projectId||!cfg.appId){alert("اول یک‌بار «تنظیم اتصال Firebase» را باز کن و اطلاعات Firebase را وارد کن.");return false}
+ await initSync();
+ if(!sync.auth){alert("اتصال Firebase آماده نیست");return false}
+ return true;
+}
+function fillSettingsSyncEmail(){
+ const e=$("settingsSyncEmail");
+ if(e&&sync.user)e.value=sync.user.email||"";
+}
+async function loginFromSettings(){
+ const email=$("settingsSyncEmail")?.value.trim(), pass=$("settingsSyncPass")?.value;
+ if(!email||!pass)return alert("ایمیل و رمز را وارد کن");
+ if(!await ensureSyncReady())return;
+ try{await sync.auth.signInWithEmailAndPassword(email,pass);alert("ورود با موفقیت انجام شد؛ همگام‌سازی فعال شد");$("settingsSyncPass").value="";setSyncStatus("☁️ همگام‌سازی فعال است")}
+ catch(e){alert("ورود ناموفق: "+(e.message||e))}
+}
+async function createFromSettings(){
+ const email=$("settingsSyncEmail")?.value.trim(), pass=$("settingsSyncPass")?.value;
+ if(!email||!pass)return alert("ایمیل و رمز را وارد کن");
+ if(pass.length<6)return alert("رمز باید حداقل ۶ کاراکتر باشد");
+ if(!await ensureSyncReady())return;
+ try{await sync.auth.createUserWithEmailAndPassword(email,pass);alert("حساب ساخته شد و همگام‌سازی فعال است. همین ایمیل و رمز را روی گوشی دوم وارد کن.");$("settingsSyncPass").value="";setSyncStatus("☁️ همگام‌سازی فعال است")}
+ catch(e){alert("ساخت حساب ناموفق: "+(e.message||e))}
+}
 async function logoutSync(){try{await sync.auth?.signOut();alert("از حساب همگام‌سازی خارج شد")}catch(e){alert(e.message)}}
 
 function normalize(s){return String(s||"").replace(/[۰-۹]/g,d=>"۰۱۲۳۴۵۶۷۸۹".indexOf(d)).replace(/[٬،]/g,",").replace(/\s+/g," ").trim()}
