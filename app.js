@@ -1,16 +1,19 @@
-const KEY="hesabdar-v9";
+const KEY="hesabdar-v10";
 const defaultsExpense=["بنزین","غذا و رستوران","خرید خانه","خرید روزانه","قبض","اینترنت و شارژ","حمل‌ونقل","پوشاک","درمان","تفریح","هدیه","سایر"];
 const defaultsIncome=["حقوق","پاداش","واریز","فروش","دریافت از شخص","سایر"];
 const $=id=>document.getElementById(id);
 const fa=n=>new Intl.NumberFormat("fa-IR").format(Number(n)||0);
 const money=n=>fa(n)+" تومان";
 const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
-const uid=()=>crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random());
+const uid=()=>{try{if(globalThis.crypto&&typeof crypto.randomUUID==="function")return crypto.randomUUID()}catch(e){}return "id-"+Date.now()+"-"+Math.random().toString(36).slice(2)};
 const blankData=()=>({accounts:[],transactions:[],people:[],reminders:[],checks:[],expenseCats:defaultsExpense.map((name,i)=>({id:"e"+i,name})),incomeCats:defaultsIncome.map((name,i)=>({id:"i"+i,name})),pin:""});
+window.addEventListener("error",e=>{console.error(e.error||e.message)});
+window.addEventListener("unhandledrejection",e=>{console.error(e.reason)});
+
 let data;
 try{data=JSON.parse(localStorage.getItem(KEY)||"null")}catch{data=null}
 data=data||blankData();
-data.accounts??=[];data.transactions??=[];data.people??=[];data.reminders??=[];data.checks??=[];data.expenseCats??=defaultsExpense.map((name,i)=>({id:"e"+i,name}));data.incomeCats??=defaultsIncome.map((name,i)=>({id:"i"+i,name}));data.pin??="";
+data.accounts??=[];data.transactions??=[];data.people??=[];data.reminders??=[];data.checks??=[];data.expenseCats??=defaultsExpense.map((name,i)=>({id:"e"+i,name}));data.incomeCats??=defaultsIncome.map((name,i)=>({id:"i"+i,name}));data.pin=typeof data.pin==="string"?data.pin:"";
 let peopleMode="debt";
 function save(){localStorage.setItem(KEY,JSON.stringify(data));render()}
 function normalize(s){return String(s||"").replace(/[۰-۹]/g,d=>"۰۱۲۳۴۵۶۷۸۹".indexOf(d)).replace(/[٬،]/g,",").replace(/\s+/g," ").trim()}
@@ -43,9 +46,13 @@ function removePin(){
  data.pin="";save();alert("رمز حذف شد");
 }
 
-document.querySelectorAll(".nav").forEach(b=>b.addEventListener("click",()=>{
- document.querySelectorAll(".nav").forEach(x=>x.classList.remove("active"));b.classList.add("active");
- document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));const page=$(b.dataset.page);if(page)page.classList.add("active");
+document.querySelectorAll(".nav").forEach(b=>b.addEventListener("click",e=>{
+ e.preventDefault();
+ document.querySelectorAll(".nav").forEach(x=>x.classList.remove("active"));
+ b.classList.add("active");
+ document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));
+ const page=$(b.dataset.page);
+ if(page)page.classList.add("active");
  render();
 }));
 $("theme").onclick=()=>document.body.classList.toggle("dark");
