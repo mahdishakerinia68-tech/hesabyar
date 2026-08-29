@@ -1,4 +1,11 @@
 const KEY="hesabdar-v11";
+const SYNC_KEY="hesabdar-firebase-config-v1";
+const SYNC_META_KEY="hesabdar-sync-meta-v1";
+let sync={app:null,auth:null,db:null,user:null,unsubscribe:null,ready:false,saving:false,queued:false};
+function syncConfig(){try{return JSON.parse(localStorage.getItem(SYNC_KEY)||"null")}catch{return null}}
+function syncMeta(){try{return JSON.parse(localStorage.getItem(SYNC_META_KEY)||"{}")}catch{return {}}}
+function setSyncStatus(t){const e=$("syncStatus");if(e)e.textContent=t||""}
+
 const defaultsExpense=["بنزین","غذا و رستوران","خرید خانه","خرید روزانه","قبض","اینترنت و شارژ","حمل‌ونقل","پوشاک","درمان","تفریح","هدیه","سایر"];
 const defaultsIncome=["حقوق","پاداش","واریز","فروش","دریافت از شخص","سایر"];
 const $=id=>document.getElementById(id);
@@ -15,7 +22,70 @@ try{data=JSON.parse(localStorage.getItem(KEY)||"null")}catch{data=null}
 data=data||blankData();
 data.accounts??=[];data.transactions??=[];data.people??=[];data.reminders??=[];data.checks??=[];data.expenseCats??=defaultsExpense.map((name,i)=>({id:"e"+i,name}));data.incomeCats??=defaultsIncome.map((name,i)=>({id:"i"+i,name}));data.pin=typeof data.pin==="string"?data.pin:"";
 let peopleMode="debt";
-function save(){localStorage.setItem(KEY,JSON.stringify(data));render()}
+function save(){localStorage.setItem(KEY,JSON.stringify(data));render(); syncSave()}
+async function initSync(){
+  const cfg=syncConfig();
+  if(!cfg||!window.firebase)return;
+  try{
+    if(!sync.app)sync.app=firebase.apps.length?firebase.app():firebase.initializeApp(cfg);
+    sync.auth=firebase.auth(); sync.db=firebase.firestore();
+    sync.auth.onAuthStateChanged(async user=>{
+      sync.user=user;
+      if(sync.unsubscribe){sync.unsubscribe();sync.unsubscribe=null}
+      if(!user){sync.ready=false;setSyncStatus("☁️ اتصال تنظیم شده؛ وارد حساب همگام‌سازی شو.");return}
+      sync.ready=true;
+      const ref=sync.db.collection("users").doc(user.uid);
+      sync.unsubscribe=ref.onSnapshot(s=>{
+        if(!s.exists){ref.set({data,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});setSyncStatus("☁️ آماده همگام‌سازی");return}
+        const remote=s.data()?.data;
+        if(remote&&typeof remote==="object"&&!sync.saving){data={...blankData(),...remote};localStorage.setItem(KEY,JSON.stringify(data));render()}
+        setSyncStatus("☁️ همگام‌سازی فعال است");
+      },err=>setSyncStatus("⚠️ خطای همگام‌سازی: "+err.message));
+    });
+  }catch(e){console.error(e);setSyncStatus("⚠️ تنظیمات Firebase نامعتبر است") }
+}
+async function syncSave(){
+  if(!sync.ready||!sync.user||!sync.db)return;
+  sync.queued=true;
+  if(sync.saving)return;
+  sync.saving=true;
+  while(sync.queued){
+    sync.queued=false;
+    try{
+      await sync.db.collection("users").doc(sync.user.uid).set({data:JSON.parse(JSON.stringify(data)),updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    }catch(e){console.error(e);setSyncStatus("⚠️ ذخیره ابری انجام نشد: "+e.message)}
+  }
+  sync.saving=false;
+}
+function openSyncSettings(){
+ const c=syncConfig()||{};
+ openModal(`<h2>☁️ اتصال دو گوشی</h2><div class="form">
+ <p class="hint">این بخش فقط تنظیمات اتصال را روی همین دستگاه ذخیره می‌کند. اطلاعات Firebase را از Project settings کپی کن.</p>
+ <input id="fbApiKey" placeholder="apiKey" value="${esc(c.apiKey||"")}">
+ <input id="fbAuthDomain" placeholder="authDomain" value="${esc(c.authDomain||"")}">
+ <input id="fbProjectId" placeholder="projectId" value="${esc(c.projectId||"")}">
+ <input id="fbStorageBucket" placeholder="storageBucket (اختیاری)" value="${esc(c.storageBucket||"")}">
+ <input id="fbAppId" placeholder="appId" value="${esc(c.appId||"")}">
+ <hr><input id="syncEmail" type="email" placeholder="ایمیل حساب مشترک" autocomplete="username">
+ <input id="syncPass" type="password" placeholder="رمز حساب مشترک" autocomplete="current-password">
+ <button class="primary" onclick="saveSyncSettings()">ذخیره و اتصال</button>
+ <button onclick="createSyncAccount()">ساخت حساب همگام‌سازی</button>
+ <button onclick="logoutSync()">خروج از حساب</button>
+ </div>`);
+}
+async function saveSyncSettings(){
+ const cfg={apiKey:$('fbApiKey').value.trim(),authDomain:$('fbAuthDomain').value.trim(),projectId:$('fbProjectId').value.trim(),storageBucket:$('fbStorageBucket').value.trim(),appId:$('fbAppId').value.trim()};
+ if(!cfg.apiKey||!cfg.authDomain||!cfg.projectId||!cfg.appId)return alert("apiKey، authDomain، projectId و appId لازم است");
+ localStorage.setItem(SYNC_KEY,JSON.stringify(cfg));
+ try{await initSync();const email=$('syncEmail').value.trim(),pass=$('syncPass').value;if(email&&pass){await sync.auth.signInWithEmailAndPassword(email,pass);alert("اتصال و ورود انجام شد")}else alert("تنظیمات ذخیره شد؛ ایمیل و رمز را هم وارد کن تا وارد شوی");closeModal()}catch(e){alert("اتصال ناموفق: "+e.message)}}
+async function createSyncAccount(){
+ const email=$('syncEmail')?.value.trim(),pass=$('syncPass')?.value;if(!email||!pass)return alert("ایمیل و رمز را وارد کن");
+ const cfg={apiKey:$('fbApiKey').value.trim(),authDomain:$('fbAuthDomain').value.trim(),projectId:$('fbProjectId').value.trim(),storageBucket:$('fbStorageBucket').value.trim(),appId:$('fbAppId').value.trim()};
+ if(!cfg.apiKey||!cfg.authDomain||!cfg.projectId||!cfg.appId)return alert("اول اطلاعات Firebase را کامل کن");
+ localStorage.setItem(SYNC_KEY,JSON.stringify(cfg));
+ try{await initSync();await sync.auth.createUserWithEmailAndPassword(email,pass);alert("حساب ساخته شد. همین ایمیل و رمز را روی گوشی دوم هم استفاده کن.")}catch(e){alert("ساخت حساب ناموفق: "+e.message)}}
+async function logoutSync(){try{await sync.auth?.signOut();alert("از حساب همگام‌سازی خارج شد")}catch(e){alert(e.message)}}
+
 function normalize(s){return String(s||"").replace(/[۰-۹]/g,d=>"۰۱۲۳۴۵۶۷۸۹".indexOf(d)).replace(/[٬،]/g,",").replace(/\s+/g," ").trim()}
 function parseMoney(v){return Number(String(v).replace(/[^\d]/g,""))||0}
 
@@ -165,4 +235,4 @@ function drawChart(inc,exp){const c=$("chart");if(!c)return;const x=c.getContext
 function exportData(){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));a.download="hesabdar-backup.json";a.click()}
 function importData(e){const file=e.target.files?.[0];if(!file)return;const r=new FileReader();r.onload=()=>{try{data=JSON.parse(r.result);save();showLock();alert("بازیابی شد")}catch{alert("فایل نامعتبر است")}};r.readAsText(file)}
 function clearData(){if(confirm("همه اطلاعات حذف شود؟")){const pin=data.pin;data=blankData();data.pin=pin;save();}}
-showLock();render();
+showLock();render();initSync();

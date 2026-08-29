@@ -6,3 +6,4 @@
 .menu-grid .nav{cursor:pointer;border:1px solid #e5e7eb;transition:transform .15s,box-shadow .15s}
 .menu-grid .nav:active{transform:scale(.96)}
 @media(max-width:420px){.menu-grid{grid-template-columns:repeat(2,1fr)}}
+.sync-box{margin-top:12px}.sync-box h3{margin:0 0 8px}.sync-box .hint{margin:6px 0 10px}
