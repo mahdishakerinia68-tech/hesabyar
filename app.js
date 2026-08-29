@@ -1,4 +1,4 @@
-const KEY="hesabdar-v7";
+const KEY="hesabdar-v8";
 const defaultsExpense=["بنزین","غذا و رستوران","خرید خانه","خرید روزانه","قبض","اینترنت و شارژ","حمل‌ونقل","پوشاک","درمان","تفریح","هدیه","سایر"];
 const defaultsIncome=["حقوق","پاداش","واریز","فروش","دریافت از شخص","سایر"];
 let data=JSON.parse(localStorage.getItem(KEY)||"null")||{accounts:[],transactions:[],people:[],reminders:[],checks:[],expenseCats:defaultsExpense.map((name,i)=>({id:"e"+i,name})),incomeCats:defaultsIncome.map((name,i)=>({id:"i"+i,name})),pin:""};
@@ -33,8 +33,9 @@ function parseSMSAmount(text){
   const income=/واریز|دریافت|افزایش|بستانکار|credit|deposit|received/i.test(s);
   return {amount:nums[0]||0,type:expense&&!income?"expense":income&&!expense?"income":"","reason":expense&&!income?"کلمات پیامک":"کلمات پیامک"};
 }
-function ensurePin(){if(data.pin){lock.classList.remove("hidden");app.style.display="none"}else{lock.classList.add("hidden");app.style.display="block"}}
-function unlock(){if(!data.pin)return setPin(true);if(pinInput.value===data.pin){lock.classList.add("hidden");app.style.display="block";pinInput.value=""}else alert("رمز اشتباه است")}
+function createLock(){if(document.getElementById("lock"))return;const d=document.createElement("div");d.id="lock";d.className="lock hidden";d.innerHTML='<div class="lockbox"><h1>🔐 حسابدار</h1><p>رمز ورود را وارد کن</p><input id="pinInput" inputmode="numeric" maxlength="8" type="password" placeholder="رمز ورود"><button class="primary" onclick="unlock()">ورود</button></div>';document.body.prepend(d)}
+function ensurePin(){createLock();const hasPin=typeof data.pin==="string"&&data.pin.length>0;if(hasPin){lock.classList.remove("hidden");app.style.display="block";app.style.visibility="hidden"}else{lock.classList.add("hidden");app.style.display="block";app.style.visibility="visible"}}
+function unlock(){if(!data.pin){lock.classList.add("hidden");app.style.display="block";app.style.visibility="visible";return;}if(pinInput.value===data.pin){lock.classList.add("hidden");app.style.display="block";pinInput.value=""}else alert("رمز اشتباه است")}
 function setPin(first=false){let p=prompt(first?"برای حسابدار یک رمز ۴ تا ۸ رقمی تعیین کن":"رمز جدید ۴ تا ۸ رقمی:");if(p===null)return;if(!/^\d{4,8}$/.test(p))return alert("رمز باید ۴ تا ۸ رقم باشد");data.pin=p;save();ensurePin();alert("رمز با موفقیت فعال شد")}
 function resetPin(){setPin(false)}
 function clearPin(){if(confirm("رمز ورود حذف شود؟")){data.pin="";save();ensurePin()}}
@@ -56,7 +57,7 @@ function pickCategory(type,id){
 }
 function openTx(){
  if(!data.accounts.length)return alert("اول یک حساب بساز");
- modalBody.innerHTML='<h2>ثبت تراکنش</h2><div class="form"><div class="type-switch"><button id="expBtn" class="chosen" onclick="txType("expense")">💸 هزینه</button><button id="incBtn" onclick="txType("income")">💰 دریافت</button></div><input id="txKind" type="hidden" value="expense"><input id="title" placeholder="عنوان یا توضیح"><input id="amount" type="number" placeholder="مبلغ"><div id="expensePanel"><b id="catLabel">دسته هزینه را انتخاب کن</b>'+categoryButtons("expense")+'<input id="cat" type="hidden"></div><div id="incomePanel" style="display:none"><b id="incatLabel">دریافت برای چه بوده؟</b>'+categoryButtons("income")+'<input id="incat" type="hidden"></div>'+accountSelect()+"<button class="primary" onclick="addTx()">ثبت</button></div>';modal.classList.remove("hidden")
+ modalBody.innerHTML='<h2>ثبت تراکنش</h2><div class="form"><div class="type-switch"><button id="expBtn" class="chosen" onclick="txType('expense')">💸 هزینه</button><button id="incBtn" onclick="txType('income')">💰 دریافت</button></div><input id="txKind" type="hidden" value="expense"><input id="title" placeholder="عنوان یا توضیح"><input id="amount" type="number" placeholder="مبلغ"><div id="expensePanel"><b id="catLabel">دسته هزینه را انتخاب کن</b>'+categoryButtons("expense")+'<input id="cat" type="hidden"></div><div id="incomePanel" style="display:none"><b id="incatLabel">دریافت برای چه بوده؟</b>'+categoryButtons("income")+'<input id="incat" type="hidden"></div>'+accountSelect()+"<button class="primary" onclick="addTx()">ثبت</button></div>';modal.classList.remove("hidden")
 }
 function txType(t){
  txKind.value=t;
