@@ -1,11 +1,11 @@
 const KEY="hesabdar-v5";
 const defaultsExpense=["بنزین","غذا و رستوران","خرید خانه","خرید روزانه","قبض","اینترنت و شارژ","حمل‌ونقل","پوشاک","درمان","تفریح","هدیه","سایر"];
 const defaultsIncome=["حقوق","پاداش","واریز","فروش","دریافت از شخص","سایر"];
-let data=JSON.parse(localStorage.getItem(KEY)||"null")||{accounts:[],transactions:[],people:[],reminders:[],checks:[],expenseCats:defaultsExpense.map((name,i)=>({id:"e"+i,name})),incomeCats:defaultsIncome.map((name,i)=>({id:"i"+i,name})),pin:""};
+let data=JSON.parse(localStorage.getItem(KEY)||"null")||{accounts:[],transactions:[],people:[],reminders:[],checks:[],expenseCats:defaultsExpense.map((name,i)=>({id:"e"+i,name})),incomeCats:defaultsIncome.map((name,i)=>({id:"i"+i,name})),pin:"123456"};
 data.accounts??=[];data.transactions??=[];data.people??=[];data.reminders??=[];data.checks??=[];
 data.expenseCats??=defaultsExpense.map((name,i)=>({id:"e"+i,name}));
 data.incomeCats??=defaultsIncome.map((name,i)=>({id:"i"+i,name}));
-data.pin??="";
+data.pin??="123456";if(data.pin==="")data.pin="123456";
 const $=id=>document.getElementById(id);
 const fa=n=>new Intl.NumberFormat("fa-IR").format(Number(n)||0);
 const money=n=>fa(n)+" تومان";
