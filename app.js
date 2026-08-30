@@ -1,6 +1,6 @@
 const KEY="hesabdar-v40";
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="A6.1";
+const APP_VERSION="1.6";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
 const SYNC_INTERVAL=5000;
@@ -508,13 +508,13 @@ function addQuickRow(pref={}){
   const box=$("quickRows");if(!box)return;
   const cats=quickTxType==="expense"?data.expenseCats:data.incomeCats;
   const row=document.createElement("div");row.className="quick-row";
-  row.innerHTML=`<input class="quick-title" placeholder="${quickTxType==="expense"?"نام هزینه":"نام دریافتی"}" value="${esc(pref.title||"")}"><input class="quick-amount" type="number" inputmode="decimal" placeholder="مبلغ" value="${pref.amount||""}"><select class="quick-cat">${cats.map(c=>`<option value="${esc(c.name)}" ${pref.category===c.name?"selected":""}>${esc(c.name)}</option>`).join("")}</select><button type="button" class="danger-icon" onclick="this.parentElement.remove()">🗑</button>`;
+  row.innerHTML=`<div class="quick-fields"><input class="quick-title" placeholder="${quickTxType==="expense"?"نام هزینه":"نام دریافتی"}" value="${esc(pref.title||"")}"><input class="quick-amount" type="number" inputmode="decimal" placeholder="مبلغ" value="${pref.amount||""}"><select class="quick-cat">${cats.map(c=>`<option value="${esc(c.name)}" ${pref.category===c.name?"selected":""}>${esc(c.name)}</option>`).join("")}</select><select class="quick-account">${data.accounts.map(a=>`<option value="${a.id}" ${a.id===(pref.accountID||data.accounts[0]?.id)?"selected":""}>${esc(a.name)}</option>`).join("")}</select></div><button type="button" class="danger-icon quick-remove" onclick="this.parentElement.remove()">🗑</button>`;
   box.appendChild(row);
 }
 function saveQuickRows(){
   const rows=[...document.querySelectorAll("#quickRows .quick-row")];if(!rows.length)return alert("حداقل یک مورد اضافه کن");
-  const acc=data.accounts[0];let count=0;
-  for(const row of rows){const amount=parseMoney(row.querySelector(".quick-amount")?.value);if(!amount)continue;const category=row.querySelector(".quick-cat")?.value||"سایر";const title=row.querySelector(".quick-title")?.value.trim()||category;const nt=touch({id:uid(),title,amount,type:quickTxType,category,accountID:acc.id,date:new Date().toISOString(),source:"quick"});data.transactions.unshift(nt);markDirty("transactions",nt.id,false,nt,nt.updatedAt);logEvent(quickTxType==="expense"?"ثبت هزینه سریع":"ثبت دریافتی سریع",`${title} • ${money(amount)}`,"create");count++}
+  let count=0;
+  for(const row of rows){const amount=parseMoney(row.querySelector(".quick-amount")?.value);if(!amount)continue;const category=row.querySelector(".quick-cat")?.value||"سایر";const title=row.querySelector(".quick-title")?.value.trim()||category;const accountID=row.querySelector(".quick-account")?.value||data.accounts[0]?.id;if(!accountID)continue;const nt=touch({id:uid(),title,amount,type:quickTxType,category,accountID,date:new Date().toISOString(),source:"quick"});data.transactions.unshift(nt);markDirty("transactions",nt.id,false,nt,nt.updatedAt);logEvent(quickTxType==="expense"?"ثبت هزینه سریع":"ثبت دریافتی سریع",`${title} • ${money(amount)} • ${data.accounts.find(a=>a.id===accountID)?.name||""}`,"create");count++}
   if(!count)return alert("مبلغ حداقل یک مورد را وارد کن");save();closeModal();render();
 }
 function accountBalance(id){let a=data.accounts.find(x=>x.id===id),v=Number(a?.balance)||0;data.transactions.forEach(t=>{if(t.type==="income"&&t.accountID===id)v+=t.amount;if(t.type==="expense"&&t.accountID===id)v-=t.amount;if(t.type==="transfer"){if(t.from===id)v-=t.amount;if(t.destinationType!=="other"&&t.to===id)v+=t.amount}});return v}
