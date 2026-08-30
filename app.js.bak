@@ -1,7 +1,7 @@
 const KEY="hesabdar-v11";
 const SYNC_KEY="hesabdar-firebase-config-v1";
 const SYNC_META_KEY="hesabdar-sync-meta-v2";
-const APP_VERSION="1.1.5";
+const APP_VERSION="1.1.4";
 // Firebase project configuration supplied for this app.
 // This is safe to ship in a web app; access is protected by Firebase Authentication + Firestore Rules.
 const DEFAULT_SYNC_CONFIG={
@@ -28,8 +28,6 @@ const uid=()=>{try{if(globalThis.crypto&&typeof crypto.randomUUID==="function")r
 const blankData=()=>({accounts:[],transactions:[],people:[],reminders:[],checks:[],expenseCats:defaultsExpense.map((name,i)=>({id:"e"+i,name})),incomeCats:defaultsIncome.map((name,i)=>({id:"i"+i,name})),pin:""});
 window.addEventListener("error",e=>{console.error(e.error||e.message)});
 window.addEventListener("unhandledrejection",e=>{console.error(e.reason)});
-window.addEventListener("online",()=>{if(sync.db)sync.db.enableNetwork().catch(console.error);setSyncStatus("🌐 اینترنت برقرار شد؛ در حال اتصال به ابر...")});
-window.addEventListener("offline",()=>setSyncStatus("⚠️ اینترنت دستگاه قطع است"));
 
 let data;
 try{data=JSON.parse(localStorage.getItem(KEY)||"null")}catch{data=null}
@@ -87,12 +85,7 @@ async function initSync(){
   if(!cfg||!window.firebase)return;
   try{
     if(!sync.app)sync.app=firebase.apps.length?firebase.app():firebase.initializeApp(cfg);
-    sync.auth=firebase.auth();
-    sync.db=firebase.firestore();
-    // iOS/Safari and some networks can have trouble with Firestore WebChannel.
-    // Force long-polling and explicitly bring the Firestore client online.
-    try{sync.db.settings({experimentalForceLongPolling:true});}catch(e){console.warn("Firestore settings",e)}
-    try{await sync.db.enableNetwork();}catch(e){console.warn("Firestore enableNetwork",e)}
+    sync.auth=firebase.auth(); sync.db=firebase.firestore();
     if(sync.authListener)return;
     sync.authListener=true;
     sync.auth.onAuthStateChanged(async user=>{
@@ -136,7 +129,6 @@ function pushToCloud(){
 async function pullFromCloud(){
   if(!sync.user||!sync.db)return alert("اول با حساب همگام‌سازی وارد شو");
   try{
-    try{await sync.db.enableNetwork();}catch(e){console.warn("enableNetwork before pull",e)}
     const s=await sync.db.collection("users").doc(sync.user.uid).get();
     if(!s.exists||!s.data()?.data)return alert("هنوز اطلاعاتی در ابر وجود ندارد");
     data=mergeData(s.data().data);localStorage.setItem(KEY,JSON.stringify(data));render();setSyncStatus("☁️ اطلاعات از ابر دریافت شد — "+dataSummary(data));alert("اطلاعات ابری دریافت شد\n"+dataSummary(data))
