@@ -1,6 +1,6 @@
 {
-  "name": "حسابدار A2",
-  "short_name": "حسابدار A2",
+  "name": "حسابدار A5",
+  "short_name": "حسابدار A5",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#f4f7fb",
@@ -8,5 +8,5 @@
   "lang": "fa",
   "dir": "rtl",
   "icons": [],
-  "version": "A2"
+  "version": "A5"
 }

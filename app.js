@@ -533,18 +533,18 @@ function previewInvoice(id){
  openModal(`<div id="invoicePreview" class="invoice-preview"><div class="invoice-head"><div><h2>فاکتور</h2><b>${esc(inv.seller||"")}</b></div><div>شماره: ${esc(inv.number||"—")}<br>تاریخ: ${invoiceDateLabel(inv.date)}</div></div><h3>${esc(inv.name||"فاکتور")}</h3><div class="preview-inv-row head"><b>توضیحات</b><b>تعداد</b><b>مبلغ واحد</b><b>مبلغ</b></div>${rows}<div class="preview-total">جمع کل: <strong>${money(invoiceTotal(inv))}</strong></div></div><button class="primary" onclick="shareInvoice('${inv.id}')">📤 ارسال فاکتور به‌صورت عکس</button>`)
 }
 function drawInvoiceCanvas(inv){
- const W=1200, rowH=78, H=Math.max(850,430+(inv.items||[]).length*rowH);
+ const W=794, rowH=58, H=Math.max(1123,520+(inv.items||[]).length*rowH);
  const c=document.createElement("canvas");c.width=W;c.height=H;const x=c.getContext("2d");
  x.fillStyle="#fff";x.fillRect(0,0,W,H);x.fillStyle="#17352b";x.textAlign="right";x.direction="rtl";
- x.font="bold 48px sans-serif";x.fillText("فاکتور",W-70,75);
- x.font="bold 30px sans-serif";x.fillText(inv.seller||"فروشگاه / فروشنده",W-70,130);
- x.font="24px sans-serif";x.fillStyle="#56645f";x.fillText("شماره: "+(inv.number||"—"),W-70,175);x.fillText("تاریخ: "+invoiceDateLabel(inv.date),W-360,175);
- x.fillStyle="#17352b";x.font="bold 28px sans-serif";x.fillText(inv.name||"فاکتور",W-70,235);
- let y=300;x.fillStyle="#eaf2ee";x.fillRect(55,y-45,W-110,60);x.fillStyle="#17352b";x.font="bold 22px sans-serif";
- x.fillText("مبلغ",W-75,y-8);x.fillText("مبلغ واحد",W-350,y-8);x.fillText("تعداد",W-650,y-8);x.fillText("توضیحات",W-790,y-8);
- x.font="24px sans-serif";
- (inv.items||[]).forEach((it,i)=>{y+=rowH;x.fillStyle=i%2?"#fafcfb":"#fff";x.fillRect(55,y-50,W-110,rowH);x.fillStyle="#23312c";x.fillText(money((Number(it.qty)||0)*(Number(it.price)||0)),W-75,y);x.fillText(money(it.price),W-350,y);x.fillText(fa(it.qty),W-650,y);x.fillText(it.desc||"—",W-790,y);});
- y+=55;x.fillStyle="#17352b";x.font="bold 32px sans-serif";x.fillText("جمع کل: "+money(invoiceTotal(inv)),W-75,y);
+ x.font="bold 34px sans-serif";x.fillText("فاکتور",W-45,55);
+ x.font="bold 22px sans-serif";x.fillText(inv.seller||"فروشگاه / فروشنده",W-45,95);
+ x.font="17px sans-serif";x.fillStyle="#56645f";x.fillText("شماره: "+(inv.number||"—"),W-45,130);x.fillText("تاریخ: "+invoiceDateLabel(inv.date),W-245,130);
+ x.fillStyle="#17352b";x.font="bold 21px sans-serif";x.fillText(inv.name||"فاکتور",W-45,180);
+ let y=245;x.fillStyle="#eaf2ee";x.fillRect(28,y-32,W-56,45);x.fillStyle="#17352b";x.font="bold 14px sans-serif";
+ x.fillText("مبلغ",W-38,y-8);x.fillText("مبلغ واحد",W-230,y-8);x.fillText("تعداد",W-400,y-8);x.fillText("توضیحات",W-490,y-8);
+ x.font="15px sans-serif";
+ (inv.items||[]).forEach((it,i)=>{y+=rowH;x.fillStyle=i%2?"#fafcfb":"#fff";x.fillRect(55,y-50,W-110,rowH);x.fillStyle="#23312c";x.fillText(money((Number(it.qty)||0)*(Number(it.price)||0)),W-38,y);x.fillText(money(it.price),W-230,y);x.fillText(fa(it.qty),W-400,y);x.fillText(it.desc||"—",W-490,y);});
+ y+=45;x.fillStyle="#17352b";x.font="bold 20px sans-serif";x.fillText("جمع کل: "+money(invoiceTotal(inv)),W-38,y);
  return c
 }
 async function shareInvoice(id){
@@ -552,7 +552,7 @@ async function shareInvoice(id){
  const c=drawInvoiceCanvas(inv);
  const blob=await new Promise(r=>c.toBlob(r,"image/jpeg",.9));const file=new File([blob],`${(inv.name||"فاکتور").replace(/[\\/:*?"<>|]/g,"_")}.jpg`,{type:"image/jpeg"});
  try{
-  if(navigator.share&&(!navigator.canShare||navigator.canShare({files:[file]}))){await navigator.share({title:inv.name||"فاکتور",text:"فاکتور",files:[file]});return}
+  if(navigator.share&&(!navigator.canShare||navigator.canShare({files:[file]}))){await navigator.share({title:inv.name||"فاکتور",text:`${inv.name||"فاکتور"} • ${money(invoiceTotal(inv))}`,files:[file]});return}
  }catch(e){if(e?.name==="AbortError")return}
  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=file.name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);alert("عکس فاکتور آماده شد؛ از گزینه اشتراک گوشی می‌توانی ارسالش کنی.")
 }
