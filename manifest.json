@@ -1,11 +1,12 @@
 {
   "name": "حسابدار ۴.۱.۰",
   "short_name": "حسابدار ۴.۱",
-  "start_url": ".",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#f4f7fb",
   "theme_color": "#111827",
   "lang": "fa",
   "dir": "rtl",
-  "icons": []
+  "icons": [],
+  "version": "4.2.0"
 }
