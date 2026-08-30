@@ -1,6 +1,6 @@
 {
-  "name": "حسابدار ۴.۱.۰",
-  "short_name": "حسابدار ۴.۱",
+  "name": "حسابدار A1",
+  "short_name": "حسابدار A1",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#f4f7fb",
@@ -8,5 +8,5 @@
   "lang": "fa",
   "dir": "rtl",
   "icons": [],
-  "version": "4.2.0"
+  "version": "A1"
 }
