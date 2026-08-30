@@ -46,7 +46,7 @@ async function upsertReminderForNote(note){if(!note?.id)return;const linked=(dat
 async function syncAllNotesToReminders(){let changed=false;const noteIds=new Set((data.notes||[]).map(n=>n.id));for(const n of data.notes||[]){const before=(data.reminders||[]).length;await upsertReminderForNote(n);if((data.reminders||[]).length!==before)changed=true}for(const r of [...(data.reminders||[])]){if(r.sourceNoteId&&!noteIds.has(r.sourceNoteId)){await cancelNativeReminder(r.id);removeRecordSilent("reminders",r.id);changed=true}}if(changed)save();else render();if(sync.db)syncSave()}
 async function removeReminderForNote(noteId){const matches=(data.reminders||[]).filter(r=>r.sourceNoteId===noteId);for(const r of matches){await cancelNativeReminder(r.id);removeRecordSilent("reminders",r.id)}if(matches.length)save()}
 
-const blankData=()=>({accounts:[],transactions:[],people:[],reminders:[],notes:[],checks:[],audit:[],expenseCats:defaultsExpense.map((name,i)=>({id:"e"+i,name})),incomeCats:defaultsIncome.map((name,i)=>({id:"i"+i,name})),pin:""});
+const blankData=()=>({accounts:[],transactions:[],people:[],reminders:[],notes:[],checks:[],invoices:[],audit:[],expenseCats:defaultsExpense.map((name,i)=>({id:"e"+i,name})),incomeCats:defaultsIncome.map((name,i)=>({id:"i"+i,name})),pin:""});
 window.addEventListener("error",e=>{console.error(e.error||e.message)});
 window.addEventListener("unhandledrejection",e=>{console.error(e.reason)});
 window.addEventListener("online",()=>{if(sync.db)sync.db.enableNetwork().catch(console.error);setSyncStatus("🌐 اینترنت برقرار شد؛ در حال اتصال به ابر...")});
@@ -55,7 +55,7 @@ window.addEventListener("offline",()=>setSyncStatus("⚠️ اینترنت دس�
 let data;
 try{data=JSON.parse(localStorage.getItem(KEY)||localStorage.getItem("hesabdar-v20")||localStorage.getItem("hesabdar-v11")||"null")}catch{data=null}
 data=data||blankData();
-data.accounts??=[];data.transactions??=[];data.people??=[];data.reminders??=[];data.notes??=[];data.checks??=[];data.audit??=[];data.expenseCats??=defaultsExpense.map((name,i)=>({id:"e"+i,name}));data.incomeCats??=defaultsIncome.map((name,i)=>({id:"i"+i,name}));data.pin=typeof data.pin==="string"?data.pin:"";data._sync??={tombstones:{}};data._sync.tombstones??={};for(const k of ["accounts","transactions","people","reminders","notes","checks","expenseCats","incomeCats"]){for(const r of data[k]){r.id??=uid();r.updatedAt??=new Date().toISOString()}}
+data.accounts??=[];data.transactions??=[];data.people??=[];data.reminders??=[];data.notes??=[];data.checks??=[];data.invoices??=[];data.audit??=[];data.expenseCats??=defaultsExpense.map((name,i)=>({id:"e"+i,name}));data.incomeCats??=defaultsIncome.map((name,i)=>({id:"i"+i,name}));data.pin=typeof data.pin==="string"?data.pin:"";data._sync??={tombstones:{}};data._sync.tombstones??={};for(const k of ["accounts","transactions","people","reminders","notes","checks","invoices","expenseCats","incomeCats"]){for(const r of data[k]){r.id??=uid();r.updatedAt??=new Date().toISOString()}}
 // Normalize older people records so saved debtors/creditors always render correctly.
 for(const p of data.people){if(p.type==="debtor"||p.type==="debtors"||p.type==="بدهکار")p.type="debt";if(p.type==="creditor"||p.type==="creditors"||p.type==="طلبکار"||p.type==="بستانکار")p.type="credit";if(p.type!=="debt"&&p.type!=="credit")p.type="debt";p.amount=Number(p.amount)||0;p.paid=Number(p.paid)||0;p.name=String(p.name||"").trim()} 
 let peopleMode="debt";
@@ -78,7 +78,7 @@ function clearAudit(){if(!data.audit?.length)return alert("گزارشی برای
 function save(){localStorage.setItem(KEY,JSON.stringify(data));render();syncSave()}
 function hasMeaningfulData(d){
   if(!d||typeof d!=="object")return false;
-  return ["accounts","transactions","people","reminders","notes","checks"].some(k=>Array.isArray(d[k])&&d[k].length>0);
+  return ["accounts","transactions","people","reminders","notes","checks","invoices"].some(k=>Array.isArray(d[k])&&d[k].length>0);
 }
 function mergeData(remote){
   const base=blankData();
@@ -92,7 +92,7 @@ function cloudDoc(){return sync.db.collection("users").doc(sync.user.uid)}
 function recordsCollection(){return cloudDoc().collection("records")}
 function recordDocId(type,id){return `${type}__${id}`}
 function allSyncRecords(){
-  const ks=["accounts","transactions","people","reminders","notes","checks","expenseCats","incomeCats","audit"];
+  const ks=["accounts","transactions","people","reminders","notes","checks","invoices","expenseCats","incomeCats","audit"];
   const out=[];
   for(const k of ks) for(const r of (data[k]||[])) out.push({id:recordDocId(k,r.id),type:k,record:r,updatedAt:r.updatedAt||new Date().toISOString(),deleted:false});
   for(const k of ks) for(const [id,dt] of Object.entries(data._sync?.tombstones?.[k]||{})) out.push({id:recordDocId(k,id),type:k,record:{id},updatedAt:dt,deleted:true});
@@ -107,7 +107,7 @@ function markDirty(type,id,deleted=false,record=null,updatedAt=null){
   sync.dirty.set(recordDocId(type,id),{id:recordDocId(type,id),type,record:deleted?{id}:record,updatedAt:updatedAt||record?.updatedAt||new Date().toISOString(),deleted});
 }
 function markAllLocalDirty(){
-  const ks=["accounts","transactions","people","reminders","notes","checks","expenseCats","incomeCats","audit"];
+  const ks=["accounts","transactions","people","reminders","notes","checks","invoices","expenseCats","incomeCats","audit"];
   for(const k of ks) for(const r of (data[k]||[])) markDirty(k,r.id,false,r,r.updatedAt);
   for(const k of ks) for(const [id,dt] of Object.entries(data._sync?.tombstones?.[k]||{})) markDirty(k,id,true,{id},dt);
 }
@@ -133,7 +133,7 @@ async function pullRest(){
   return snap.docs.map(d=>d.data());
 }
 function recordsFromLocal(){
-  const ks=["accounts","transactions","people","reminders","notes","checks","expenseCats","incomeCats","audit"],out=[];
+  const ks=["accounts","transactions","people","reminders","notes","checks","invoices","expenseCats","incomeCats","audit"],out=[];
   for(const k of ks) for(const r of (data[k]||[])) out.push({id:recordDocId(k,r.id),type:k,record:r,updatedAt:r.updatedAt||new Date().toISOString(),deleted:false});
   for(const k of ks) for(const [id,dt] of Object.entries(data._sync?.tombstones?.[k]||{})) out.push({id:recordDocId(k,id),type:k,record:{id},updatedAt:dt,deleted:true});
   return out;
@@ -148,7 +148,7 @@ async function reconcileInitial(remote){
   if(outgoing.length) await pushRest(outgoing);
 }
 function mergeCloud(remote){
-  const ks=["accounts","transactions","people","reminders","notes","checks","expenseCats","incomeCats","audit"];
+  const ks=["accounts","transactions","people","reminders","notes","checks","invoices","expenseCats","incomeCats","audit"];
   let changed=false;
   const remoteMap=new Map();
   for(const x of (remote||[])){if(!x?.type||!x?.record?.id)continue;remoteMap.set(recordDocId(x.type,x.record.id),x)}
@@ -319,6 +319,7 @@ document.querySelectorAll(".nav").forEach(b=>b.addEventListener("click",e=>{
  render();
  logEvent("ورود به بخش",page?.querySelector("h2")?.textContent||b.textContent.trim(),"nav");
 }));
+document.addEventListener("input",e=>{if(e.target.closest("#invoiceRows"))updateInvoiceLiveTotal()});
 $("theme").onclick=()=>{const dark=document.body.classList.toggle("dark");logEvent("تغییر تم",dark?"حالت شیشه‌ای تیره فعال شد":"حالت شیشه‌ای روشن فعال شد","settings")};
 $("menuBtn").onclick=()=>{$("menuModal").classList.remove("hidden");logEvent("باز کردن منو","منوی اصلی","nav")};
 function closeMenu(){$("menuModal").classList.add("hidden")}
@@ -360,10 +361,41 @@ function cardActions(a){
 }
 function deleteAccount(id){const a=data.accounts.find(x=>x.id===id);if(!a)return;if(confirm("این حساب و تراکنش‌های مرتبط با آن حذف شوند؟")){const related=data.transactions.filter(t=>t.accountID===id||t.from===id||t.to===id);related.forEach(t=>removeRecord("transactions",t.id));removeRecord("accounts",id);logEvent("حذف حساب",`${a.name} • ${related.length} تراکنش مرتبط حذف شد`,"delete")}}
 function categoryButtons(type,selected=""){const arr=type==="expense"?data.expenseCats:data.incomeCats;return `<div class="category-window">${arr.map(c=>`<button type="button" class="cat-btn ${c.name===selected?"selected-cat":""}" onclick="pickCategory('${type}','${c.id}')">${esc(c.name)}</button>`).join("")}</div>`}
-function openTx(id=null){if(!data.accounts.length)return alert("اول از بخش حساب‌ها یک حساب اضافه کنید");const t=id&&data.transactions.find(x=>x.id===id);if(t?.type==="transfer")return openTransfer(id);const typ=t?.type||"expense";openModal(`<h2>${t?"ویرایش تراکنش":"ثبت تراکنش"}</h2><div class="form"><div class="type-switch"><button type="button" id="expBtn" class="${typ==="expense"?"chosen":""}" onclick="txType('expense')">💸 هزینه</button><button type="button" id="incBtn" class="${typ==="income"?"chosen":""}" onclick="txType('income')">💰 دریافت</button></div><input id="txKind" type="hidden" value="${typ}"><input id="title" placeholder="عنوان" value="${esc(t?.title||"")}"><input id="amount" type="number" placeholder="مبلغ" value="${Number(t?.amount)||""}"><div id="expensePanel" style="display:${typ==="expense"?"block":"none"}"><b id="catLabel">${t?.category?"دسته هزینه: "+esc(t.category):"دسته هزینه را انتخاب کنید"}</b>${categoryButtons("expense",typ==="expense"?t?.category:"")}<input id="cat" type="hidden" value="${esc(typ==="expense"?t?.category||"":"")}"></div><div id="incomePanel" style="display:${typ==="income"?"block":"none"}"><b id="incatLabel">${t?.category?"نوع دریافت: "+esc(t.category):"نوع دریافت را انتخاب کنید"}</b>${categoryButtons("income",typ==="income"?t?.category:"")}<input id="incat" type="hidden" value="${esc(typ==="income"?t?.category||"":"")}"></div>${accountSelect("acc",t?.accountID||"")}<button class="primary" onclick="saveTx('${t?.id||""}')">${t?"ذخیره تغییرات":"ثبت تراکنش"}</button></div>`)}
+function openTx(id=null){if(!data.accounts.length)return alert("اول از بخش حساب‌ها یک حساب اضافه کنید");const t=id&&data.transactions.find(x=>x.id===id);if(t?.type==="transfer")return openTransfer(id);const typ=t?.type||"expense";openModal(`<h2>${t?"ویرایش تراکنش":"ثبت تراکنش"}</h2><div class="form"><div class="type-switch"><button type="button" id="expBtn" class="${typ==="expense"?"chosen":""}" onclick="txType('expense')">💸 هزینه</button><button type="button" id="incBtn" class="${typ==="income"?"chosen":""}" onclick="txType('income')">💰 دریافت</button></div><input id="txKind" type="hidden" value="${typ}"><input id="title" placeholder="عنوان" value="${esc(t?.title||"")}"><input id="amount" type="number" placeholder="مبلغ" value="${Number(t?.amount)||""}"><div id="expensePanel" style="display:${typ==="expense"?"block":"none"}"><b id="catLabel">${t?.category?"دسته هزینه: "+esc(t.category):"دسته هزینه را انتخاب کنید"}</b>${categoryButtons("expense",typ==="expense"?t?.category:"")}<input id="cat" type="hidden" value="${esc(typ==="expense"?t?.category||"":"")}"></div><div id="incomePanel" style="display:${typ==="income"?"block":"none"}"><b id="incatLabel">${t?.category?"نوع دریافت: "+esc(t.category):"نوع دریافت را انتخاب کنید"}</b>${categoryButtons("income",typ==="income"?t?.category:"")}<input id="incat" type="hidden" value="${esc(typ==="income"?t?.category||"":"")}"></div>${accountSelect("acc",t?.accountID||"")}<label class="file-label">📎 تصویر پیوست (اختیاری)<input id="txImage" type="file" accept="image/*" onchange="previewTxImage(this)"></label>${t?.image?`<div class="attachment-preview"><img src="${t.image}" alt="پیوست"></div>`:""}<div id="txImagePreview"></div><button class="primary" onclick="saveTx('${t?.id||""}')">${t?"ذخیره تغییرات":"ثبت تراکنش"}</button></div>`)}
 function txType(t){$("txKind").value=t;$("expBtn").classList.toggle("chosen",t==="expense");$("incBtn").classList.toggle("chosen",t==="income");$("expensePanel").style.display=t==="expense"?"block":"none";$("incomePanel").style.display=t==="income"?"block":"none"}
 function pickCategory(type,id){const c=(type==="expense"?data.expenseCats:data.incomeCats).find(x=>x.id===id);if(!c)return;if(type==="expense"){$("cat").value=c.name;$("catLabel").textContent="دسته هزینه: "+c.name}else{$("incat").value=c.name;$(("incatLabel")).textContent="نوع دریافت: "+c.name}}
-function saveTx(id){const amount=parseMoney($("amount").value),type=$("txKind").value,category=type==="expense"?$("cat").value:$("incat").value;if(!amount)return alert("مبلغ را وارد کنید");if(!category)return alert("دسته را انتخاب کنید");if(id){const t=data.transactions.find(x=>x.id===id);Object.assign(t,{title:$("title").value.trim()||category,amount,type,category,accountID:$("acc").value});touch(t);markDirty("transactions",t.id,false,t,t.updatedAt)}else{const nt=touch({id:uid(),title:$("title").value.trim()||category,amount,type,category,accountID:$("acc").value,date:new Date().toISOString(),source:"manual"});data.transactions.unshift(nt);markDirty("transactions",nt.id,false,nt,nt.updatedAt)}save();logEvent(id?"ویرایش تراکنش":"ایجاد تراکنش",`${$("title").value.trim()||category} • ${money(amount)}`,id?"edit":"create");closeModal()}
+async function saveTx(id){
+ const amount=parseMoney($("amount").value),type=$("txKind").value,category=type==="expense"?$("cat").value:$("incat").value;
+ if(!amount)return alert("مبلغ را وارد کنید");if(!category)return alert("دسته را انتخاب کنید");
+ let image=null; const file=$("txImage")?.files?.[0];
+ if(file){try{image=await compressImage(file,1200,.72)}catch(e){console.warn(e)}}
+ if(id){
+  const t=data.transactions.find(x=>x.id===id); if(!t)return;
+  Object.assign(t,{title:$("title").value.trim()||category,amount,type,category,accountID:$("acc").value});
+  if(image)t.image=image;
+  touch(t);markDirty("transactions",t.id,false,t,t.updatedAt);
+ }else{
+  const nt=touch({id:uid(),title:$("title").value.trim()||category,amount,type,category,accountID:$("acc").value,date:new Date().toISOString(),source:"manual"});
+  if(image)nt.image=image;
+  data.transactions.unshift(nt);markDirty("transactions",nt.id,false,nt,nt.updatedAt);
+ }
+ save();logEvent(id?"ویرایش تراکنش":"ایجاد تراکنش",`${$("title").value.trim()||category} • ${money(amount)}`,id?"edit":"create");closeModal()
+}
+function compressImage(file,max=1200,quality=.72){
+ return new Promise((resolve,reject)=>{
+  const r=new FileReader();r.onerror=reject;r.onload=()=>{
+   const img=new Image();img.onload=()=>{
+    const scale=Math.min(1,max/Math.max(img.width,img.height)),c=document.createElement("canvas");
+    c.width=Math.max(1,Math.round(img.width*scale));c.height=Math.max(1,Math.round(img.height*scale));
+    c.getContext("2d").drawImage(img,0,0,c.width,c.height);resolve(c.toDataURL("image/jpeg",quality));
+   };img.onerror=reject;img.src=r.result;
+  };r.readAsDataURL(file)
+ })
+}
+function previewTxImage(input){
+ const f=input?.files?.[0],box=$("txImagePreview");if(!box||!f)return;
+ const r=new FileReader();r.onload=()=>box.innerHTML=`<div class="attachment-preview"><img src="${r.result}" alt="پیش‌نمایش"></div>`;r.readAsDataURL(f)
+}
 function saveBankTx(type,amount,accountID){const nt=touch({id:uid(),title:$("bt").value.trim()||"تراکنش بانکی",amount,type,category:$("bc").value,accountID,date:new Date().toISOString(),source:"bank"});data.transactions.unshift(nt);markDirty("transactions",nt.id,false,nt,nt.updatedAt);save();logEvent("ایجاد تراکنش بانکی",`${nt.title} • ${money(nt.amount)}`,"create");closeModal()}
 function openTransfer(id=null){if(data.accounts.length<2)return alert("برای انتقال حداقل دو حساب لازم است");const t=id&&data.transactions.find(x=>x.id===id);openModal(`<h2>${t?"ویرایش انتقال":"انتقال بین حساب‌ها"}</h2><div class="form">${accountSelect("from",t?.from||data.accounts[0].id)}<span style="text-align:center">↓</span>${accountSelect("to",t?.to||data.accounts[1].id)}<input id="tam" type="number" placeholder="مبلغ" value="${Number(t?.amount)||""}"><input id="tnote" placeholder="توضیحات" value="${esc(t?.title||"")}"><button class="primary" onclick="saveTransfer('${t?.id||""}')">${t?"ذخیره تغییرات":"انتقال"}</button></div>`)}
 function saveTransfer(id){if($("from").value===$("to").value)return alert("مبدأ و مقصد باید متفاوت باشند");const amount=parseMoney($("tam").value);if(!amount)return alert("مبلغ را وارد کنید");const o={title:$("tnote").value.trim()||"انتقال بین حساب‌ها",amount,type:"transfer",from:$("from").value,to:$("to").value,source:"transfer"};if(id){const t=data.transactions.find(x=>x.id===id);Object.assign(t,o);touch(t);markDirty("transactions",t.id,false,t,t.updatedAt)}else{const nt=touch({id:uid(),date:new Date().toISOString(),...o});data.transactions.unshift(nt);markDirty("transactions",nt.id,false,nt,nt.updatedAt)}save();logEvent(id?"ویرایش انتقال":"ایجاد انتقال",`${money(amount)}` ,id?"edit":"create");closeModal()}
@@ -452,8 +484,78 @@ function saveQuickRows(){
 }
 function accountBalance(id){let a=data.accounts.find(x=>x.id===id),v=Number(a?.balance)||0;data.transactions.forEach(t=>{if(t.type==="income"&&t.accountID===id)v+=t.amount;if(t.type==="expense"&&t.accountID===id)v-=t.amount;if(t.type==="transfer"){if(t.from===id)v-=t.amount;if(t.to===id)v+=t.amount}});return v}
 function actionButtons(editFn,deleteFn,id){return `<div class="actions"><button type="button" title="ویرایش" onclick="${editFn}(\'${id}\')">✏️</button><button type="button" class="danger-icon" title="حذف" onclick="${deleteFn}(\'${id}\')">🗑</button></div>`}
-function txHTML(t){if(t.type==="transfer")return `<div class="item"><div><b>↔ ${esc(t.title)}</b><div class="meta">${esc(data.accounts.find(a=>a.id===t.from)?.name||"")} ← ${esc(data.accounts.find(a=>a.id===t.to)?.name||"")}</div></div><div><strong>${money(t.amount)}</strong>${actionButtons("openTransfer","deleteTx",t.id)}</div></div>`;let a=data.accounts.find(x=>x.id===t.accountID),sign=t.type==="income"?"+":"−";return `<div class="item"><div><b>${esc(t.title)}</b><div class="meta">${esc(t.category||"")} • ${a?esc(a.name):""} • ${t.source==="bank"?"بانکی":"دستی"}</div></div><div><strong class="${t.type}">${sign}${money(t.amount)}</strong>${actionButtons("openTx","deleteTx",t.id)}</div></div>`}
+function txHTML(t){if(t.type==="transfer")return `<div class="item"><div><b>↔ ${esc(t.title)}</b><div class="meta">${esc(data.accounts.find(a=>a.id===t.from)?.name||"")} ← ${esc(data.accounts.find(a=>a.id===t.to)?.name||"")}</div></div><div><strong>${money(t.amount)}</strong>${actionButtons("openTransfer","deleteTx",t.id)}</div></div>`;let a=data.accounts.find(x=>x.id===t.accountID),sign=t.type==="income"?"+":"−";return `<div class="item"><div><b>${esc(t.title)}</b><div class="meta">${esc(t.category||"")} • ${a?esc(a.name):""} • ${t.source==="bank"?"بانکی":"دستی"}</div>${t.image?`<img class="tx-thumb" src="${t.image}" alt="پیوست" onclick="viewImage('${t.id}')">`:""}</div><div><strong class="${t.type}">${sign}${money(t.amount)}</strong>${actionButtons("openTx","deleteTx",t.id)}</div></div>`}
+function viewImage(id){const t=data.transactions.find(x=>x.id===id);if(!t?.image)return;openModal(`<h2>📎 تصویر پیوست</h2><div class="attachment-large"><img src="${t.image}" alt="پیوست"></div>`)}
 function empty(s){return `<div class="card" style="text-align:center">${s}</div>`}
+
+function invoiceTotal(inv){return (inv.items||[]).reduce((s,x)=>s+(Number(x.qty)||0)*(Number(x.price)||0),0)}
+function invoiceDateLabel(v){if(!v)return "";try{return new Date(v+"T12:00:00").toLocaleDateString("fa-IR")}catch{return v}}
+function invoiceRowHTML(item,i){return `<div class="invoice-row"><input class="inv-desc" placeholder="شرح کالا / خدمات" value="${esc(item?.desc||"")}"><input class="inv-qty" type="number" min="0" step="any" placeholder="تعداد" value="${Number(item?.qty)||""}"><input class="inv-price" type="number" min="0" step="any" placeholder="مبلغ واحد" value="${Number(item?.price)||""}"><button type="button" class="danger-icon" onclick="this.parentElement.remove()">🗑</button></div>`}
+function addInvoiceRow(pref={}){const box=$("invoiceRows");if(!box)return;const div=document.createElement("div");div.innerHTML=invoiceRowHTML(pref,box.children.length);box.appendChild(div.firstElementChild)}
+function openInvoice(id=null){
+ const inv=id&&data.invoices.find(x=>x.id===id);
+ const items=inv?.items?.length?inv.items:[{desc:"",qty:1,price:""}];
+ openModal(`<h2>🧾 ${inv?"ویرایش فاکتور":"ساخت فاکتور"}</h2><div class="form">
+ <input id="invName" placeholder="نام فاکتور (مثلاً فاکتور فروش مرداد)" value="${esc(inv?.name||"")}">
+ <input id="invSeller" placeholder="نام فروشنده / فروشگاه" value="${esc(inv?.seller||"")}">
+ <div class="two-fields"><input id="invDate" type="date" value="${esc(inv?.date||new Date().toISOString().slice(0,10))}"><input id="invNo" placeholder="شماره فاکتور" value="${esc(inv?.number||"")}"></div>
+ <div class="invoice-table-head"><span>توضیحات</span><span>تعداد</span><span>مبلغ واحد</span><span></span></div>
+ <div id="invoiceRows">${items.map(invoiceRowHTML).join("")}</div>
+ <button type="button" onclick="addInvoiceRow()">＋ افزودن ردیف</button>
+ <div class="invoice-total-box">جمع کل: <strong id="invLiveTotal">۰ تومان</strong></div>
+ <button class="primary" onclick="saveInvoice('${inv?.id||""}')">💾 ${inv?"ذخیره تغییرات":"ساخت فاکتور"}</button>
+ </div>`);
+ updateInvoiceLiveTotal();
+}
+function updateInvoiceLiveTotal(){
+ const rows=[...document.querySelectorAll("#invoiceRows .invoice-row")];let total=0;
+ rows.forEach(r=>total+=(Number(r.querySelector(".inv-qty")?.value)||0)*(Number(r.querySelector(".inv-price")?.value)||0));
+ if($("invLiveTotal"))$("invLiveTotal").textContent=money(total)
+}
+function saveInvoice(id){
+ const name=$("invName").value.trim()||"فاکتور جدید", seller=$("invSeller").value.trim(),date=$("invDate").value||new Date().toISOString().slice(0,10),number=$("invNo").value.trim();
+ const items=[...document.querySelectorAll("#invoiceRows .invoice-row")].map(r=>({desc:r.querySelector(".inv-desc")?.value.trim()||"",qty:Number(r.querySelector(".inv-qty")?.value)||0,price:Number(r.querySelector(".inv-price")?.value)||0})).filter(x=>x.desc||x.qty||x.price);
+ if(!items.length)return alert("حداقل یک ردیف فاکتور وارد کن");
+ const o={name,seller,date,number,items,total:0};
+ o.total=invoiceTotal(o);
+ if(id){const x=data.invoices.find(v=>v.id===id);Object.assign(x,o);touch(x);markDirty("invoices",x.id,false,x,x.updatedAt)}
+ else{const x=touch({id:uid(),...o});data.invoices.unshift(x);markDirty("invoices",x.id,false,x,x.updatedAt)}
+ save();logEvent(id?"ویرایش فاکتور":"ساخت فاکتور",`${name} • ${money(o.total)}`,id?"edit":"create");closeModal()
+}
+function deleteInvoice(id){if(!confirm("این فاکتور حذف شود؟"))return;const x=data.invoices.find(v=>v.id===id);removeRecord("invoices",id);logEvent("حذف فاکتور",x?.name||id,"delete")}
+function invoiceHTML(inv){
+ const total=invoiceTotal(inv);
+ return `<div class="item invoice-item"><div><b>🧾 ${esc(inv.name||"فاکتور")}</b><div class="meta">${esc(inv.seller||"فروشنده ثبت نشده")} • ${invoiceDateLabel(inv.date)}${inv.number?" • شماره "+esc(inv.number):""}</div><div class="meta">جمع کل: ${money(total)} • ${fa((inv.items||[]).length)} ردیف</div></div><div class="actions"><button onclick="openInvoice('${inv.id}')">✏️</button><button onclick="previewInvoice('${inv.id}')">👁</button><button onclick="shareInvoice('${inv.id}')">📤</button><button class="danger-icon" onclick="deleteInvoice('${inv.id}')">🗑</button></div></div>`
+}
+function previewInvoice(id){
+ const inv=data.invoices.find(x=>x.id===id);if(!inv)return;
+ const rows=(inv.items||[]).map(x=>`<div class="preview-inv-row"><span>${esc(x.desc)}</span><span>${fa(x.qty)}</span><span>${money(x.price)}</span><span>${money((Number(x.qty)||0)*(Number(x.price)||0))}</span></div>`).join("");
+ openModal(`<div id="invoicePreview" class="invoice-preview"><div class="invoice-head"><div><h2>فاکتور</h2><b>${esc(inv.seller||"")}</b></div><div>شماره: ${esc(inv.number||"—")}<br>تاریخ: ${invoiceDateLabel(inv.date)}</div></div><h3>${esc(inv.name||"فاکتور")}</h3><div class="preview-inv-row head"><b>توضیحات</b><b>تعداد</b><b>مبلغ واحد</b><b>مبلغ</b></div>${rows}<div class="preview-total">جمع کل: <strong>${money(invoiceTotal(inv))}</strong></div></div><button class="primary" onclick="shareInvoice('${inv.id}')">📤 ارسال فاکتور به‌صورت عکس</button>`)
+}
+function drawInvoiceCanvas(inv){
+ const W=1200, rowH=78, H=Math.max(850,430+(inv.items||[]).length*rowH);
+ const c=document.createElement("canvas");c.width=W;c.height=H;const x=c.getContext("2d");
+ x.fillStyle="#fff";x.fillRect(0,0,W,H);x.fillStyle="#17352b";x.textAlign="right";x.direction="rtl";
+ x.font="bold 48px sans-serif";x.fillText("فاکتور",W-70,75);
+ x.font="bold 30px sans-serif";x.fillText(inv.seller||"فروشگاه / فروشنده",W-70,130);
+ x.font="24px sans-serif";x.fillStyle="#56645f";x.fillText("شماره: "+(inv.number||"—"),W-70,175);x.fillText("تاریخ: "+invoiceDateLabel(inv.date),W-360,175);
+ x.fillStyle="#17352b";x.font="bold 28px sans-serif";x.fillText(inv.name||"فاکتور",W-70,235);
+ let y=300;x.fillStyle="#eaf2ee";x.fillRect(55,y-45,W-110,60);x.fillStyle="#17352b";x.font="bold 22px sans-serif";
+ x.fillText("مبلغ",W-75,y-8);x.fillText("مبلغ واحد",W-350,y-8);x.fillText("تعداد",W-650,y-8);x.fillText("توضیحات",W-790,y-8);
+ x.font="24px sans-serif";
+ (inv.items||[]).forEach((it,i)=>{y+=rowH;x.fillStyle=i%2?"#fafcfb":"#fff";x.fillRect(55,y-50,W-110,rowH);x.fillStyle="#23312c";x.fillText(money((Number(it.qty)||0)*(Number(it.price)||0)),W-75,y);x.fillText(money(it.price),W-350,y);x.fillText(fa(it.qty),W-650,y);x.fillText(it.desc||"—",W-790,y);});
+ y+=55;x.fillStyle="#17352b";x.font="bold 32px sans-serif";x.fillText("جمع کل: "+money(invoiceTotal(inv)),W-75,y);
+ return c
+}
+async function shareInvoice(id){
+ const inv=data.invoices.find(x=>x.id===id);if(!inv)return;
+ const c=drawInvoiceCanvas(inv);
+ const blob=await new Promise(r=>c.toBlob(r,"image/jpeg",.9));const file=new File([blob],`${(inv.name||"فاکتور").replace(/[\\/:*?"<>|]/g,"_")}.jpg`,{type:"image/jpeg"});
+ try{
+  if(navigator.share&&(!navigator.canShare||navigator.canShare({files:[file]}))){await navigator.share({title:inv.name||"فاکتور",text:"فاکتور",files:[file]});return}
+ }catch(e){if(e?.name==="AbortError")return}
+ const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=file.name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);alert("عکس فاکتور آماده شد؛ از گزینه اشتراک گوشی می‌توانی ارسالش کنی.")
+}
 function render(){
  const inc=data.transactions.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0),exp=data.transactions.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0),base=data.accounts.reduce((s,a)=>s+(Number(a.balance)||0),0),net=inc-exp;
  if($("balance"))$("balance").textContent=money(base+net);if($("income"))$("income").textContent=money(inc);if($("expense"))$("expense").textContent=money(exp);
@@ -465,6 +567,7 @@ function render(){
  if($("peopleList"))$("peopleList").innerHTML=data.people.filter(p=>(p.type||"debt")===peopleMode).map(p=>{const total=Number(p.amount)||0,paid=Math.min(Number(p.paid)||0,total),remaining=Math.max(0,total-paid);return `<div class="item"><div><b>${esc(p.name)}</b><div class="meta">${p.due?"سررسید: "+p.due:""}${p.note?" • "+esc(p.note):""}</div><div class="meta">کل: ${money(total)} • تسویه: ${money(paid)}</div></div><div><strong>${money(remaining)}</strong><div class="actions"><button type="button" onclick="payPerson('${p.id}')">تسویه</button>${actionButtons("openPerson","deletePerson",p.id)}</div></div></div>`}).join("")||empty(peopleMode==="debt"?"هنوز بدهکاری ثبت نشده":"هنوز طلبی ثبت نشده");
  if($("reminderList"))$("reminderList").innerHTML=data.reminders.map(r=>`<div class="item"><div><b>${esc(r.title)}</b><div class="meta">${new Date(r.date).toLocaleString("fa-IR")} • ${r.repeat==="once"?"یک‌بار":r.repeat==="weekly"?"هفتگی":"ماهانه"}</div></div><div><strong>${r.amount?money(r.amount):""}</strong>${actionButtons("openReminder","deleteReminder",r.id)}</div></div>`).join("")||empty("یادآوری ندارید");
  if($("noteList"))$("noteList").innerHTML=data.notes.map(noteHTML).join("")||empty("یادداشتی ندارید");
+ if($("invoiceList"))$("invoiceList").innerHTML=data.invoices.map(invoiceHTML).join("")||empty("هنوز فاکتوری ساخته نشده است");
  if($("checkList"))$("checkList").innerHTML=data.checks.map(c=>`<div class="item"><div><b>${c.type==="receive"?"دریافتی":"پرداختی"} • ${esc(c.name)}</b><div class="meta">${c.date}${c.bank?" • "+esc(c.bank):""}</div></div><div><strong>${money(c.amount)}</strong>${actionButtons("openCheck","deleteCheck",c.id)}</div></div>`).join("")||empty("چکی ثبت نشده");
  if($("categoryList"))$("categoryList").innerHTML='<div class="card"><b>هزینه‌ها</b><p>'+data.expenseCats.map(c=>esc(c.name)).join(" • ")+'</p><b>دریافت‌ها</b><p>'+data.incomeCats.map(c=>esc(c.name)).join(" • ")+'</p></div>';
  const debt=data.people.filter(p=>p.type==="debt").reduce((s,p)=>s+p.amount-p.paid,0),credit=data.people.filter(p=>p.type==="credit").reduce((s,p)=>s+p.amount-p.paid,0);
