@@ -1,1 +1,11 @@
-{"name":"حسابدار","short_name":"حسابدار","start_url":".","display":"standalone","background_color":"#f5f7fb","theme_color":"#111827","lang":"fa","dir":"rtl","icons":[]}
+{
+  "name": "حسابدار ۲.۰.۰",
+  "short_name": "حسابدار ۲.۰",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#f4f7fb",
+  "theme_color": "#111827",
+  "lang": "fa",
+  "dir": "rtl",
+  "icons": []
+}

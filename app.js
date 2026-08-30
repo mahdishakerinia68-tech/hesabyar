@@ -1,7 +1,7 @@
-const KEY="hesabdar-v11";
+const KEY="hesabdar-v20";
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const SYNC_META_KEY="hesabdar-sync-meta-v2";
-const APP_VERSION="1.1.6";
+const APP_VERSION="2.0.0";
+const SYNC_INTERVAL=5000;
 // Firebase project configuration supplied for this app.
 // This is safe to ship in a web app; access is protected by Firebase Authentication + Firestore Rules.
 const DEFAULT_SYNC_CONFIG={
@@ -32,11 +32,11 @@ window.addEventListener("online",()=>{if(sync.db)sync.db.enableNetwork().catch(c
 window.addEventListener("offline",()=>setSyncStatus("⚠️ اینترنت دستگاه قطع است"));
 
 let data;
-try{data=JSON.parse(localStorage.getItem(KEY)||"null")}catch{data=null}
+try{data=JSON.parse(localStorage.getItem(KEY)||localStorage.getItem("hesabdar-v11")||"null")}catch{data=null}
 data=data||blankData();
-data.accounts??=[];data.transactions??=[];data.people??=[];data.reminders??=[];data.checks??=[];data.expenseCats??=defaultsExpense.map((name,i)=>({id:"e"+i,name}));data.incomeCats??=defaultsIncome.map((name,i)=>({id:"i"+i,name}));data.pin=typeof data.pin==="string"?data.pin:"";
+data.accounts??=[];data.transactions??=[];data.people??=[];data.reminders??=[];data.checks??=[];data.expenseCats??=defaultsExpense.map((name,i)=>({id:"e"+i,name}));data.incomeCats??=defaultsIncome.map((name,i)=>({id:"i"+i,name}));data.pin=typeof data.pin==="string"?data.pin:"";data._sync??={tombstones:{}};data._sync.tombstones??={};for(const k of ["accounts","transactions","people","reminders","checks","expenseCats","incomeCats"]){for(const r of data[k]){r.id??=uid();r.updatedAt??=new Date().toISOString()}}
 let peopleMode="debt";
-function save(){localStorage.setItem(KEY,JSON.stringify(data));render(); syncSave()}
+function save(){localStorage.setItem(KEY,JSON.stringify(data));render();syncSave()}
 function hasMeaningfulData(d){
   if(!d||typeof d!=="object")return false;
   return ["accounts","transactions","people","reminders","checks"].some(k=>Array.isArray(d[k])&&d[k].length>0);
@@ -101,54 +101,11 @@ async function pullRest(){
   const doc=await restRequest('GET');
   return readRestDocument(doc);
 }
-async function hydrateSync(user){
-  if(!user)return;
-  sync.hydrating=true;
-  try{
-    const remote=await pullRest();
-    if(hasMeaningfulData(remote)){
-      data=mergeData(remote);localStorage.setItem(KEY,JSON.stringify(data));render();
-      setSyncStatus("☁️ اطلاعات از ابر دریافت شد — "+dataSummary(data));
-    }else if(hasMeaningfulData(data)){
-      await pushRest();
-      setSyncStatus("☁️ اطلاعات این گوشی به ابر منتقل شد — "+dataSummary(data));
-    }else{
-      setSyncStatus("☁️ ابر خالی است؛ آماده همگام‌سازی");
-    }
-  }catch(e){
-    if(e.code==='NOT_FOUND'||e.message.includes('not found')){
-      try{await pushRest();setSyncStatus("☁️ اطلاعات این گوشی به ابر منتقل شد — "+dataSummary(data));}
-      catch(x){setSyncStatus("⚠️ ارسال به ابر ناموفق: "+(x.code||'')+" "+x.message);}
-    }else setSyncStatus("⚠️ خطای اتصال ابر: "+(e.code||'')+" "+e.message);
-  }finally{sync.hydrating=false}
-}
-async function initSync(){
-  const cfg=syncConfig();
-  if(!cfg||!window.firebase)return;
-  try{
-    if(!sync.app)sync.app=firebase.apps.length?firebase.app():firebase.initializeApp(cfg);
-    sync.auth=firebase.auth();
-    if(sync.authListener)return;
-    sync.authListener=true;
-    sync.auth.onAuthStateChanged(async user=>{
-      sync.user=user; fillSettingsSyncEmail();
-      if(sync.unsubscribe){clearInterval(sync.unsubscribe);sync.unsubscribe=null}
-      if(!user){sync.ready=false;setSyncStatus("☁️ اتصال تنظیم شده؛ وارد حساب همگام‌سازی شو.");return}
-      sync.ready=true;
-      await hydrateSync(user);
-      sync.unsubscribe=setInterval(async()=>{
-        if(!sync.user||sync.hydrating||sync.saving)return;
-        try{
-          const remote=await pullRest();
-          if(remote&&JSON.stringify(remote)!==JSON.stringify(data)){
-            data=mergeData(remote);localStorage.setItem(KEY,JSON.stringify(data));render();
-          }
-          setSyncStatus("☁️ همگام‌سازی فعال است");
-        }catch(e){setSyncStatus("⚠️ خطای همگام‌سازی: "+(e.code||'')+" "+e.message)}
-      },5000);
-    });
-  }catch(e){console.error(e);setSyncStatus("⚠️ تنظیمات Firebase نامعتبر است")}
-}
+function mergeArrays(local=[],remote=[],tombs={}){const m=new Map(local.map(r=>[r.id,r]));for(const r of remote){const old=m.get(r.id);if(!old||String(r.updatedAt||"")>String(old.updatedAt||""))m.set(r.id,r)}for(const[id,dt]of Object.entries(tombs||{})){const r=m.get(id);if(r&&String(dt)>String(r.updatedAt||""))m.delete(id)}return [...m.values()]}
+function mergeCloud(remote){const out=JSON.parse(JSON.stringify(data));const ks=["accounts","transactions","people","reminders","checks","expenseCats","incomeCats"];for(const k of ks)out[k]=mergeArrays(data[k],remote?.[k]||[],{...(remote?._sync?.tombstones?.[k]||{}),...(data._sync?.tombstones?.[k]||{})});out._sync={tombstones:{}};for(const k of ks)out._sync.tombstones[k]={...(remote?._sync?.tombstones?.[k]||{}),...(data._sync?.tombstones?.[k]||{})};out.pin=data.pin||remote?.pin||"";return out}
+async function hydrateSync(){if(!sync.user)return;sync.hydrating=true;try{let remote;try{remote=await pullRest()}catch(e){if(e.code==='NOT_FOUND'){await pushRest();setSyncStatus("☁️ اطلاعات اولیه در ابر ذخیره شد");return}throw e}if(remote){data=mergeCloud(remote);localStorage.setItem(KEY,JSON.stringify(data));render();await pushRest();setSyncStatus("☁️ همگام‌سازی فعال • هر ۵ ثانیه")}else{await pushRest();setSyncStatus("☁️ اطلاعات این گوشی به ابر منتقل شد")}}catch(e){setSyncStatus("⚠️ خطای همگام‌سازی: "+(e.code||e.message))}finally{sync.hydrating=false}}
+async function syncTick(){if(!sync.ready||!sync.user||sync.hydrating||sync.saving)return;try{const remote=await pullRest();if(remote){const merged=mergeCloud(remote);if(JSON.stringify(merged)!==JSON.stringify(data)){data=merged;localStorage.setItem(KEY,JSON.stringify(data));render();await pushRest()}}setSyncStatus("☁️ آنلاین • بررسی هر ۵ ثانیه") }catch(e){setSyncStatus("⚠️ همگام‌سازی: "+(e.code||e.message))}}
+async function initSync(){const cfg=syncConfig();if(!cfg||!window.firebase)return;try{if(!sync.app)sync.app=firebase.apps.length?firebase.app():firebase.initializeApp(cfg);sync.auth=firebase.auth();if(sync.authListener)return;sync.authListener=true;sync.auth.onAuthStateChanged(async user=>{sync.user=user;fillSettingsSyncEmail();if(sync.timer)clearInterval(sync.timer);if(!user){sync.ready=false;setSyncStatus("☁️ برای همگام‌سازی وارد شوید");return}sync.ready=true;await hydrateSync();sync.timer=setInterval(syncTick,SYNC_INTERVAL)})}catch(e){console.error(e);setSyncStatus("⚠️ تنظیمات Firebase نامعتبر است")}}
 async function syncSave(){
   if(!sync.ready||!sync.user||sync.hydrating)return;
   sync.queued=true;
@@ -276,79 +233,36 @@ const modal=$("modal"),modalBody=$("modalBody");
 function openModal(html){modalBody.innerHTML=html;modal.classList.remove("hidden")}
 function closeModal(){modal.classList.add("hidden")}
 
-function accountSelect(id="acc"){return `<select id="${id}">${data.accounts.map(a=>`<option value="${a.id}">${esc(a.name)}${a.bank?" • "+esc(a.bank):""}</option>`).join("")}</select>`}
-function openAccount(){openModal(`<h2>افزودن حساب</h2><div class="form"><input id="an" placeholder="نام حساب"><input id="bank" placeholder="نام بانک"><input id="sender" placeholder="شماره فرستنده پیامک بانک"><input id="card" placeholder="شماره کارت (اختیاری)"><input id="ab" type="number" placeholder="موجودی اولیه"><button class="primary" onclick="addAccount()">ذخیره</button></div>`)}
-function addAccount(){if(!an.value.trim())return alert("نام حساب را وارد کن");data.accounts.push({id:uid(),name:an.value.trim(),bank:bank.value.trim(),sender:sender.value.trim(),card:card.value.trim(),balance:Number(ab.value)||0});save();closeModal()}
-
-function categoryButtons(type){
- const arr=type==="expense"?data.expenseCats:data.incomeCats;
- return `<div class="category-window">${arr.map(c=>`<button type="button" class="cat-btn" onclick="pickCategory('${type}','${esc(c.id)}')">${esc(c.name)}</button>`).join("")}</div>`;
-}
-function openTx(){
- if(!data.accounts.length)return alert("اول از بخش حساب‌ها یک حساب اضافه کن");
- openModal(`<h2>ثبت تراکنش</h2><div class="form">
- <div class="type-switch"><button type="button" id="expBtn" class="chosen" onclick="txType('expense')">💸 هزینه</button><button type="button" id="incBtn" onclick="txType('income')">💰 دریافت</button></div>
- <input id="txKind" type="hidden" value="expense"><input id="title" placeholder="عنوان هزینه">
- <div id="expensePanel"><b id="catLabel">دسته هزینه را انتخاب کن</b>${categoryButtons("expense")}<input id="cat" type="hidden"></div>
- <div id="incomePanel" style="display:none"><b id="incatLabel">دریافت برای چه بوده؟</b>${categoryButtons("income")}<input id="incat" type="hidden"></div>
- ${accountSelect("acc")}<button class="primary" onclick="addTx()">ثبت</button></div>`);
-}
-function txType(t){$("txKind").value=t;$("expBtn").classList.toggle("chosen",t==="expense");$("incBtn").classList.toggle("chosen",t==="income");$("expensePanel").style.display=t==="expense"?"block":"none";$("incomePanel").style.display=t==="income"?"block":"none";$("title").placeholder=t==="expense"?"عنوان هزینه (اختیاری)":"توضیح دریافت (اختیاری)"}
-function pickCategory(type,id){const arr=type==="expense"?data.expenseCats:data.incomeCats,c=arr.find(x=>x.id===id);if(!c)return;if(type==="expense"){$("cat").value=c.name;$("catLabel").textContent="دسته هزینه: "+c.name}else{$("incat").value=c.name;$("incatLabel").textContent="نوع دریافت: "+c.name}}
-function addTx(){
- const amount=parseMoney($("amount")?.value||0); // amount is created below if missing
- if(!amount)return alert("مبلغ را وارد کن");
- const t=$("txKind").value,cat=t==="expense"?$("cat").value:$("incat").value;if(!cat)return alert(t==="expense"?"دسته هزینه را انتخاب کن":"نوع دریافت را انتخاب کن");
- data.transactions.unshift({id:uid(),title:$("title").value.trim()||cat,amount,type:t,category:cat,accountID:$("acc").value,date:new Date().toISOString(),source:"manual"});save();closeModal()
-}
-// Amount input is inserted when opening a transaction; patch the generated form safely.
-const _oldOpenTx=openTx;
-openTx=function(){
- if(!data.accounts.length)return alert("اول از بخش حساب‌ها یک حساب اضافه کن");
- _oldOpenTx();
- const f=$("title"); if(f){const amount=document.createElement("input");amount.id="amount";amount.type="number";amount.placeholder="مبلغ";f.insertAdjacentElement("afterend",amount)}
-}
-
-function openBankMessage(){
- if(!data.accounts.length)return alert("اول یک حساب اضافه کن");
- openModal(`<h2>پیامک بانک</h2><div class="form"><textarea id="sms" placeholder="متن کامل پیامک بانک را Paste کن"></textarea>${accountSelect("ba")}<button class="primary" onclick="parseSMS()">تشخیص تراکنش</button></div><p class="hint">اگر مبلغ با + شروع شود دریافت و اگر با - شروع شود برداشت ثبت می‌شود. در نبود علامت، از متن پیامک تشخیص داده می‌شود.</p>`)
-}
-function parseSMSAmount(text){
- const s=normalize(text);
- const signed=[...s.matchAll(/([+-])\s*(\d[\d,\.]*)/g)];
- if(signed.length){const m=signed[0];return {amount:parseMoney(m[2]),type:m[1]==="-"?"expense":"income",reason:"علامت + / - مبلغ"}}
- const nums=[...s.matchAll(/\d[\d,\.]{2,}/g)].map(x=>parseMoney(x[0])).filter(Boolean);
- const ex=/(برداشت|خرید|پرداخت|کسر|برداشت از|debit|purchase|withdraw)/i.test(s);
- const inc=/(واریز|دریافت|افزایش|بستانکار|credit|deposit|received)/i.test(s);
- return {amount:nums[0]||0,type:ex&&!inc?"expense":inc&&!ex?"income":"",reason:"عبارات پیامک"};
-}
-function parseSMS(){
- const r=parseSMSAmount($("sms").value);
- if(!r.amount||!r.type)return alert("نوع تراکنش مشخص نشد. در پیامک از + برای دریافت یا - برای برداشت استفاده کن، یا متن واریز/برداشت را داشته باشد.");
- const cats=r.type==="income"?data.incomeCats:data.expenseCats;
- openModal(`<h2>تأیید پیامک</h2><div class="card sms-preview"><p>نوع: <b>${r.type==="income"?"💰 دریافت / واریز":"💸 برداشت / هزینه"}</b></p><p>مبلغ: <b>${r.type==="income"?"+":"−"}${money(r.amount)}</b></p><p>روش تشخیص: ${esc(r.reason)}</p></div><div class="form"><input id="bt" value="${r.type==="income"?"دریافت بانکی":"برداشت بانکی"}"><select id="bc">${cats.map(c=>`<option>${esc(c.name)}</option>`).join("")}</select><button class="primary" onclick="saveBankTx('${r.type}',${r.amount},'${esc($("ba").value)}')">تأیید و ثبت</button></div>`)
-}
-function saveBankTx(type,amount,accountID){data.transactions.unshift({id:uid(),title:$("bt").value.trim()||"تراکنش بانکی",amount,type,category:$("bc").value,accountID,date:new Date().toISOString(),source:"bank"});save();closeModal()}
-
-function openTransfer(){
- if(data.accounts.length<2)return alert("برای انتقال حداقل دو حساب لازم است");
- openModal(`<h2>انتقال بین حساب‌ها</h2><div class="form">${accountSelect("from")}<span style="text-align:center">↓</span>${accountSelect("to")}<input id="tam" type="number" placeholder="مبلغ"><input id="tnote" placeholder="توضیحات"><button class="primary" onclick="addTransfer()">انتقال</button></div>`);
-}
-function addTransfer(){if($("from").value===$("to").value)return alert("مبدأ و مقصد باید متفاوت باشند");let a=parseMoney($("tam").value);if(!a)return alert("مبلغ را وارد کن");data.transactions.unshift({id:uid(),title:$("tnote").value||"انتقال بین حساب‌ها",amount:a,type:"transfer",from:$("from").value,to:$("to").value,date:new Date().toISOString(),source:"transfer"});save();closeModal()}
-
-function openCategory(){
- openModal(`<h2>دسته‌بندی‌ها</h2><div class="section-head"><b>دسته‌های هزینه</b><button onclick="addCatPrompt('expense')">＋</button></div><div class="category-window">${data.expenseCats.map(c=>`<button class="cat-btn">${esc(c.name)}</button>`).join("")}</div><div class="section-head"><b>نوع‌های دریافت</b><button onclick="addCatPrompt('income')">＋</button></div><div class="category-window">${data.incomeCats.map(c=>`<button class="cat-btn">${esc(c.name)}</button>`).join("")}</div>`)
-}
-function addCatPrompt(type){let n=prompt(type==="expense"?"نام دسته هزینه:":"نام نوع دریافت:");if(!n?.trim())return;let arr=type==="expense"?data.expenseCats:data.incomeCats;arr.push({id:uid(),name:n.trim()});save();openCategory()}
-
-function openPerson(){openModal(`<h2>بدهکار / بستانکار</h2><div class="form"><select id="pt"><option value="debt">من بدهکارم</option><option value="credit">من طلبکارم</option></select><input id="pn" placeholder="نام شخص"><input id="pa" type="number" placeholder="مبلغ"><input id="pd" type="date"><textarea id="pnote" placeholder="توضیحات"></textarea><button class="primary" onclick="addPerson()">ذخیره</button></div>`)}
-function addPerson(){if(!$("pn").value.trim()||!parseMoney($("pa").value))return alert("نام و مبلغ را وارد کن");data.people.push({id:uid(),type:$("pt").value,name:$("pn").value.trim(),amount:parseMoney($("pa").value),paid:0,due:$("pd").value,note:$("pnote").value});save();closeModal()}
-function payPerson(id){let p=data.people.find(x=>x.id===id);let v=prompt("مبلغ تسویه:",String(p.amount-p.paid));if(v!==null){p.paid=Math.min(p.amount,p.paid+parseMoney(v));save()}}
-
-function openReminder(){openModal(`<h2>یادآوری</h2><div class="form"><input id="rt" placeholder="عنوان"><input id="ra" type="number" placeholder="مبلغ"><input id="rd" type="datetime-local"><select id="rr"><option value="once">یک‌بار</option><option value="monthly">ماهانه</option><option value="weekly">هفتگی</option></select><select id="rb"><option value="expense">پرداخت</option><option value="income">دریافت</option></select><button class="primary" onclick="addReminder()">ذخیره</button></div>`)}
-function addReminder(){if(!$("rt").value||!$("rd").value)return alert("عنوان و تاریخ لازم است");data.reminders.push({id:uid(),title:$("rt").value,amount:parseMoney($("ra").value),date:$("rd").value,repeat:$("rr").value,type:$("rb").value});save();closeModal()}
-function openCheck(){openModal(`<h2>ثبت چک</h2><div class="form"><select id="ct"><option value="receive">چک دریافتی</option><option value="pay">چک پرداختی</option></select><input id="cn" placeholder="نام شخص"><input id="camount" type="number" placeholder="مبلغ"><input id="cdate" type="date"><input id="cnum" placeholder="شماره چک"><input id="cbank" placeholder="بانک"><textarea id="cnote" placeholder="توضیحات"></textarea><button class="primary" onclick="addCheck()">ذخیره</button></div>`)}
-function addCheck(){if(!$("cn").value||!parseMoney($("camount").value)||!$("cdate").value)return alert("نام، مبلغ و تاریخ لازم است");data.checks.push({id:uid(),type:$("ct").value,name:$("cn").value,amount:parseMoney($("camount").value),date:$("cdate").value,number:$("cnum").value,bank:$("cbank").value,note:$("cnote").value,done:false});save();closeModal()}
+function touch(r){r.updatedAt=new Date().toISOString();return r}
+function markDeleted(type,id){data._sync??={tombstones:{}};data._sync.tombstones??={};data._sync.tombstones[type]??={};data._sync.tombstones[type][id]=new Date().toISOString()}
+function removeRecord(type,id){const i=data[type].findIndex(x=>x.id===id);if(i<0)return;data[type].splice(i,1);markDeleted(type,id);save()}
+function accountSelect(id="acc",selected=""){return `<select id="${id}">${data.accounts.map(a=>`<option value="${a.id}" ${a.id===selected?"selected":""}>${esc(a.name)}${a.bank?" • "+esc(a.bank):""}</option>`).join("")}</select>`}
+function openAccount(id=null){const a=id&&data.accounts.find(x=>x.id===id);openModal(`<h2>${a?"ویرایش حساب":"افزودن حساب"}</h2><div class="form"><input id="an" placeholder="نام حساب" value="${esc(a?.name||"")}"><input id="bank" placeholder="نام بانک" value="${esc(a?.bank||"")}"><input id="sender" placeholder="شماره فرستنده پیامک بانک" value="${esc(a?.sender||"")}"><input id="card" placeholder="شماره کارت (اختیاری)" value="${esc(a?.card||"")}"><input id="ab" type="number" placeholder="موجودی اولیه" value="${Number(a?.balance)||0}"><button class="primary" onclick="saveAccount('${a?.id||""}')">${a?"ذخیره تغییرات":"ذخیره"}</button></div>`)}
+function saveAccount(id){if(!$("an").value.trim())return alert("نام حساب را وارد کنید");const o={name:$("an").value.trim(),bank:$("bank").value.trim(),sender:$("sender").value.trim(),card:$("card").value.trim(),balance:Number($("ab").value)||0};if(id){const a=data.accounts.find(x=>x.id===id);Object.assign(a,o);touch(a)}else data.accounts.push(touch({id:uid(),...o}));save();closeModal()}
+function deleteAccount(id){if(data.transactions.some(t=>t.accountID===id||t.from===id||t.to===id))return alert("این حساب تراکنش یا انتقال دارد؛ ابتدا آن‌ها را اصلاح یا حذف کنید");if(confirm("این حساب حذف شود؟"))removeRecord("accounts",id)}
+function categoryButtons(type,selected=""){const arr=type==="expense"?data.expenseCats:data.incomeCats;return `<div class="category-window">${arr.map(c=>`<button type="button" class="cat-btn ${c.name===selected?"selected-cat":""}" onclick="pickCategory('${type}','${c.id}')">${esc(c.name)}</button>`).join("")}</div>`}
+function openTx(id=null){if(!data.accounts.length)return alert("اول از بخش حساب‌ها یک حساب اضافه کنید");const t=id&&data.transactions.find(x=>x.id===id);if(t?.type==="transfer")return openTransfer(id);const typ=t?.type||"expense";openModal(`<h2>${t?"ویرایش تراکنش":"ثبت تراکنش"}</h2><div class="form"><div class="type-switch"><button type="button" id="expBtn" class="${typ==="expense"?"chosen":""}" onclick="txType('expense')">💸 هزینه</button><button type="button" id="incBtn" class="${typ==="income"?"chosen":""}" onclick="txType('income')">💰 دریافت</button></div><input id="txKind" type="hidden" value="${typ}"><input id="title" placeholder="عنوان" value="${esc(t?.title||"")}"><input id="amount" type="number" placeholder="مبلغ" value="${Number(t?.amount)||""}"><div id="expensePanel" style="display:${typ==="expense"?"block":"none"}"><b id="catLabel">${t?.category?"دسته هزینه: "+esc(t.category):"دسته هزینه را انتخاب کنید"}</b>${categoryButtons("expense",typ==="expense"?t?.category:"")}<input id="cat" type="hidden" value="${esc(typ==="expense"?t?.category||"":"")}"></div><div id="incomePanel" style="display:${typ==="income"?"block":"none"}"><b id="incatLabel">${t?.category?"نوع دریافت: "+esc(t.category):"نوع دریافت را انتخاب کنید"}</b>${categoryButtons("income",typ==="income"?t?.category:"")}<input id="incat" type="hidden" value="${esc(typ==="income"?t?.category||"":"")}"></div>${accountSelect("acc",t?.accountID||"")}<button class="primary" onclick="saveTx('${t?.id||""}')">${t?"ذخیره تغییرات":"ثبت تراکنش"}</button></div>`)}
+function txType(t){$("txKind").value=t;$("expBtn").classList.toggle("chosen",t==="expense");$("incBtn").classList.toggle("chosen",t==="income");$("expensePanel").style.display=t==="expense"?"block":"none";$("incomePanel").style.display=t==="income"?"block":"none"}
+function pickCategory(type,id){const c=(type==="expense"?data.expenseCats:data.incomeCats).find(x=>x.id===id);if(!c)return;if(type==="expense"){$("cat").value=c.name;$("catLabel").textContent="دسته هزینه: "+c.name}else{$("incat").value=c.name;$(("incatLabel")).textContent="نوع دریافت: "+c.name}}
+function saveTx(id){const amount=parseMoney($("amount").value),type=$("txKind").value,category=type==="expense"?$("cat").value:$("incat").value;if(!amount)return alert("مبلغ را وارد کنید");if(!category)return alert("دسته را انتخاب کنید");if(id){const t=data.transactions.find(x=>x.id===id);Object.assign(t,{title:$("title").value.trim()||category,amount,type,category,accountID:$("acc").value});touch(t)}else data.transactions.unshift(touch({id:uid(),title:$("title").value.trim()||category,amount,type,category,accountID:$("acc").value,date:new Date().toISOString(),source:"manual"}));save();closeModal()}
+function saveBankTx(type,amount,accountID){data.transactions.unshift(touch({id:uid(),title:$("bt").value.trim()||"تراکنش بانکی",amount,type,category:$("bc").value,accountID,date:new Date().toISOString(),source:"bank"}));save();closeModal()}
+function openTransfer(id=null){if(data.accounts.length<2)return alert("برای انتقال حداقل دو حساب لازم است");const t=id&&data.transactions.find(x=>x.id===id);openModal(`<h2>${t?"ویرایش انتقال":"انتقال بین حساب‌ها"}</h2><div class="form">${accountSelect("from",t?.from||data.accounts[0].id)}<span style="text-align:center">↓</span>${accountSelect("to",t?.to||data.accounts[1].id)}<input id="tam" type="number" placeholder="مبلغ" value="${Number(t?.amount)||""}"><input id="tnote" placeholder="توضیحات" value="${esc(t?.title||"")}"><button class="primary" onclick="saveTransfer('${t?.id||""}')">${t?"ذخیره تغییرات":"انتقال"}</button></div>`)}
+function saveTransfer(id){if($("from").value===$("to").value)return alert("مبدأ و مقصد باید متفاوت باشند");const amount=parseMoney($("tam").value);if(!amount)return alert("مبلغ را وارد کنید");const o={title:$("tnote").value.trim()||"انتقال بین حساب‌ها",amount,type:"transfer",from:$("from").value,to:$("to").value,source:"transfer"};if(id){const t=data.transactions.find(x=>x.id===id);Object.assign(t,o);touch(t)}else data.transactions.unshift(touch({id:uid(),date:new Date().toISOString(),...o}));save();closeModal()}
+function deleteTx(id){if(confirm("این تراکنش حذف شود؟"))removeRecord("transactions",id)}
+function openCategory(){openModal(`<h2>🏷 دسته‌بندی‌ها</h2><div class="section-head"><b>دسته‌های هزینه</b><button onclick="addCatPrompt('expense')">＋</button></div>${data.expenseCats.map(c=>`<div class="item compact"><b>${esc(c.name)}</b><div class="actions"><button onclick="editCategory('expense','${c.id}')">✏️</button><button class="danger-icon" onclick="removeCategory('expense','${c.id}')">🗑</button></div></div>`).join("")}<div class="section-head"><b>نوع‌های دریافت</b><button onclick="addCatPrompt('income')">＋</button></div>${data.incomeCats.map(c=>`<div class="item compact"><b>${esc(c.name)}</b><div class="actions"><button onclick="editCategory('income','${c.id}')">✏️</button><button class="danger-icon" onclick="removeCategory('income','${c.id}')">🗑</button></div></div>`).join("")}`)}
+function addCatPrompt(type){const n=prompt(type==="expense"?"نام دسته هزینه:":"نام نوع دریافت:");if(!n?.trim())return;const arr=type==="expense"?data.expenseCats:data.incomeCats;arr.push(touch({id:uid(),name:n.trim()}));save();openCategory()}
+function editCategory(type,id){const arr=type==="expense"?data.expenseCats:data.incomeCats,c=arr.find(x=>x.id===id);if(!c)return;const n=prompt("نام جدید:",c.name);if(n?.trim()){const old=c.name;c.name=n.trim();touch(c);data.transactions.forEach(t=>{if(t.category===old){t.category=c.name;touch(t)}});save();openCategory()}}
+function removeCategory(type,id){if(!confirm("این دسته حذف شود؟"))return;removeRecord(type==="expense"?"expenseCats":"incomeCats",id);openCategory()}
+function openPerson(id=null){const p=id&&data.people.find(x=>x.id===id);openModal(`<h2>${p?"ویرایش بدهکار/بستانکار":"بدهکار / بستانکار"}</h2><div class="form"><select id="pt"><option value="debt" ${p?.type==="debt"?"selected":""}>من بدهکارم</option><option value="credit" ${p?.type==="credit"?"selected":""}>من طلبکارم</option></select><input id="pn" placeholder="نام شخص" value="${esc(p?.name||"")}"><input id="pa" type="number" placeholder="مبلغ" value="${Number(p?.amount)||""}"><input id="pd" type="date" value="${esc(p?.due||"")}"><textarea id="pnote" placeholder="توضیحات">${esc(p?.note||"")}</textarea><button class="primary" onclick="savePerson('${p?.id||""}')">${p?"ذخیره تغییرات":"ذخیره"}</button></div>`)}
+function savePerson(id){if(!$("pn").value.trim()||!parseMoney($("pa").value))return alert("نام و مبلغ را وارد کنید");const o={type:$("pt").value,name:$("pn").value.trim(),amount:parseMoney($("pa").value),due:$("pd").value,note:$("pnote").value};if(id){const p=data.people.find(x=>x.id===id);Object.assign(p,o);touch(p)}else data.people.push(touch({id:uid(),paid:0,...o}));save();closeModal()}
+function deletePerson(id){if(confirm("این مورد حذف شود؟"))removeRecord("people",id)}
+function payPerson(id){const p=data.people.find(x=>x.id===id);if(!p)return;const v=prompt("مبلغ تسویه:",String(p.amount-p.paid));if(v!==null){p.paid=Math.min(p.amount,p.paid+parseMoney(v));touch(p);save()}}
+function openReminder(id=null){const r=id&&data.reminders.find(x=>x.id===id);openModal(`<h2>${r?"ویرایش یادآوری":"یادآوری"}</h2><div class="form"><input id="rt" placeholder="عنوان" value="${esc(r?.title||"")}"><input id="ra" type="number" placeholder="مبلغ" value="${Number(r?.amount)||""}"><input id="rd" type="datetime-local" value="${esc(r?.date||"")}"><select id="rr"><option value="once" ${r?.repeat==="once"?"selected":""}>یک‌بار</option><option value="monthly" ${r?.repeat==="monthly"?"selected":""}>ماهانه</option><option value="weekly" ${r?.repeat==="weekly"?"selected":""}>هفتگی</option></select><select id="rb"><option value="expense" ${r?.type==="expense"?"selected":""}>پرداخت</option><option value="income" ${r?.type==="income"?"selected":""}>دریافت</option></select><button class="primary" onclick="saveReminder('${r?.id||""}')">${r?"ذخیره تغییرات":"ذخیره"}</button></div>`)}
+function saveReminder(id){if(!$("rt").value||!$("rd").value)return alert("عنوان و تاریخ لازم است");const o={title:$("rt").value.trim(),amount:parseMoney($("ra").value),date:$("rd").value,repeat:$("rr").value,type:$("rb").value};if(id){const r=data.reminders.find(x=>x.id===id);Object.assign(r,o);touch(r)}else data.reminders.push(touch({id:uid(),...o}));save();closeModal()}
+function deleteReminder(id){if(confirm("این یادآوری حذف شود؟"))removeRecord("reminders",id)}
+function openCheck(id=null){const c=id&&data.checks.find(x=>x.id===id);openModal(`<h2>${c?"ویرایش چک":"ثبت چک"}</h2><div class="form"><select id="ct"><option value="receive" ${c?.type==="receive"?"selected":""}>چک دریافتی</option><option value="pay" ${c?.type==="pay"?"selected":""}>چک پرداختی</option></select><input id="cn" placeholder="نام شخص" value="${esc(c?.name||"")}"><input id="camount" type="number" placeholder="مبلغ" value="${Number(c?.amount)||""}"><input id="cdate" type="date" value="${esc(c?.date||"")}"><input id="cnum" placeholder="شماره چک" value="${esc(c?.number||"")}"><input id="cbank" placeholder="بانک" value="${esc(c?.bank||"")}"><textarea id="cnote" placeholder="توضیحات">${esc(c?.note||"")}</textarea><button class="primary" onclick="saveCheck('${c?.id||""}')">${c?"ذخیره تغییرات":"ذخیره"}</button></div>`)}
+function saveCheck(id){if(!$("cn").value.trim()||!parseMoney($("camount").value)||!$("cdate").value)return alert("نام، مبلغ و تاریخ لازم است");const o={type:$("ct").value,name:$("cn").value.trim(),amount:parseMoney($("camount").value),date:$("cdate").value,number:$("cnum").value.trim(),bank:$("cbank").value.trim(),note:$("cnote").value};if(id){const c=data.checks.find(x=>x.id===id);Object.assign(c,o);touch(c)}else data.checks.push(touch({id:uid(),done:false,...o}));save();closeModal()}
+function deleteCheck(id){if(confirm("این چک حذف شود؟"))removeRecord("checks",id)}
 function requestNotifications(){if(!("Notification"in window))return alert("اعلان در این مرورگر در دسترس نیست");Notification.requestPermission().then(p=>alert(p==="granted"?"اعلان فعال شد":"اجازه اعلان داده نشد"))}
 
 function accountBalance(id){let a=data.accounts.find(x=>x.id===id),v=Number(a?.balance)||0;data.transactions.forEach(t=>{if(t.type==="income"&&t.accountID===id)v+=t.amount;if(t.type==="expense"&&t.accountID===id)v-=t.amount;if(t.type==="transfer"){if(t.from===id)v-=t.amount;if(t.to===id)v+=t.amount}});return v}
