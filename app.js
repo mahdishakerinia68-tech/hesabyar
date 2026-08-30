@@ -362,12 +362,79 @@ function noteHTML(n){
 }
 
 function openReminder(id=null){const r=id&&data.reminders.find(x=>x.id===id);openModal(`<h2>${r?"ویرایش یادآوری":"یادآوری"}</h2><div class="form"><input id="rt" placeholder="عنوان" value="${esc(r?.title||"")}"><input id="ra" type="number" placeholder="مبلغ" value="${Number(r?.amount)||""}"><input id="rd" type="datetime-local" value="${esc(r?.date||"")}"><select id="rr"><option value="once" ${r?.repeat==="once"?"selected":""}>یک‌بار</option><option value="monthly" ${r?.repeat==="monthly"?"selected":""}>ماهانه</option><option value="weekly" ${r?.repeat==="weekly"?"selected":""}>هفتگی</option></select><select id="rb"><option value="expense" ${r?.type==="expense"?"selected":""}>پرداخت</option><option value="income" ${r?.type==="income"?"selected":""}>دریافت</option></select><button class="primary" onclick="saveReminder('${r?.id||""}')">${r?"ذخیره تغییرات":"ذخیره"}</button></div>`)}
-function saveReminder(id){if(!$("rt").value||!$("rd").value)return alert("عنوان و تاریخ لازم است");const o={title:$("rt").value.trim(),amount:parseMoney($("ra").value),date:$("rd").value,repeat:$("rr").value,type:$("rb").value};if(id){const r=data.reminders.find(x=>x.id===id);Object.assign(r,o);touch(r);markDirty("reminders",r.id,false,r,r.updatedAt)}else{const nr=touch({id:uid(),...o});data.reminders.push(nr);markDirty("reminders",nr.id,false,nr,nr.updatedAt)}save();logEvent(id?"ویرایش یادآوری":"ایجاد یادآوری",o.title,id?"edit":"create");closeModal()}
+function saveReminder(id){if(!$("rt").value||!$("rd").value)return alert("عنوان و تاریخ لازم است");const o={title:$("rt").value.trim(),amount:parseMoney($("ra").value),date:$("rd").value,repeat:$("rr").value,type:$("rb").value};if(id){const r=data.reminders.find(x=>x.id===id);Object.assign(r,o);touch(r);markDirty("reminders",r.id,false,r,r.updatedAt)}else{const nr=touch({id:uid(),...o});data.reminders.push(nr);markDirty("reminders",nr.id,false,nr,nr.updatedAt)}save();syncReminderWorker();checkDueReminders();logEvent(id?"ویرایش یادآوری":"ایجاد یادآوری",o.title,id?"edit":"create");closeModal()}
 function deleteReminder(id){if(confirm("این یادآوری حذف شود؟")){const r=data.reminders.find(x=>x.id===id);removeRecord("reminders",id);logEvent("حذف یادآوری",r?.title||id,"delete")}}
 function openCheck(id=null){const c=id&&data.checks.find(x=>x.id===id);openModal(`<h2>${c?"ویرایش چک":"ثبت چک"}</h2><div class="form"><select id="ct"><option value="receive" ${c?.type==="receive"?"selected":""}>چک دریافتی</option><option value="pay" ${c?.type==="pay"?"selected":""}>چک پرداختی</option></select><input id="cn" placeholder="نام شخص" value="${esc(c?.name||"")}"><input id="camount" type="number" placeholder="مبلغ" value="${Number(c?.amount)||""}"><input id="cdate" type="date" value="${esc(c?.date||"")}"><input id="cnum" placeholder="شماره چک" value="${esc(c?.number||"")}"><input id="cbank" placeholder="بانک" value="${esc(c?.bank||"")}"><textarea id="cnote" placeholder="توضیحات">${esc(c?.note||"")}</textarea><button class="primary" onclick="saveCheck('${c?.id||""}')">${c?"ذخیره تغییرات":"ذخیره"}</button></div>`)}
 function saveCheck(id){if(!$("cn").value.trim()||!parseMoney($("camount").value)||!$("cdate").value)return alert("نام، مبلغ و تاریخ لازم است");const o={type:$("ct").value,name:$("cn").value.trim(),amount:parseMoney($("camount").value),date:$("cdate").value,number:$("cnum").value.trim(),bank:$("cbank").value.trim(),note:$("cnote").value};if(id){const c=data.checks.find(x=>x.id===id);Object.assign(c,o);touch(c);markDirty("checks",c.id,false,c,c.updatedAt)}else{const nc=touch({id:uid(),done:false,...o});data.checks.push(nc);markDirty("checks",nc.id,false,nc,nc.updatedAt)}save();logEvent(id?"ویرایش چک":"ثبت چک",`${o.name} • ${money(o.amount)}`,id?"edit":"create");closeModal()}
 function deleteCheck(id){if(confirm("این چک حذف شود؟")){const c=data.checks.find(x=>x.id===id);removeRecord("checks",id);logEvent("حذف چک",c?.name||id,"delete")}}
-function requestNotifications(){if(!("Notification"in window))return alert("اعلان در این مرورگر در دسترس نیست");Notification.requestPermission().then(p=>alert(p==="granted"?"اعلان فعال شد":"اجازه اعلان داده نشد"))}
+
+// Unified reminder engine: foreground checks + Service Worker/Periodic Background Sync.
+let reminderTimer=null;
+let reminderSW=null;
+const REMINDER_SEEN_KEY="hesabdar-reminder-seen-v41";
+function reminderSeen(){try{return JSON.parse(localStorage.getItem(REMINDER_SEEN_KEY)||"{}")}catch{return {}}}
+function setReminderSeen(x){localStorage.setItem(REMINDER_SEEN_KEY,JSON.stringify(x))}
+function nextReminderDate(r, fromMs){
+  let d=new Date(r.date); if(Number.isNaN(d.getTime())) return null;
+  if(r.repeat==="weekly"){while(d.getTime()<=fromMs)d.setDate(d.getDate()+7)}
+  else if(r.repeat==="monthly"){while(d.getTime()<=fromMs)d.setMonth(d.getMonth()+1)}
+  return d;
+}
+function syncReminderWorker(){
+  if(!reminderSW)return;
+  try{reminderSW.postMessage({type:"SYNC_REMINDERS",reminders:data.reminders||[]})}catch(e){console.warn(e)}
+}
+async function registerReminderWorker(){
+  if(!('serviceWorker' in navigator))return;
+  try{
+    const reg=await navigator.serviceWorker.register('./sw.js',{scope:'./'});
+    reminderSW=reg.active||reg.waiting||reg.installing;
+    navigator.serviceWorker.addEventListener('controllerchange',()=>{reminderSW=navigator.serviceWorker.controller;syncReminderWorker()});
+    if(reg.periodicSync){
+      try{await reg.periodicSync.register('hesabdar-reminders',{minInterval:60*1000})}catch(e){console.warn('Periodic sync unavailable',e)}
+    }
+    if(reg.sync){try{await reg.sync.register('hesabdar-reminders')}catch(e){} }
+    syncReminderWorker();
+  }catch(e){console.warn('Service Worker registration failed',e)}
+}
+function showReminderNotification(r){
+  const title='🔔 '+r.title;
+  const body=(r.amount?money(r.amount)+' • ':'')+(r.type==='expense'?'پرداخت':'دریافت');
+  if('Notification' in window && Notification.permission==='granted'){
+    try{if(reminderSW?.showNotification)reminderSW.showNotification(title,{body,tag:'reminder-'+r.id,data:{id:r.id}});else new Notification(title,{body,tag:'reminder-'+r.id})}catch(e){}
+  }
+}
+function checkDueReminders(){
+  const now=Date.now(), seen=reminderSeen(); let changed=false;
+  for(const r of (data.reminders||[])){
+    const d=new Date(r.date); if(Number.isNaN(d.getTime()))continue;
+    let due=d.getTime();
+    if(r.repeat==='once'){
+      if(due<=now && !seen[r.id]){showReminderNotification(r);seen[r.id]=now;changed=true}
+    }else{
+      while(due<=now){
+        const key=r.id+'@'+due;
+        if(!seen[key]){showReminderNotification(r);seen[key]=now;changed=true}
+        const nd=nextReminderDate({date:new Date(due).toISOString(),repeat:r.repeat},due);
+        if(!nd)break; due=nd.getTime();
+      }
+    }
+  }
+  if(changed)setReminderSeen(seen);
+  syncReminderWorker();
+}
+function startReminderEngine(){
+  if(reminderTimer)clearInterval(reminderTimer);
+  checkDueReminders();
+  reminderTimer=setInterval(checkDueReminders,15000);
+  registerReminderWorker();
+}
+function requestNotifications(){
+  if(!('Notification'in window))return alert('اعلان در این مرورگر در دسترس نیست');
+  Notification.requestPermission().then(async p=>{
+    if(p==='granted'){await registerReminderWorker();checkDueReminders();alert('اعلان‌ها فعال شد')}else alert('اجازه اعلان داده نشد')
+  });
+}
 
 function accountBalance(id){let a=data.accounts.find(x=>x.id===id),v=Number(a?.balance)||0;data.transactions.forEach(t=>{if(t.type==="income"&&t.accountID===id)v+=t.amount;if(t.type==="expense"&&t.accountID===id)v-=t.amount;if(t.type==="transfer"){if(t.from===id)v-=t.amount;if(t.to===id)v+=t.amount}});return v}
 function actionButtons(editFn,deleteFn,id){return `<div class="actions"><button type="button" title="ویرایش" onclick="${editFn}(\'${id}\')">✏️</button><button type="button" class="danger-icon" title="حذف" onclick="${deleteFn}(\'${id}\')">🗑</button></div>`}
@@ -395,4 +462,4 @@ function drawChart(inc,exp){const c=$("chart");if(!c)return;const x=c.getContext
 function exportData(){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));a.download="hesabdar-backup.json";a.click();logEvent("پشتیبان‌گیری","فایل JSON صادر شد","settings")}
 function importData(e){const file=e.target.files?.[0];if(!file)return;const r=new FileReader();r.onload=()=>{try{data=JSON.parse(r.result);data.audit??=[];data.notes??=[];save();logEvent("بازیابی اطلاعات","پشتیبان وارد شد","settings");showLock();alert("بازیابی شد")}catch{alert("فایل نامعتبر است")}};r.readAsText(file)}
 function clearData(){if(confirm("همه اطلاعات حذف شود؟")){const pin=data.pin;data=blankData();data.pin=pin;save();logEvent("پاک کردن اطلاعات","اطلاعات برنامه پاک شد","delete");}}
-showLock();render();logEvent("اجرای برنامه","برنامه حسابدار اجرا شد","system");initSync();
+showLock();render();logEvent("اجرای برنامه","برنامه حسابدار اجرا شد","system");initSync();startReminderEngine();
