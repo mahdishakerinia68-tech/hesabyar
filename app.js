@@ -412,6 +412,25 @@ function previewTxImage(input){
  const f=input?.files?.[0],box=$("txImagePreview");if(!box||!f)return;
  const r=new FileReader();r.onload=()=>box.innerHTML=`<div class="attachment-preview"><img src="${r.result}" alt="پیش‌نمایش"></div>`;r.readAsDataURL(f)
 }
+function openBankMessage(){
+  if(!data.accounts.length)return alert("ابتدا یک حساب اضافه کنید");
+  openModal(`<h2>🏦 تشخیص پیامک بانکی</h2><div class="form">
+    <select id="bma">${data.accounts.map(a=>`<option value="${a.id}">${esc(a.name)}${a.bank?" • "+esc(a.bank):""}</option>`).join("")}</select>
+    <select id="bmt"><option value="income">دریافتی / واریز</option><option value="expense">پرداخت / برداشت</option></select>
+    <input id="bmaAmount" type="number" min="0" placeholder="مبلغ تراکنش">
+    <input id="bt" placeholder="عنوان / شرح پیامک">
+    <textarea id="bms" placeholder="متن پیامک بانک (اختیاری)"></textarea>
+    <select id="bc"><option value="بانکی">بانکی</option>${data.expenseCats.map(c=>`<option value="${esc(c.name)}">${esc(c.name)}</option>`).join("")}</select>
+    <button class="primary" onclick="processBankMessage()">ثبت تراکنش</button>
+  </div>`);
+}
+function processBankMessage(){
+  const accountID=$("bma")?.value, amount=parseMoney($("bmaAmount")?.value||"");
+  if(!accountID||!amount)return alert("حساب و مبلغ را وارد کنید");
+  const type=$("bmt")?.value||"income", title=$("bt")?.value.trim()||"تراکنش بانکی";
+  const nt=touch({id:uid(),title,amount,type,category:$("bc")?.value||"بانکی",accountID,date:new Date().toISOString(),source:"bank",bankMessage:$("bms")?.value||""});
+  data.transactions.unshift(nt);markDirty("transactions",nt.id,false,nt,nt.updatedAt);save();logEvent("ثبت پیامک بانکی",`${title} • ${money(amount)}`,"create");closeModal();
+}
 function saveBankTx(type,amount,accountID){const nt=touch({id:uid(),title:$("bt").value.trim()||"تراکنش بانکی",amount,type,category:$("bc").value,accountID,date:new Date().toISOString(),source:"bank"});data.transactions.unshift(nt);markDirty("transactions",nt.id,false,nt,nt.updatedAt);save();logEvent("ایجاد تراکنش بانکی",`${nt.title} • ${money(nt.amount)}`,"create");closeModal()}
 function openTransfer(id=null){
  const t=id&&data.transactions.find(x=>x.id===id);
