@@ -1,6 +1,6 @@
 {
-  "name": "حسابدار 1.6",
-  "short_name": "حسابدار 1.6",
+  "name": "حسابدار 1.7",
+  "short_name": "حسابدار 1.7",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#f4f7fb",
@@ -8,5 +8,5 @@
   "lang": "fa",
   "dir": "rtl",
   "icons": [],
-  "version": "1.6"
+  "version": "1.7"
 }

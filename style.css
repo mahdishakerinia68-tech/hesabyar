@@ -37,7 +37,7 @@ header{background:rgba(255,255,255,.38)!important;border-bottom:1px solid rgba(2
 .preview-inv-row{display:grid;grid-template-columns:2.2fr .8fr 1.2fr 1.2fr;gap:8px;padding:13px 5px;border-bottom:1px solid #edf2ef}.preview-inv-row.head{background:#eaf2ee;font-size:13px}.preview-total{text-align:left;padding-top:20px;font-size:20px}
 @media(max-width:560px){.invoice-row{grid-template-columns:minmax(0,1.7fr) .7fr 1.1fr 38px}.invoice-table-head{grid-template-columns:minmax(0,1.7fr) .7fr 1.1fr 38px}.invoice-row input{padding:10px 7px}.preview-inv-row{grid-template-columns:1.7fr .7fr 1.1fr 1.1fr;font-size:12px}.invoice-head{font-size:12px}}
 
-/* A6.2: standard sizing and breathing room */
+/* A1.7: standard sizing and breathing room */
 body{font-size:15px;line-height:1.55}
 .page{padding:14px 18px 28px}
 .section-head{margin:26px 2px 13px}
@@ -57,3 +57,5 @@ body{font-size:15px;line-height:1.55}
 .quick-remove{flex:0 0 34px!important;width:34px;height:34px!important;padding:0!important}
 @media(max-width:650px){.quick-fields{grid-template-columns:1fr 1fr}.quick-row{align-items:flex-start}.quick-remove{margin-top:4px}}
 @media(max-width:520px){header h1{font-size:25px}.hero{padding:22px;border-radius:24px}.hero strong{font-size:25px}.grid{gap:9px}.grid>button{padding:13px}.section-head h2{font-size:17px}.page{padding-left:13px;padding-right:13px}.sheet{padding:20px;border-radius:24px}.account-item{gap:8px}.account-item>div:last-child{flex-direction:column;align-items:flex-end}.account-item .actions{flex-direction:row}}
+
+.report-filters{margin-top:12px}.report-filters h3{margin-top:0}.report-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}.report-summary>div{background:#f4f8f6;border-radius:14px;padding:12px}.report-summary span,.report-summary b{display:block}.report-summary b{margin-top:5px;font-size:14px}.report-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #e6eee9}.report-row:last-child{border-bottom:0}.report-row small{display:block;color:#7a8982;font-size:11px;margin-top:4px}.report-card h3{margin-top:0;font-size:15px}.report-table{max-height:360px;overflow:auto;margin-top:8px}@media(max-width:520px){.report-summary{grid-template-columns:1fr}.report-filters .filters{grid-template-columns:1fr}.report-row{align-items:flex-start}}

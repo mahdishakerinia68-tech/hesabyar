@@ -1,4 +1,4 @@
-const CACHE="hesabdar-A6.1-offline-v1";
+const CACHE="hesabdar-1.7-offline-v1";
 const ASSETS=["./","./index.html","./style.css","./app.js","./capacitor-local-notifications-bridge.js","./manifest.json","./sw.js"];
 
 self.addEventListener("install", event=>{
