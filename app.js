@@ -1,6 +1,6 @@
 const KEY="hesabdar-v20";
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="2.2.0";
+const APP_VERSION="3.0.0";
 const SYNC_INTERVAL=5000;
 // Firebase project configuration supplied for this app.
 // This is safe to ship in a web app; access is protected by Firebase Authentication + Firestore Rules.
