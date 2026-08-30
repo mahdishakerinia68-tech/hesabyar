@@ -1,6 +1,7 @@
 const KEY="hesabdar-v11";
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const SYNC_META_KEY="hesabdar-sync-meta-v1";
+const SYNC_META_KEY="hesabdar-sync-meta-v2";
+const APP_VERSION="1.1.4";
 // Firebase project configuration supplied for this app.
 // This is safe to ship in a web app; access is protected by Firebase Authentication + Firestore Rules.
 const DEFAULT_SYNC_CONFIG={
@@ -38,7 +39,16 @@ function hasMeaningfulData(d){
   if(!d||typeof d!=="object")return false;
   return ["accounts","transactions","people","reminders","checks"].some(k=>Array.isArray(d[k])&&d[k].length>0);
 }
-function mergeData(remote){return {...blankData(),...(remote&&typeof remote==="object"?remote:{})}}
+function mergeData(remote){
+  const base=blankData();
+  if(remote&&typeof remote==="object"){
+    for(const k of Object.keys(base)) if(remote[k]!==undefined) base[k]=remote[k];
+    if(typeof remote.pin==="string") base.pin=remote.pin;
+  }
+  return base;
+}
+function cloudPayload(){return {data:JSON.parse(JSON.stringify(data)),updatedAt:firebase.firestore.FieldValue.serverTimestamp(),appVersion:APP_VERSION};}
+function dataSummary(d){return `حساب‌ها: ${Array.isArray(d?.accounts)?d.accounts.length:0} | تراکنش‌ها: ${Array.isArray(d?.transactions)?d.transactions.length:0} | اشخاص: ${Array.isArray(d?.people)?d.people.length:0}`;}
 async function hydrateSync(user){
   if(!user||!sync.db)return;
   const ref=sync.db.collection("users").doc(user.uid);
@@ -46,30 +56,28 @@ async function hydrateSync(user){
   try{
     const snap=await ref.get();
     if(!snap.exists){
-      // First device wins: create the cloud document from its existing local data.
-      await ref.set({data:JSON.parse(JSON.stringify(data)),updatedAt:firebase.firestore.FieldValue.serverTimestamp(),syncVersion:1});
-      setSyncStatus("☁️ اطلاعات این گوشی به ابر منتقل شد");
+      await ref.set(cloudPayload());
+      setSyncStatus("☁️ اطلاعات این گوشی به ابر منتقل شد — "+dataSummary(data));
     }else{
       const remote=snap.data()?.data;
       if(hasMeaningfulData(remote)){
         data=mergeData(remote);
         localStorage.setItem(KEY,JSON.stringify(data));
         render();
-        setSyncStatus("☁️ اطلاعات از ابر دریافت شد");
+        setSyncStatus("☁️ اطلاعات از ابر دریافت شد — "+dataSummary(data));
       }else if(hasMeaningfulData(data)){
-        // Never let an empty/new device overwrite an existing useful local dataset.
-        await ref.set({data:JSON.parse(JSON.stringify(data)),updatedAt:firebase.firestore.FieldValue.serverTimestamp(),syncVersion:1},{merge:true});
-        setSyncStatus("☁️ اطلاعات این گوشی به ابر منتقل شد");
+        await ref.set(cloudPayload(),{merge:true});
+        setSyncStatus("☁️ اطلاعات این گوشی به ابر منتقل شد — "+dataSummary(data));
       }else{
         data=mergeData(remote);
         localStorage.setItem(KEY,JSON.stringify(data));
         render();
-        setSyncStatus("☁️ همگام‌سازی آماده است");
+        setSyncStatus("☁️ همگام‌سازی آماده است — "+dataSummary(data));
       }
     }
   }catch(e){
-    console.error(e);
-    setSyncStatus("⚠️ دریافت/ارسال اطلاعات انجام نشد: "+(e.message||e));
+    console.error("hydrateSync",e);
+    setSyncStatus("⚠️ خطای Firebase: "+(e.code||"")+" "+(e.message||e));
   }finally{sync.hydrating=false}
 }
 async function initSync(){
@@ -109,22 +117,22 @@ async function syncSave(){
   while(sync.queued){
     sync.queued=false;
     try{
-      await sync.db.collection("users").doc(sync.user.uid).set({data:JSON.parse(JSON.stringify(data)),updatedAt:firebase.firestore.FieldValue.serverTimestamp(),syncVersion:1});
-    }catch(e){console.error(e);setSyncStatus("⚠️ ذخیره ابری انجام نشد: "+e.message)}
+      await sync.db.collection("users").doc(sync.user.uid).set(cloudPayload());
+    }catch(e){console.error(e);setSyncStatus("⚠️ ذخیره ابری انجام نشد: "+(e.code||"")+" "+e.message)}
   }
   sync.saving=false;
 }
 function pushToCloud(){
   if(!sync.user||!sync.db)return alert("اول با حساب همگام‌سازی وارد شو");
-  sync.db.collection("users").doc(sync.user.uid).set({data:JSON.parse(JSON.stringify(data)),updatedAt:firebase.firestore.FieldValue.serverTimestamp(),syncVersion:1}).then(()=>setSyncStatus("☁️ اطلاعات این گوشی به ابر منتقل شد")).catch(e=>alert("ارسال ناموفق: "+e.message));
+  sync.db.collection("users").doc(sync.user.uid).set(cloudPayload()).then(()=>setSyncStatus("☁️ اطلاعات این گوشی به ابر منتقل شد — "+dataSummary(data))).catch(e=>alert("ارسال ناموفق: "+(e.code||"")+" "+e.message));
 }
 async function pullFromCloud(){
   if(!sync.user||!sync.db)return alert("اول با حساب همگام‌سازی وارد شو");
   try{
     const s=await sync.db.collection("users").doc(sync.user.uid).get();
     if(!s.exists||!s.data()?.data)return alert("هنوز اطلاعاتی در ابر وجود ندارد");
-    data=mergeData(s.data().data);localStorage.setItem(KEY,JSON.stringify(data));render();setSyncStatus("☁️ اطلاعات از ابر دریافت شد");alert("اطلاعات ابری دریافت شد")
-  }catch(e){alert("دریافت ناموفق: "+e.message)}
+    data=mergeData(s.data().data);localStorage.setItem(KEY,JSON.stringify(data));render();setSyncStatus("☁️ اطلاعات از ابر دریافت شد — "+dataSummary(data));alert("اطلاعات ابری دریافت شد\n"+dataSummary(data))
+  }catch(e){alert("دریافت ناموفق: "+(e.code||"")+" "+e.message)}
 }
 function openSyncSettings(){
  const c=syncConfig()||{};
