@@ -1,12 +1,12 @@
 {
-  "name": "حسابدار 3.0",
-  "short_name": "حسابدار 3.0",
+  "name": "حساب‌یار 3.1",
+  "short_name": "حساب‌یار 3.1",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#f4f7fb",
   "theme_color": "#111827",
   "lang": "fa",
   "dir": "rtl",
-  "icons": [],
-  "version": "3.0"
+  "icons": [{"src":"logo.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}],
+  "version": "3.1"
 }

@@ -1,5 +1,6 @@
-const CACHE="hesabdar-3.0-offline-v1";
-const ASSETS=["./","./index.html","./style.css","./app.js","./capacitor-local-notifications-bridge.js","./manifest.json","./sw.js"];
+const CACHE="hesabdar-3.1-offline-v1";
+const ASSETS=["./",
+      "./logo.png","./index.html","./style.css","./app.js","./capacitor-local-notifications-bridge.js","./manifest.json","./sw.js"];
 
 self.addEventListener("install", event=>{
   event.waitUntil(

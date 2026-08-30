@@ -63,3 +63,11 @@ body{font-size:15px;line-height:1.55}
 .invoice-row select{width:100%;padding:10px;border:1px solid #dce7e2;border-radius:12px;background:#fff;font:inherit;font-size:13px;min-width:0}
 @media(max-width:560px){.invoice-row,.invoice-table-head{grid-template-columns:1fr 1.4fr .65fr 1fr 34px}.invoice-row select{padding:9px 5px;font-size:11px}}
 @media print{body{background:#fff!important}.app>header,body>.modal:not(:last-child),.modal .close,.modal .actions button{display:none!important}.invoice-preview{border:0!important;box-shadow:none!important;width:100%!important}.modal{position:static!important;background:#fff!important}.modal .sheet{position:static!important;max-width:none!important;max-height:none!important;overflow:visible!important;box-shadow:none!important}}
+.date-time-picker{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:10px;border:1px solid #ddd;border-radius:14px;background:#fafafa}.date-time-picker label{display:flex;flex-direction:column;gap:6px;font-weight:700;font-size:13px}.date-time-picker input{width:100%;box-sizing:border-box;padding:11px;border:1px solid #ccc;border-radius:10px;background:#fff;font-size:16px}.date-time-picker small{grid-column:1/-1;color:#777;font-size:12px}@media(max-width:480px){.date-time-picker{grid-template-columns:1fr}.date-time-picker small{grid-column:auto}}
+.brand-head{display:flex;align-items:center;gap:10px}
+.app-logo{width:46px;height:46px;border-radius:12px;object-fit:cover;flex:0 0 auto;box-shadow:0 4px 12px rgba(0,0,0,.12)}
+.invoice-adjustments{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:10px 0}
+.adjustment-field{display:flex;flex-direction:column;gap:6px}
+.adjustment-field label{font-size:13px;font-weight:700}
+.adjustment-field input{width:100%;box-sizing:border-box}
+@media(max-width:620px){.invoice-adjustments{grid-template-columns:1fr}.app-logo{width:40px;height:40px}}
