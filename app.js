@@ -1,7 +1,7 @@
 const KEY="hesabdar-v11";
 const SYNC_KEY="hesabdar-firebase-config-v1";
 const SYNC_META_KEY="hesabdar-sync-meta-v2";
-const APP_VERSION="1.1.5";
+const APP_VERSION="1.1.6";
 // Firebase project configuration supplied for this app.
 // This is safe to ship in a web app; access is protected by Firebase Authentication + Firestore Rules.
 const DEFAULT_SYNC_CONFIG={
@@ -51,35 +51,75 @@ function mergeData(remote){
 }
 function cloudPayload(){return {data:JSON.parse(JSON.stringify(data)),updatedAt:firebase.firestore.FieldValue.serverTimestamp(),appVersion:APP_VERSION};}
 function dataSummary(d){return `حساب‌ها: ${Array.isArray(d?.accounts)?d.accounts.length:0} | تراکنش‌ها: ${Array.isArray(d?.transactions)?d.transactions.length:0} | اشخاص: ${Array.isArray(d?.people)?d.people.length:0}`;}
+function firestoreValue(v){
+  if(v===null)return {nullValue:null};
+  if(typeof v==='boolean')return {booleanValue:v};
+  if(typeof v==='number')return Number.isInteger(v)?{integerValue:String(v)}:{doubleValue:v};
+  if(typeof v==='string')return {stringValue:v};
+  if(Array.isArray(v))return {arrayValue:{values:v.map(firestoreValue)}};
+  if(v&&typeof v==='object'){
+    const fields={}; for(const [k,val] of Object.entries(v)) fields[k]=firestoreValue(val);
+    return {mapValue:{fields}};
+  }
+  return {stringValue:String(v)};
+}
+function fromFirestoreValue(v){
+  if(!v)return null;
+  if('nullValue'in v)return null;
+  if('booleanValue'in v)return v.booleanValue;
+  if('integerValue'in v)return Number(v.integerValue);
+  if('doubleValue'in v)return Number(v.doubleValue);
+  if('stringValue'in v)return v.stringValue;
+  if('timestampValue'in v)return v.timestampValue;
+  if('arrayValue'in v)return (v.arrayValue.values||[]).map(fromFirestoreValue);
+  if('mapValue'in v){const o={};for(const [k,val] of Object.entries(v.mapValue.fields||{}))o[k]=fromFirestoreValue(val);return o;}
+  return null;
+}
+function firestoreUrl(){
+  const cfg=syncConfig();
+  return `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(cfg.projectId)}/databases/(default)/documents/users/${encodeURIComponent(sync.user.uid)}`;
+}
+async function restRequest(method,body){
+  if(!sync.user)throw new Error('کاربر وارد نشده است');
+  const token=await sync.user.getIdToken(true);
+  const r=await fetch(firestoreUrl(),{method,headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined,cache:'no-store'});
+  const text=await r.text(); let j={}; try{j=text?JSON.parse(text):{}}catch{}
+  if(!r.ok){const e=new Error(j.error?.message||`HTTP ${r.status}`);e.code=j.error?.status||`http-${r.status}`;throw e;}
+  return j;
+}
+function restDocument(){
+  return {fields:{data:firestoreValue(data),appVersion:firestoreValue(APP_VERSION),updatedAt:firestoreValue(new Date().toISOString())}};
+}
+function readRestDocument(doc){
+  const d=doc?.fields?.data;
+  return d?fromFirestoreValue(d):null;
+}
+async function pushRest(){
+  return restRequest('PATCH',restDocument());
+}
+async function pullRest(){
+  const doc=await restRequest('GET');
+  return readRestDocument(doc);
+}
 async function hydrateSync(user){
-  if(!user||!sync.db)return;
-  const ref=sync.db.collection("users").doc(user.uid);
+  if(!user)return;
   sync.hydrating=true;
   try{
-    const snap=await ref.get();
-    if(!snap.exists){
-      await ref.set(cloudPayload());
+    const remote=await pullRest();
+    if(hasMeaningfulData(remote)){
+      data=mergeData(remote);localStorage.setItem(KEY,JSON.stringify(data));render();
+      setSyncStatus("☁️ اطلاعات از ابر دریافت شد — "+dataSummary(data));
+    }else if(hasMeaningfulData(data)){
+      await pushRest();
       setSyncStatus("☁️ اطلاعات این گوشی به ابر منتقل شد — "+dataSummary(data));
     }else{
-      const remote=snap.data()?.data;
-      if(hasMeaningfulData(remote)){
-        data=mergeData(remote);
-        localStorage.setItem(KEY,JSON.stringify(data));
-        render();
-        setSyncStatus("☁️ اطلاعات از ابر دریافت شد — "+dataSummary(data));
-      }else if(hasMeaningfulData(data)){
-        await ref.set(cloudPayload(),{merge:true});
-        setSyncStatus("☁️ اطلاعات این گوشی به ابر منتقل شد — "+dataSummary(data));
-      }else{
-        data=mergeData(remote);
-        localStorage.setItem(KEY,JSON.stringify(data));
-        render();
-        setSyncStatus("☁️ همگام‌سازی آماده است — "+dataSummary(data));
-      }
+      setSyncStatus("☁️ ابر خالی است؛ آماده همگام‌سازی");
     }
   }catch(e){
-    console.error("hydrateSync",e);
-    setSyncStatus("⚠️ خطای Firebase: "+(e.code||"")+" "+(e.message||e));
+    if(e.code==='NOT_FOUND'||e.message.includes('not found')){
+      try{await pushRest();setSyncStatus("☁️ اطلاعات این گوشی به ابر منتقل شد — "+dataSummary(data));}
+      catch(x){setSyncStatus("⚠️ ارسال به ابر ناموفق: "+(x.code||'')+" "+x.message);}
+    }else setSyncStatus("⚠️ خطای اتصال ابر: "+(e.code||'')+" "+e.message);
   }finally{sync.hydrating=false}
 }
 async function initSync(){
@@ -88,59 +128,51 @@ async function initSync(){
   try{
     if(!sync.app)sync.app=firebase.apps.length?firebase.app():firebase.initializeApp(cfg);
     sync.auth=firebase.auth();
-    sync.db=firebase.firestore();
-    // iOS/Safari and some networks can have trouble with Firestore WebChannel.
-    // Force long-polling and explicitly bring the Firestore client online.
-    try{sync.db.settings({experimentalForceLongPolling:true});}catch(e){console.warn("Firestore settings",e)}
-    try{await sync.db.enableNetwork();}catch(e){console.warn("Firestore enableNetwork",e)}
     if(sync.authListener)return;
     sync.authListener=true;
     sync.auth.onAuthStateChanged(async user=>{
-      sync.user=user;
-      fillSettingsSyncEmail();
-      if(sync.unsubscribe){sync.unsubscribe();sync.unsubscribe=null}
+      sync.user=user; fillSettingsSyncEmail();
+      if(sync.unsubscribe){clearInterval(sync.unsubscribe);sync.unsubscribe=null}
       if(!user){sync.ready=false;setSyncStatus("☁️ اتصال تنظیم شده؛ وارد حساب همگام‌سازی شو.");return}
       sync.ready=true;
       await hydrateSync(user);
-      const ref=sync.db.collection("users").doc(user.uid);
-      sync.unsubscribe=ref.onSnapshot(s=>{
-        if(!s.exists)return;
-        const remote=s.data()?.data;
-        if(remote&&typeof remote==="object"&&!sync.saving&&!sync.hydrating){
-          data=mergeData(remote);
-          localStorage.setItem(KEY,JSON.stringify(data));
-          render();
-        }
-        setSyncStatus("☁️ همگام‌سازی فعال است");
-      },err=>setSyncStatus("⚠️ خطای همگام‌سازی: "+err.message));
+      sync.unsubscribe=setInterval(async()=>{
+        if(!sync.user||sync.hydrating||sync.saving)return;
+        try{
+          const remote=await pullRest();
+          if(remote&&JSON.stringify(remote)!==JSON.stringify(data)){
+            data=mergeData(remote);localStorage.setItem(KEY,JSON.stringify(data));render();
+          }
+          setSyncStatus("☁️ همگام‌سازی فعال است");
+        }catch(e){setSyncStatus("⚠️ خطای همگام‌سازی: "+(e.code||'')+" "+e.message)}
+      },5000);
     });
   }catch(e){console.error(e);setSyncStatus("⚠️ تنظیمات Firebase نامعتبر است")}
 }
 async function syncSave(){
-  if(!sync.ready||!sync.user||!sync.db||sync.hydrating)return;
+  if(!sync.ready||!sync.user||sync.hydrating)return;
   sync.queued=true;
   if(sync.saving)return;
   sync.saving=true;
   while(sync.queued){
     sync.queued=false;
-    try{
-      await sync.db.collection("users").doc(sync.user.uid).set(cloudPayload());
-    }catch(e){console.error(e);setSyncStatus("⚠️ ذخیره ابری انجام نشد: "+(e.code||"")+" "+e.message)}
+    try{await pushRest();setSyncStatus("☁️ ذخیره ابری انجام شد — "+dataSummary(data));}
+    catch(e){console.error(e);setSyncStatus("⚠️ ذخیره ابری انجام نشد: "+(e.code||'')+" "+e.message)}
   }
   sync.saving=false;
 }
-function pushToCloud(){
-  if(!sync.user||!sync.db)return alert("اول با حساب همگام‌سازی وارد شو");
-  sync.db.collection("users").doc(sync.user.uid).set(cloudPayload()).then(()=>setSyncStatus("☁️ اطلاعات این گوشی به ابر منتقل شد — "+dataSummary(data))).catch(e=>alert("ارسال ناموفق: "+(e.code||"")+" "+e.message));
+async function pushToCloud(){
+  if(!sync.user)return alert("اول با حساب همگام‌سازی وارد شو");
+  try{await pushRest();setSyncStatus("☁️ اطلاعات این گوشی به ابر منتقل شد — "+dataSummary(data));alert("ارسال با موفقیت انجام شد\n"+dataSummary(data));}
+  catch(e){alert("ارسال ناموفق: "+(e.code||'')+"\n"+e.message)}
 }
 async function pullFromCloud(){
-  if(!sync.user||!sync.db)return alert("اول با حساب همگام‌سازی وارد شو");
+  if(!sync.user)return alert("اول با حساب همگام‌سازی وارد شو");
   try{
-    try{await sync.db.enableNetwork();}catch(e){console.warn("enableNetwork before pull",e)}
-    const s=await sync.db.collection("users").doc(sync.user.uid).get();
-    if(!s.exists||!s.data()?.data)return alert("هنوز اطلاعاتی در ابر وجود ندارد");
-    data=mergeData(s.data().data);localStorage.setItem(KEY,JSON.stringify(data));render();setSyncStatus("☁️ اطلاعات از ابر دریافت شد — "+dataSummary(data));alert("اطلاعات ابری دریافت شد\n"+dataSummary(data))
-  }catch(e){alert("دریافت ناموفق: "+(e.code||"")+" "+e.message)}
+    const remote=await pullRest();
+    if(!remote)return alert("هنوز اطلاعاتی در ابر وجود ندارد");
+    data=mergeData(remote);localStorage.setItem(KEY,JSON.stringify(data));render();setSyncStatus("☁️ اطلاعات از ابر دریافت شد — "+dataSummary(data));alert("اطلاعات ابری دریافت شد\n"+dataSummary(data));
+  }catch(e){alert("دریافت ناموفق: "+(e.code||'')+"\n"+e.message)}
 }
 function openSyncSettings(){
  const c=syncConfig()||{};
