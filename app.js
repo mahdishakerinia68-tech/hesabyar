@@ -12,7 +12,7 @@ const DEFAULT_SYNC_CONFIG={
   appId:"1:1048332879407:web:d1168138d754d28c8d68da",
   measurementId:"G-562NVEJKZT"
 };
-let sync={app:null,auth:null,db:null,user:null,unsubscribe:null,ready:false,saving:false,queued:false};
+let sync={app:null,auth:null,db:null,user:null,unsubscribe:null,ready:false,saving:false,queued:false,hydrating:false,authListener:false};
 function syncConfig(){try{return JSON.parse(localStorage.getItem(SYNC_KEY)||"null")||DEFAULT_SYNC_CONFIG}catch{return DEFAULT_SYNC_CONFIG}}
 function syncMeta(){try{return JSON.parse(localStorage.getItem(SYNC_META_KEY)||"{}")}catch{return {}}}
 function setSyncStatus(t){const e=$("syncStatus");if(e)e.textContent=t||""}
@@ -34,45 +34,102 @@ data=data||blankData();
 data.accounts??=[];data.transactions??=[];data.people??=[];data.reminders??=[];data.checks??=[];data.expenseCats??=defaultsExpense.map((name,i)=>({id:"e"+i,name}));data.incomeCats??=defaultsIncome.map((name,i)=>({id:"i"+i,name}));data.pin=typeof data.pin==="string"?data.pin:"";
 let peopleMode="debt";
 function save(){localStorage.setItem(KEY,JSON.stringify(data));render(); syncSave()}
+function hasMeaningfulData(d){
+  if(!d||typeof d!=="object")return false;
+  return ["accounts","transactions","people","reminders","checks"].some(k=>Array.isArray(d[k])&&d[k].length>0);
+}
+function mergeData(remote){return {...blankData(),...(remote&&typeof remote==="object"?remote:{})}}
+async function hydrateSync(user){
+  if(!user||!sync.db)return;
+  const ref=sync.db.collection("users").doc(user.uid);
+  sync.hydrating=true;
+  try{
+    const snap=await ref.get();
+    if(!snap.exists){
+      // First device wins: create the cloud document from its existing local data.
+      await ref.set({data:JSON.parse(JSON.stringify(data)),updatedAt:firebase.firestore.FieldValue.serverTimestamp(),syncVersion:1});
+      setSyncStatus("☁️ اطلاعات این گوشی به ابر منتقل شد");
+    }else{
+      const remote=snap.data()?.data;
+      if(hasMeaningfulData(remote)){
+        data=mergeData(remote);
+        localStorage.setItem(KEY,JSON.stringify(data));
+        render();
+        setSyncStatus("☁️ اطلاعات از ابر دریافت شد");
+      }else if(hasMeaningfulData(data)){
+        // Never let an empty/new device overwrite an existing useful local dataset.
+        await ref.set({data:JSON.parse(JSON.stringify(data)),updatedAt:firebase.firestore.FieldValue.serverTimestamp(),syncVersion:1},{merge:true});
+        setSyncStatus("☁️ اطلاعات این گوشی به ابر منتقل شد");
+      }else{
+        data=mergeData(remote);
+        localStorage.setItem(KEY,JSON.stringify(data));
+        render();
+        setSyncStatus("☁️ همگام‌سازی آماده است");
+      }
+    }
+  }catch(e){
+    console.error(e);
+    setSyncStatus("⚠️ دریافت/ارسال اطلاعات انجام نشد: "+(e.message||e));
+  }finally{sync.hydrating=false}
+}
 async function initSync(){
   const cfg=syncConfig();
   if(!cfg||!window.firebase)return;
   try{
     if(!sync.app)sync.app=firebase.apps.length?firebase.app():firebase.initializeApp(cfg);
     sync.auth=firebase.auth(); sync.db=firebase.firestore();
+    if(sync.authListener)return;
+    sync.authListener=true;
     sync.auth.onAuthStateChanged(async user=>{
       sync.user=user;
       fillSettingsSyncEmail();
       if(sync.unsubscribe){sync.unsubscribe();sync.unsubscribe=null}
       if(!user){sync.ready=false;setSyncStatus("☁️ اتصال تنظیم شده؛ وارد حساب همگام‌سازی شو.");return}
       sync.ready=true;
+      await hydrateSync(user);
       const ref=sync.db.collection("users").doc(user.uid);
       sync.unsubscribe=ref.onSnapshot(s=>{
-        if(!s.exists){ref.set({data,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});setSyncStatus("☁️ آماده همگام‌سازی");return}
+        if(!s.exists)return;
         const remote=s.data()?.data;
-        if(remote&&typeof remote==="object"&&!sync.saving){data={...blankData(),...remote};localStorage.setItem(KEY,JSON.stringify(data));render()}
+        if(remote&&typeof remote==="object"&&!sync.saving&&!sync.hydrating){
+          data=mergeData(remote);
+          localStorage.setItem(KEY,JSON.stringify(data));
+          render();
+        }
         setSyncStatus("☁️ همگام‌سازی فعال است");
       },err=>setSyncStatus("⚠️ خطای همگام‌سازی: "+err.message));
     });
-  }catch(e){console.error(e);setSyncStatus("⚠️ تنظیمات Firebase نامعتبر است") }
+  }catch(e){console.error(e);setSyncStatus("⚠️ تنظیمات Firebase نامعتبر است")}
 }
 async function syncSave(){
-  if(!sync.ready||!sync.user||!sync.db)return;
+  if(!sync.ready||!sync.user||!sync.db||sync.hydrating)return;
   sync.queued=true;
   if(sync.saving)return;
   sync.saving=true;
   while(sync.queued){
     sync.queued=false;
     try{
-      await sync.db.collection("users").doc(sync.user.uid).set({data:JSON.parse(JSON.stringify(data)),updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+      await sync.db.collection("users").doc(sync.user.uid).set({data:JSON.parse(JSON.stringify(data)),updatedAt:firebase.firestore.FieldValue.serverTimestamp(),syncVersion:1});
     }catch(e){console.error(e);setSyncStatus("⚠️ ذخیره ابری انجام نشد: "+e.message)}
   }
   sync.saving=false;
 }
+function pushToCloud(){
+  if(!sync.user||!sync.db)return alert("اول با حساب همگام‌سازی وارد شو");
+  sync.db.collection("users").doc(sync.user.uid).set({data:JSON.parse(JSON.stringify(data)),updatedAt:firebase.firestore.FieldValue.serverTimestamp(),syncVersion:1}).then(()=>setSyncStatus("☁️ اطلاعات این گوشی به ابر منتقل شد")).catch(e=>alert("ارسال ناموفق: "+e.message));
+}
+async function pullFromCloud(){
+  if(!sync.user||!sync.db)return alert("اول با حساب همگام‌سازی وارد شو");
+  try{
+    const s=await sync.db.collection("users").doc(sync.user.uid).get();
+    if(!s.exists||!s.data()?.data)return alert("هنوز اطلاعاتی در ابر وجود ندارد");
+    data=mergeData(s.data().data);localStorage.setItem(KEY,JSON.stringify(data));render();setSyncStatus("☁️ اطلاعات از ابر دریافت شد");alert("اطلاعات ابری دریافت شد")
+  }catch(e){alert("دریافت ناموفق: "+e.message)}
+}
 function openSyncSettings(){
  const c=syncConfig()||{};
  openModal(`<h2>☁️ اتصال دو گوشی</h2><div class="form">
- <p class="hint">اتصال Firebase این برنامه از قبل تنظیم شده است. فقط ایمیل و رمز حساب مشترک را وارد کن.</p>
+ <p class="hint">ایمیل و رمز یکسان را روی هر دو گوشی استفاده کن. بعد از ورود، اطلاعات موجود در ابر خودکار دریافت می‌شود.</p>
  <input id="fbApiKey" placeholder="apiKey" value="${esc(c.apiKey||"")}">
  <input id="fbAuthDomain" placeholder="authDomain" value="${esc(c.authDomain||"")}">
  <input id="fbProjectId" placeholder="projectId" value="${esc(c.projectId||"")}">
@@ -103,10 +160,7 @@ async function ensureSyncReady(){
  if(!sync.auth){alert("اتصال Firebase آماده نیست");return false}
  return true;
 }
-function fillSettingsSyncEmail(){
- const e=$("settingsSyncEmail");
- if(e&&sync.user)e.value=sync.user.email||"";
-}
+function fillSettingsSyncEmail(){const e=$("settingsSyncEmail");if(e&&sync.user)e.value=sync.user.email||""}
 async function loginFromSettings(){
  const email=$("settingsSyncEmail")?.value.trim(), pass=$("settingsSyncPass")?.value;
  if(!email||!pass)return alert("ایمیل و رمز را وارد کن");
