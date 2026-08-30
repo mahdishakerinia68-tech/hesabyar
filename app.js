@@ -1,6 +1,6 @@
 const KEY="hesabdar-v40";
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="3.1";
+const APP_VERSION="3.2";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
 const SYNC_INTERVAL=5000;
@@ -35,7 +35,7 @@ function toEnDigits(s){return String(s).replace(/[۰-۹]/g,d=>String('۰۱۲۳۴
 function jalaliLabel(v){if(!v)return '—';let d=new Date(v);if(Number.isNaN(d.getTime())){let m=toEnDigits(v).match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);return m?`${m[1]}/${String(m[2]).padStart(2,'0')}/${String(m[3]).padStart(2,'0')}`:String(v)}let j=gregorianToJalali(d.getFullYear(),d.getMonth()+1,d.getDate());return `${toFaDigits(j[0])}/${padFa(j[1])}/${padFa(j[2])}`} 
 function jalaliInputValue(v){if(!v)return '';let d=new Date(v);if(Number.isNaN(d.getTime()))return String(v);let j=gregorianToJalali(d.getFullYear(),d.getMonth()+1,d.getDate());return `${toFaDigits(j[0])}/${String(j[1]).padStart(2,'0')}/${String(j[2]).padStart(2,'0')}`} 
 function jalaliToISO(v){let m=toEnDigits(v||'').trim().match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);if(!m)return '';let g=jalaliToGregorian(+m[1],+m[2],+m[3]);return `${g[0]}-${String(g[1]).padStart(2,'0')}-${String(g[2]).padStart(2,'0')}`}
-function jalaliDateTimeInput(v){if(!v)return '';let d=new Date(v);if(Number.isNaN(d.getTime()))return String(v).replace('T',' ');let j=gregorianToJalali(d.getFullYear(),d.getMonth()+1,d.getDate());return `${j[0]}/${String(j[1]).padStart(2,'0')}/${String(j[2]).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`}
+function jalaliDateTimeInput(v){if(!v)return '';let d=new Date(v);if(Number.isNaN(d.getTime()))return toFaDigits(String(v).replace('T',' '));let j=gregorianToJalali(d.getFullYear(),d.getMonth()+1,d.getDate());return `${toFaDigits(j[0])}/${padFa(j[1])}/${padFa(j[2])} ${toFaDigits(String(d.getHours()).padStart(2,'0'))}:${toFaDigits(String(d.getMinutes()).padStart(2,'0'))}`}
 function jalaliDateTimeToISO(v){let x=toEnDigits(v||'').trim().replace('T',' ');let m=x.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})(?:\s+(\d{1,2}):(\d{2}))?$/);if(!m)return '';let g=jalaliToGregorian(+m[1],+m[2],+m[3]);return `${g[0]}-${String(g[1]).padStart(2,'0')}-${String(g[2]).padStart(2,'0')}T${String(m[4]||'00').padStart(2,'0')}:${m[5]||'00'}`}
 function todayJalali(){let d=new Date(),j=gregorianToJalali(d.getFullYear(),d.getMonth()+1,d.getDate());return `${j[0]}/${String(j[1]).padStart(2,'0')}/${String(j[2]).padStart(2,'0')}`}
 
@@ -88,7 +88,7 @@ function auditIcon(k){return ({create:"➕",edit:"✏️",delete:"🗑️",payme
 function renderAudit(){
   const box=$("auditList"); if(!box)return;
   const logs=(data.audit||[]).slice(0,250);
-  box.innerHTML=logs.map(e=>`<div class="audit-item"><div class="audit-icon">${auditIcon(e.kind)}</div><div class="audit-main"><b>${esc(e.action)}</b>${e.detail?`<div class="meta">${esc(e.detail)}</div>`:""}<small>${new Date(e.at).toLocaleString("fa-IR")}</small></div></div>`).join("")||empty("هنوز گزارشی ثبت نشده است");
+  box.innerHTML=logs.map(e=>`<div class="audit-item"><div class="audit-icon">${auditIcon(e.kind)}</div><div class="audit-main"><b>${esc(e.action)}</b>${e.detail?`<div class="meta">${esc(e.detail)}</div>`:""}<small>${new Intl.DateTimeFormat("fa-IR-u-ca-persian",{dateStyle:"short",timeStyle:"short"}).format(new Date(e.at))}</small></div></div>`).join("")||empty("هنوز گزارشی ثبت نشده است");
 }
 function clearAudit(){if(!data.audit?.length)return alert("گزارشی برای پاک کردن وجود ندارد");if(confirm("همه گزارش‌های فعالیت پاک شوند؟")){const old=data.audit.slice();data.audit=[];for(const e of old)markDirty("audit",e.id,true,{id:e.id},new Date().toISOString());save();logEvent("گزارش‌ها پاک شدند","سابقه فعالیت قبلی حذف شد","system")}}
 function save(){localStorage.setItem(KEY,JSON.stringify(data));render();syncSave()}
@@ -479,10 +479,10 @@ function savePerson(id){const name=$("pn").value.trim(),amount=parseMoney($("pa"
 function deletePerson(id){if(confirm("این مورد حذف شود؟")){const p=data.people.find(x=>x.id===id);removeRecord("people",id);logEvent("حذف شخص",p?.name||id,"delete")}}
 function payPerson(id){const p=data.people.find(x=>x.id===id);if(!p)return;const remaining=Math.max(0,(Number(p.amount)||0)-(Number(p.paid)||0));const v=prompt("مبلغ تسویه:",String(remaining));if(v!==null){const n=parseMoney(v);if(!n)return alert("مبلغ نامعتبر است");p.paid=Math.min(Number(p.amount)||0,(Number(p.paid)||0)+n);touch(p);markDirty("people",p.id,false,p,p.updatedAt);save();logEvent("تسویه شخص",`${p.name} • ${money(n)}`,"payment")}}
 
-function pickerDateValue(v){const d=v?new Date(v):new Date(); if(Number.isNaN(d.getTime())) return ""; return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;}
+function pickerDateValue(v){if(!v)return todayJalali();let d=new Date(v);if(Number.isNaN(d.getTime()))return toFaDigits(String(v));let j=gregorianToJalali(d.getFullYear(),d.getMonth()+1,d.getDate());return `${toFaDigits(j[0])}/${padFa(j[1])}/${padFa(j[2])}`;}
 function pickerTimeValue(v){const d=v?new Date(v):new Date(); if(Number.isNaN(d.getTime())) return ""; return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;}
-function pickerToISO(dateId,timeId){const dv=$(dateId)?.value||"", tv=$(timeId)?.value||"00:00"; if(!dv)return ""; const [y,m,d]=dv.split("-").map(Number),[hh,mm]=tv.split(":").map(Number); return new Date(y,m-1,d,hh||0,mm||0,0,0).toISOString();}
-function pickerBox(dateId,timeId,v){return `<div class="date-time-picker"><label>📅 تاریخ <input id="${dateId}" type="date" value="${pickerDateValue(v)}"></label><label>⏰ ساعت <input id="${timeId}" type="time" value="${pickerTimeValue(v)}"></label><small>تاریخ و ساعت را از انتخابگر انتخاب کن</small></div>`;}
+function pickerToISO(dateId,timeId){const dv=$(dateId)?.value||"", tv=$(timeId)?.value||"00:00"; if(!dv)return ""; return jalaliDateTimeToISO(`${dv} ${tv}`);}
+function pickerBox(dateId,timeId,v){return `<div class="date-time-picker"><label>📅 تاریخ شمسی <input id="${dateId}" inputmode="numeric" autocomplete="off" placeholder="۱۴۰۵/۰۶/۰۸" value="${esc(pickerDateValue(v))}"></label><label>⏰ ساعت <input id="${timeId}" type="time" value="${pickerTimeValue(v)}"></label><small>تاریخ را به‌صورت شمسی وارد کن (۱۴۰۵/۰۶/۰۸)</small></div>`;}
 
 function openNote(id=null){
  const n=id&&data.notes.find(x=>x.id===id);
@@ -677,7 +677,7 @@ function renderAdvancedReport(){
  if(type!=="all" && type!=="transfer") rows=rows.filter(t=>t.type===type);
  if(account) rows=rows.filter(t=>t.accountID===account || t.from===account || t.to===account);
  const fi=from?jalaliToISO(from):"", ti=to?jalaliToISO(to):"";
- if(fi)rows=rows.filter(t=>String(t.date||"")>=fi); if(ti)rows=rows.filter(t=>String(t.date||"")<=ti+"T23:59");
+ const fiISO=fi?jalaliToISO(fi):"", tiISO=ti?jalaliToISO(ti):""; if(fiISO)rows=rows.filter(t=>String(t.date||"")>=fiISO); if(tiISO)rows=rows.filter(t=>String(t.date||"")<=tiISO+"T23:59");
  const income=rows.filter(t=>t.type==="income").reduce((s,t)=>s+Number(t.amount||0),0), expense=rows.filter(t=>t.type==="expense").reduce((s,t)=>s+Number(t.amount||0),0);
  box.innerHTML=`<div class="report-summary"><div><span>دریافتی</span><b class="income">${money(income)}</b></div><div><span>هزینه</span><b class="expense">${money(expense)}</b></div><div><span>خالص</span><b>${money(income-expense)}</b></div></div><div class="report-table">${rows.slice(0,100).map(t=>`<div class="report-row"><span>${esc(t.title||"تراکنش")}<small>${jalaliLabel(t.date)} • ${esc(t.category||"")}</small></span><strong class="${t.type}">${t.type==="income"?"+":"−"}${money(t.amount)}</strong></div>`).join("")||`<p class="hint">موردی با این فیلتر پیدا نشد.</p>`}</div>`;
 }

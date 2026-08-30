@@ -1,4 +1,4 @@
-const CACHE="hesabdar-3.1-offline-v1";
+const CACHE="hesabdar-3.2-offline-v1";
 const ASSETS=["./",
       "./logo.png","./index.html","./style.css","./app.js","./capacitor-local-notifications-bridge.js","./manifest.json","./sw.js"];
 
