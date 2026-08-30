@@ -1,6 +1,6 @@
 const KEY="hesabdar-v40";
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="A6";
+const APP_VERSION="A6.1";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
 const SYNC_INTERVAL=5000;

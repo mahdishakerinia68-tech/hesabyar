@@ -1,6 +1,6 @@
 {
-  "name": "حسابدار A6",
-  "short_name": "حسابدار A6",
+  "name": "حسابدار A6.1",
+  "short_name": "حسابدار A6.1",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#f4f7fb",
@@ -8,5 +8,5 @@
   "lang": "fa",
   "dir": "rtl",
   "icons": [],
-  "version": "A6"
+  "version": "A6.1"
 }
