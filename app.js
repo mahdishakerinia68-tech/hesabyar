@@ -552,8 +552,18 @@ async function checkForUpdates(manual=false){const repo=githubRepo();if($("githu
   if(isNewerVersion(remote,APP_VERSION)){setUpdateStatus("⚠️ نسخه جدید "+remote+" موجود است؛ بروزرسانی بررسی شد");if(localStorage.getItem("hesabdar-last-notified-update")!==remote){localStorage.setItem("hesabdar-last-notified-update",remote);await notifyUpdate(remote,rel.html_url)}}else{setUpdateStatus("✅ برنامه به‌روز است؛ نسخه فعلی "+APP_VERSION);localStorage.setItem("hesabdar-last-update",remote)}
   await updateServiceWorker(true);return true;
 }catch(e){setUpdateStatus("❌ بررسی بروزرسانی انجام نشد؛ اینترنت و نام مخزن را بررسی کن.");return false}}
-async function updateServiceWorker(force=false){if(!("serviceWorker" in navigator))return false;try{const reg=await navigator.serviceWorker.ready;if(force||reg.update)await reg.update();return true}catch(e){console.warn("service worker update",e);return false}}
-function startUpdateChecker(){setTimeout(()=>checkForUpdates(false),2500);setInterval(()=>checkForUpdates(false),UPDATE_CHECK_MS);window.addEventListener("online",()=>setTimeout(()=>checkForUpdates(false),1500));if("serviceWorker" in navigator)navigator.serviceWorker.addEventListener("controllerchange",()=>{if(!sessionStorage.getItem("hesabdar-sw-reloaded")){sessionStorage.setItem("hesabdar-sw-reloaded","1");location.reload()}})}
+async function updateServiceWorker(force=false){
+  if(!("serviceWorker" in navigator))return false;
+  try{
+    const reg=await navigator.serviceWorker.getRegistration();
+    if(!reg)return false;
+    await reg.update();
+    if(force && reg.waiting)reg.waiting.postMessage({type:"SKIP_WAITING"});
+    return true;
+  }catch(e){console.warn("service worker update",e);return false}
+}
+
+function startUpdateChecker(){setTimeout(()=>checkForUpdates(false),2500);setInterval(()=>checkForUpdates(false),UPDATE_CHECK_MS);window.addEventListener("online",()=>setTimeout(()=>checkForUpdates(false),1500));if("serviceWorker" in navigator)navigator.serviceWorker.addEventListener("controllerchange",()=>location.reload())}
 async function requestNotifications(){const ok=await requestNativeNotifications();alert(ok?"اعلان‌ها فعال شدند؛ یادآوری‌های زمان‌دار نیز زمان‌بندی شدند.":"اجازه اعلان داده نشد یا قابلیت Native در این محیط در دسترس نیست.")}
 
 
