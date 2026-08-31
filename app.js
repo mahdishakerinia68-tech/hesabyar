@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="3.7.3";
+const APP_VERSION="3.8";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
@@ -664,7 +664,7 @@ function openInvoice(id=null){
  const people=Array.isArray(inv?.people)?inv.people:[];
  const cust=inv?.customerId?data.customers.find(c=>c.id===inv.customerId):null;
  const brand=inv?.brandingSnapshot||data.branding||{};
- openModal(`<h2>🧾 ${inv?"ویرایش فاکتور":"ثبت / صدور فاکتور"}</h2><div class="form">
+ openModal(`<div class="ios-invoice-modal"><div class="ios-invoice-top"><div class="ios-invoice-icon">🧾</div><div><h2> ${inv?"ویرایش فاکتور":"ثبت / صدور فاکتور"}</h2><small>فاکتور خود را مثل یک فرم مدرن آیفون مدیریت کن</small></div></div><div class="form ios-invoice-form">
  <input id="invName" placeholder="نام فاکتور" value="${esc(inv?.name||"")}">
  <div class="two-fields"><input id="invSeller" placeholder="نام فروشگاه / فروشنده" value="${esc(inv?.seller||brand.storeName||"")}"><select id="invCustomer"><option value="">بدون مشتری</option>${data.customers.map(c=>`<option value="${c.id}" ${c.id===inv?.customerId?"selected":""}>${esc(c.name)}${c.phone?" • "+esc(c.phone):""}</option>`).join("")}</select></div>
  <div class="two-fields"><input id="invDate" inputmode="numeric" placeholder="تاریخ شمسی ۱۴۰۵/۰۶/۰۸" value="${esc(jalaliInputValue(inv?.date)||todayJalali())}"><input id="invNo" placeholder="شماره فاکتور" value="${esc(inv?.number||"")}"></div>
@@ -681,8 +681,8 @@ function openInvoice(id=null){
  <div id="invoiceRows">${items.map(invoiceRowHTML).join("")}</div>
  <button type="button" onclick="addInvoiceRow()">＋ افزودن ردیف</button>
  <div class="invoice-total-box"><div>مبلغ قبل از تخفیف: <strong id="invLiveSubtotal">۰ تومان</strong></div><div>تخفیف: <strong id="invLiveDiscount">۰ تومان</strong></div><div>مالیات: <strong id="invLiveTax">۰ تومان</strong></div><div class="final-total">مبلغ نهایی: <strong id="invLiveTotal">۰ تومان</strong></div></div>
- <button class="primary" onclick="saveInvoice('${inv?.id||""}')">💾 ${inv?"ذخیره تغییرات":"ثبت و صدور فاکتور"}</button>
- </div>`);
+ <button class="primary ios-invoice-save" onclick="saveInvoice('${inv?.id||""}')">💾 ${inv?"ذخیره تغییرات":"ثبت و صدور فاکتور"}</button>
+ </div></div>`);
  updateInvoiceLiveTotal();updateInvoicePeopleTotals();
 }
 function invoiceSubtotal(inv){return (inv.items||[]).reduce((s,x)=>s+(Number(x.qty)||0)*(Number(x.price)||0),0)}

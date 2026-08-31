@@ -92,7 +92,7 @@ body{font-size:15px;line-height:1.55}
 .note-actions .actions button{width:34px;height:34px;padding:0}
 @media(max-width:520px){.note-card .accordion-head{padding:11px 12px}.note-card .accordion-body{padding:0 10px 10px}.note-check-row{min-height:38px;padding:5px 7px}.note-check-row label{font-size:13.5px}.note-text{font-size:13.5px;line-height:1.7}}
 
-/* حساب‌یار 3.7.1 — invoice persistence / people / discount UI */
+/* حساب‌یار 3.8 — invoice persistence / people / discount UI */
 .invoice-section-title{font-weight:900;margin-top:10px;padding:11px 13px;border-radius:14px;background:rgba(33,132,91,.08);border:1px solid rgba(33,132,91,.12)}
 .invoice-person-row{display:grid;grid-template-columns:1.5fr 1fr 1fr 42px;gap:8px;margin:8px 0;align-items:center}
 .invoice-person-row input{width:100%;min-width:0;padding:12px;border:1px solid #dce7e2;border-radius:13px;background:rgba(255,255,255,.72);font:inherit}
@@ -136,3 +136,34 @@ body{font-size:15px;line-height:1.55}
 .ios-note-meta{font-size:13px;opacity:.78;margin-top:6px}.ios-note-meta.muted{opacity:.55}
 .note-flag{font-size:13px}.note-priority{font-size:12px;opacity:.7}
 .note-card.has-alarm{border-inline-start:3px solid rgba(0,122,255,.65)}
+
+
+/* v3.8 — iPhone Reminders-inspired invoice editor theme (theme only; invoice logic incl. discount preserved) */
+.ios-invoice-modal{max-width:640px;margin:auto}
+.ios-invoice-top{display:flex;gap:12px;align-items:center;margin-bottom:16px}
+.ios-invoice-top h2{margin:0;font-size:21px;font-weight:800;letter-spacing:-.2px}
+.ios-invoice-top small{display:block;opacity:.62;margin-top:3px;font-size:12px}
+.ios-invoice-icon{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:rgba(0,122,255,.13);font-size:22px}
+.ios-invoice-form{gap:10px}
+.ios-invoice-form>input,.ios-invoice-form>textarea,.ios-invoice-form>.two-fields input,.ios-invoice-form>.two-fields select,
+.ios-invoice-form .invoice-row input,.ios-invoice-form .invoice-row select,.ios-invoice-form .invoice-person-row input{
+  border:1px solid rgba(60,60,67,.12);background:rgba(118,118,128,.07);border-radius:13px;min-height:46px;box-sizing:border-box;color:inherit
+}
+.ios-invoice-form>input:first-child{font-size:20px;font-weight:700;background:rgba(118,118,128,.06)}
+.ios-invoice-form .two-fields{gap:9px}
+.ios-invoice-form .invoice-section-title{margin-top:8px;padding:12px 14px;border:0;border-radius:14px;background:rgba(118,118,128,.08);font-weight:800;color:inherit}
+.ios-invoice-form .invoice-table-head{color:rgba(60,60,67,.65);font-size:11px;margin-top:5px}
+.ios-invoice-form .invoice-row,.ios-invoice-form .invoice-person-row{gap:7px}
+.ios-invoice-form .invoice-row button,.ios-invoice-form .invoice-person-row button{border-radius:12px}
+.ios-invoice-form>button:not(.primary){border:0;border-radius:13px;background:rgba(0,122,255,.10);color:#007aff;font-weight:700;padding:11px 13px}
+.ios-invoice-form .invoice-people-totals{margin:8px 0;padding:12px 14px;border:0;border-radius:14px;background:rgba(118,118,128,.07);font-size:13px}
+.ios-invoice-form .invoice-total-box{margin-top:8px;padding:15px;border:0;border-radius:16px;background:rgba(118,118,128,.08);line-height:2}
+.ios-invoice-form .invoice-total-box .final-total{border-top:1px solid rgba(60,60,67,.12);font-size:19px;padding-top:8px}
+.ios-invoice-save{border:0!important;border-radius:15px!important;background:#007aff!important;color:#fff!important;min-height:48px;font-size:16px!important;font-weight:800!important;box-shadow:none!important}
+.ios-invoice-form textarea{padding:13px 14px}
+.ios-invoice-form .invoice-row select{font-size:12px}
+.dark .ios-invoice-form>input,.dark .ios-invoice-form>textarea,.dark .ios-invoice-form>.two-fields input,.dark .ios-invoice-form>.two-fields select,
+.dark .ios-invoice-form .invoice-row input,.dark .ios-invoice-form .invoice-row select,.dark .ios-invoice-form .invoice-person-row input{background:rgba(118,118,128,.16);border-color:rgba(255,255,255,.09);color:#f2f2f7}
+.dark .ios-invoice-form .invoice-table-head{color:#aeb0b7}
+.dark .ios-invoice-form .invoice-total-box,.dark .ios-invoice-form .invoice-people-totals,.dark .ios-invoice-form .invoice-section-title{background:rgba(118,118,128,.14)}
+.dark .ios-invoice-form .invoice-total-box .final-total{border-color:rgba(255,255,255,.10)}
