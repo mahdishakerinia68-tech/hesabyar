@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="3.8.2";
+const APP_VERSION="4.0";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
@@ -28,10 +28,10 @@ function autoBackupEnabled(){return localStorage.getItem(AUTO_BACKUP_ENABLED_KEY
 function setAutoBackupEnabled(v){localStorage.setItem(AUTO_BACKUP_ENABLED_KEY,v?"true":"false"); if(v) createAutoBackup("فعال‌سازی پشتیبان خودکار"); logEvent(v?"پشتیبان خودکار فعال شد":"پشتیبان خودکار غیرفعال شد",v?"پشتیبان‌گیری خودکار هر ۶ ساعت فعال است":"پشتیبان‌گیری خودکار خاموش شد","settings",false); renderSettingsFeatures()}
 function createAutoBackup(reason="زمان‌بندی"){try{if(!autoBackupEnabled())return false; const raw=JSON.stringify(data); const list=JSON.parse(localStorage.getItem(AUTO_BACKUP_KEY)||"[]"); list.unshift({at:new Date().toISOString(),reason,data:JSON.parse(raw)}); while(list.length>5)list.pop(); localStorage.setItem(AUTO_BACKUP_KEY,JSON.stringify(list)); localStorage.setItem(AUTO_BACKUP_KEY+"-last",new Date().toISOString()); return true}catch(e){console.warn("auto backup",e);return false}}
 function getAutoBackupInfo(){try{const last=localStorage.getItem(AUTO_BACKUP_KEY+"-last");return last?new Date(last):null}catch{return null}}
-function restoreLatestAutoBackup(){try{const list=JSON.parse(localStorage.getItem(AUTO_BACKUP_KEY)||"[]"); if(!list.length)return alert("هنوز پشتیبان خودکاری وجود ندارد."); if(!confirm("آخرین پشتیبان خودکار جایگزین اطلاعات فعلی شود؟"))return; data=list[0].data; normalizeData(); save(); logEvent("بازیابی پشتیبان خودکار",new Intl.DateTimeFormat("fa-IR-u-ca-persian",{dateStyle:"short",timeStyle:"short"}).format(new Date(list[0].at)),"settings"); alert("آخرین پشتیبان خودکار بازیابی شد.")}catch(e){alert("پشتیبان خودکار قابل بازیابی نیست.")}}
-function normalizeData(){data=data||blankData(); for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats","audit"]){data[k]??=[];} data.pin=typeof data.pin==="string"?data.pin:""; data.pinHash=typeof data.pinHash==="string"?data.pinHash:""; data.pinSalt=typeof data.pinSalt==="string"?data.pinSalt:""; data.branding??={storeName:"",logo:"",stamp:"",signature:""}; data.branding.storeName??="";data.branding.logo??="";data.branding.stamp??="";data.branding.signature??=""; data.yearSettlements??={}; data._sync??={tombstones:{}}; data._sync.tombstones??={}; for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats"]){for(const r of data[k]){r.id??=uid();r.updatedAt??=new Date().toISOString();}} for(const inv of data.invoices){inv.people=Array.isArray(inv.people)?inv.people:[];inv.discount=Number(inv.discount)||0;inv.discountPercent=Number(inv.discountPercent)||0;inv.total=invoiceTotal(inv);inv.brandingSnapshot??={storeName:data.branding.storeName||"",logo:data.branding.logo||"",stamp:data.branding.stamp||"",signature:data.branding.signature||""};}}
-function renderSettingsFeatures(){const e=$("autoBackupToggle");if(e)e.checked=autoBackupEnabled(); const last=$("autoBackupLast"); if(last){const d=getAutoBackupInfo();last.textContent=d?"آخرین پشتیبان: "+new Intl.DateTimeFormat("fa-IR-u-ca-persian",{dateStyle:"short",timeStyle:"short"}).format(d):"هنوز پشتیبان خودکاری ساخته نشده";} const v=$("appVersionText");if(v)v.textContent=APP_VERSION;}
-function setSyncStatus(t){const e=$("syncStatus");if(e)e.textContent=t||""}
+function restoreLatestAutoBackup(){try{const list=JSON.parse(localStorage.getItem(AUTO_BACKUP_KEY)||"[]"); if(!list.length)return alert("هنوز پشتیبان خودکاری وجود ندارد."); if(!confirm("آخرین پشتیبان خودکار جایگزین اطلاعات فعلی شود؟"))return; data=list[0].data; normalizeData(); save(); logEvent("بازیابی پشتیبان خودکار",new Date(list[0].at).toLocaleString("fa-IR"),"settings"); alert("آخرین پشتیبان خودکار بازیابی شد.")}catch(e){alert("پشتیبان خودکار قابل بازیابی نیست.")}}
+function normalizeData(){data=data||blankData(); for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats","audit"]){data[k]??=[];} data.pin=typeof data.pin==="string"?data.pin:""; data.pinHash=typeof data.pinHash==="string"?data.pinHash:""; data.pinSalt=typeof data.pinSalt==="string"?data.pinSalt:""; data.branding??={storeName:"",logo:"",stamp:"",signature:""}; data.yearSettlements??={}; data._sync??={tombstones:{}}; data._sync.tombstones??={}; for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats"]){for(const r of data[k]){r.id??=uid();r.updatedAt??=new Date().toISOString();}}}
+function renderSettingsFeatures(){const e=$("autoBackupToggle");if(e)e.checked=autoBackupEnabled(); const last=$("autoBackupLast"); if(last){const d=getAutoBackupInfo();last.textContent=d?"آخرین پشتیبان: "+d.toLocaleString("fa-IR"):"هنوز پشتیبان خودکاری ساخته نشده";} const v=$("appVersionText");if(v)v.textContent=APP_VERSION;}
+function setSyncStatus(t){const e=$("syncStatus");if(e)e.textContent=t||"";const b=$("syncBadge");if(!b)return;const s=String(t||"");let cls="offline",label="☁️ آفلاین";if(s.includes("آنلاین")||s.includes("انجام شد")||s.includes("متصل است")){cls="online";label="☁️ متصل"}else if(s.includes("⚠️")||s.includes("ناموفق")){cls="error";label="⚠️ خطای اتصال"}else if(s.includes("در حال")||s.includes("بررسی")){cls="pending";label="☁️ در حال اتصال..."}else if(s.includes("وارد شوید")||s.includes("ابتدا")){cls="offline";label="☁️ واردنشده"}b.textContent=label;b.className="sync-badge "+cls}
 
 const defaultsExpense=["بنزین","غذا و رستوران","خرید خانه","خرید روزانه","قبض","اینترنت و شارژ","حمل‌ونقل","پوشاک","درمان","تفریح","هدیه","سایر"];
 const defaultsIncome=["حقوق","پاداش","واریز","فروش","دریافت از شخص","سایر"];
@@ -41,17 +41,16 @@ const money=n=>fa(n)+" تومان";
 const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
 // Jalali date helpers (UI uses Persian dates; storage remains ISO/Gregorian for compatibility).
 function div(a,b){return Math.floor(a/b)}
-const PERSIAN_FMT=new Intl.DateTimeFormat('en-US-u-ca-persian',{year:'numeric',month:'numeric',day:'numeric',timeZone:'UTC'});
-function gregorianToJalali(gy,gm,gd){const parts=PERSIAN_FMT.formatToParts(new Date(Date.UTC(gy,gm-1,gd)));const get=k=>Number(parts.find(x=>x.type===k)?.value);return [get('year'),get('month'),get('day')]}
-function jalaliToGregorian(jy,jm,jd){const target=[Number(jy),Number(jm),Number(jd)];let lo=Date.UTC(jy+620,0,1),hi=Date.UTC(jy+623,11,31);while(lo<=hi){const mid=lo+Math.floor((hi-lo)/86400000/2)*86400000;const d=new Date(mid),g=[d.getUTCFullYear(),d.getUTCMonth()+1,d.getUTCDate()],j=gregorianToJalali(...g);const cmp=j[0]-target[0]||j[1]-target[1]||j[2]-target[2];if(cmp===0)return g;if(cmp<0)lo=mid+86400000;else hi=mid-86400000}throw new Error('Invalid Jalali date')}
+function gregorianToJalali(gy,gm,gd){let gdm=[0,31,59,90,120,151,181,212,243,273,304,334];let jy=gy<=1600?0:979;gy-=gy<=1600?621:1600;let gy2=gm>2?gy+1:gy;let days=365*gy+div(gy2+3,4)-div(gy2+99,100)+div(gy2+399,400)-80+gd+gdm[gm-1];jy+=33*div(days,12053);days%=12053;jy+=4*div(days,1461);days%=1461;if(days>365){jy+=div(days-1,365);days=(days-1)%365}let jm=days<186?1+div(days,31):7+div(days-186,30);let jd=1+(days<186?days%31:(days-186)%30);return [jy,jm,jd]}
+function jalaliToGregorian(jy,jm,jd){jy+=1595;let days=-355668+(365*jy)+(div(jy,33)*8)+div(((jy%33)+3),4)+jd+((jm<7)?(jm-1)*31:((jm-7)*30)+186);let gy=400*div(days,146097);days%=146097;if(days>36524){gy+=100*div(--days,36524);days%=36524;if(days>=365)days++}gy+=4*div(days,1461);days%=1461;if(days>365){gy+=div(days-1,365);days=(days-1)%365}let gd=days+1;let sal_a=[0,31,((gy%4===0&&gy%100!==0)||(gy%400===0))?29:28,31,30,31,30,31,31,30,31,30,31];let gm;for(gm=1;gm<=12;gm++){const v=sal_a[gm];if(gd<=v)break;gd-=v}return [gy,gm,gd]}
 function padFa(n){return String(n).padStart(2,'0').replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d])}
 function toFaDigits(s){return String(s).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d])}
 function toEnDigits(s){return String(s).replace(/[۰-۹]/g,d=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))}
-function jalaliLabel(v){if(!v)return '—';let d=new Date(v);if(Number.isNaN(d.getTime())){let m=toEnDigits(v).match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);return m?`${toFaDigits(m[1])}/${padFa(m[2])}/${padFa(m[3])}`:String(v)}let j=gregorianToJalali(d.getFullYear(),d.getMonth()+1,d.getDate());return `${toFaDigits(j[0])}/${padFa(j[1])}/${padFa(j[2])}`} 
-function jalaliInputValue(v){if(!v)return '';let d=new Date(v);if(Number.isNaN(d.getTime()))return String(v);let j=gregorianToJalali(d.getFullYear(),d.getMonth()+1,d.getDate());return `${toFaDigits(j[0])}/${padFa(j[1])}/${padFa(j[2])}`} 
+function jalaliLabel(v){if(!v)return '—';let d=new Date(v);if(Number.isNaN(d.getTime())){let m=toEnDigits(v).match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);return m?`${m[1]}/${String(m[2]).padStart(2,'0')}/${String(m[3]).padStart(2,'0')}`:String(v)}let j=gregorianToJalali(d.getFullYear(),d.getMonth()+1,d.getDate());return `${toFaDigits(j[0])}/${padFa(j[1])}/${padFa(j[2])}`} 
+function jalaliInputValue(v){if(!v)return '';let d=new Date(v);if(Number.isNaN(d.getTime()))return String(v);let j=gregorianToJalali(d.getFullYear(),d.getMonth()+1,d.getDate());return `${toFaDigits(j[0])}/${String(j[1]).padStart(2,'0')}/${String(j[2]).padStart(2,'0')}`} 
 function jalaliToISO(v){let m=toEnDigits(v||'').trim().match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);if(!m)return '';let g=jalaliToGregorian(+m[1],+m[2],+m[3]);return `${g[0]}-${String(g[1]).padStart(2,'0')}-${String(g[2]).padStart(2,'0')}`}
 function jalaliDateTimeInput(v){if(!v)return '';let d=new Date(v);if(Number.isNaN(d.getTime()))return toFaDigits(String(v).replace('T',' '));let j=gregorianToJalali(d.getFullYear(),d.getMonth()+1,d.getDate());return `${toFaDigits(j[0])}/${padFa(j[1])}/${padFa(j[2])} ${toFaDigits(String(d.getHours()).padStart(2,'0'))}:${toFaDigits(String(d.getMinutes()).padStart(2,'0'))}`}
-function jalaliDateTimeToISO(v){let x=toEnDigits(v||'').trim().replace('T',' '),m=x.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})(?:\s+(\d{1,2}):(\d{2}))?$/);if(!m)return '';let g=jalaliToGregorian(+m[1],+m[2],+m[3]);return `${g[0]}-${String(g[1]).padStart(2,'0')}-${String(g[2]).padStart(2,'0')}T${String(m[4]||'00').padStart(2,'0')}:${m[5]||'00'}`}
+function jalaliDateTimeToISO(v){let x=toEnDigits(v||'').trim().replace('T',' ');let m=x.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})(?:\s+(\d{1,2}):(\d{2}))?$/);if(!m)return '';let g=jalaliToGregorian(+m[1],+m[2],+m[3]);return `${g[0]}-${String(g[1]).padStart(2,'0')}-${String(g[2]).padStart(2,'0')}T${String(m[4]||'00').padStart(2,'0')}:${m[5]||'00'}`}
 function todayJalali(){let d=new Date(),j=gregorianToJalali(d.getFullYear(),d.getMonth()+1,d.getDate());return `${j[0]}/${String(j[1]).padStart(2,'0')}/${String(j[2]).padStart(2,'0')}`}
 
 const uid=()=>{try{if(globalThis.crypto&&typeof crypto.randomUUID==="function")return crypto.randomUUID()}catch(e){}return "id-"+Date.now()+"-"+Math.random().toString(36).slice(2)};
@@ -63,22 +62,100 @@ function getNativeLocalNotifications(){try{if(nativeNotifications)return nativeN
 function notificationIdForReminder(id){let h=0;for(const ch of String(id||""))h=((h<<5)-h+ch.charCodeAt(0))|0;return NATIVE_NOTIFICATION_ID_PREFIX+(Math.abs(h)%100000000)}
 function localDateFromInput(v){if(!v)return null;const d=new Date(v);return Number.isNaN(d.getTime())?null:d}
 function addMonthsSafe(d,n){const out=new Date(d.getTime()),day=out.getDate();out.setDate(1);out.setMonth(out.getMonth()+n);const last=new Date(out.getFullYear(),out.getMonth()+1,0).getDate();out.setDate(Math.min(day,last));return out}
-function nextReminderDate(r,now=new Date()){let d=localDateFromInput(r?.date);if(!d)return null;const rep=r.repeat||"once";if(rep==="once")return d>now?d:null;let guard=0;while(d<=now&&guard++<500){if(rep==="daily")d=new Date(d.getTime()+86400000);else if(rep==="weekly")d=new Date(d.getTime()+7*86400000);else if(rep==="monthly")d=addMonthsSafe(d,1);else if(rep==="yearly")d=addMonthsSafe(d,12);else return null}return d>now?d:null}
+function nextReminderDate(r,now=new Date()){let d=localDateFromInput(r?.date);if(!d)return null;const rep=r.repeat||"once";if(rep==="once")return d>now?d:null;let guard=0;while(d<=now&&guard++<500){if(rep==="daily")d=new Date(d.getTime()+86400000);else if(rep==="weekly")d=new Date(d.getTime()+7*86400000);else if(rep==="monthly")d=addMonthsSafe(d,1);else return null}return d>now?d:null}
 async function cancelNativeReminder(id){const p=getNativeLocalNotifications();if(!p)return;try{await p.cancel({notifications:[{id:notificationIdForReminder(id)}]})}catch(e){console.warn("cancel reminder",e)}}
-function repeatSchedule(rep){if(rep==="daily")return {repeats:true,every:"day"};if(rep==="weekly")return {repeats:true,every:"week"};if(rep==="monthly")return {repeats:true,every:"month"};if(rep==="yearly")return {repeats:true,every:"year"};return {repeats:false}}
+function repeatSchedule(rep){if(rep==="daily")return {repeats:true,every:"day"};if(rep==="weekly")return {repeats:true,every:"week"};if(rep==="monthly")return {repeats:true,every:"month"};return {repeats:false}}
 async function scheduleNativeReminder(r){const p=getNativeLocalNotifications();if(!p)return false;const at=nextReminderDate(r);if(!at)return false;try{await p.schedule({notifications:[{id:notificationIdForReminder(r.id),title:r.title||"یادآوری حسابدار",body:r.body||"زمان یادآوری فرا رسیده است.",schedule:{at,...repeatSchedule(r.repeat||"once")},extra:{reminderId:r.id,sourceNoteId:r.sourceNoteId||null}}]});return true}catch(e){console.warn("schedule reminder",e);return false}}
 async function rescheduleAllNativeReminders(){if(!getNativeLocalNotifications())return;for(const r of data.reminders||[]){await cancelNativeReminder(r.id);await scheduleNativeReminder(r)}}
 async function requestNativeNotifications(){const p=getNativeLocalNotifications();if(p){try{const perm=await p.requestPermissions();if(perm.display!=="granted")return false;if(typeof p.checkExactNotificationSetting==="function"){const exact=await p.checkExactNotificationSetting();if(exact.value!=="granted"&&typeof p.changeExactNotificationSetting==="function")try{await p.changeExactNotificationSetting()}catch(e){console.warn("exact notification setting",e)}}await rescheduleAllNativeReminders();return true}catch(e){console.warn("native notification permission",e);return false}}if("Notification"in window){try{return (await Notification.requestPermission())==="granted"}catch(e){}}return false}
 function reminderBodyFromNote(note){const parts=[];if(note?.text)parts.push(note.text);const pending=(note?.items||[]).filter(x=>!x.done).map(x=>x.text).filter(Boolean);if(pending.length)parts.push(pending.join(" • "));return parts.join(" — ")||"یادآوری یادداشت"}
 function removeRecordSilent(type,id){const i=data[type].findIndex(x=>x.id===id);if(i<0)return;data[type].splice(i,1);markDeleted(type,id)}
-async function upsertReminderForNote(note,renderAfter=true){if(!note?.id)return;const linked=(data.reminders||[]).filter(x=>x.sourceNoteId===note.id);let r=linked[0];for(const duplicate of linked.slice(1)){await cancelNativeReminder(duplicate.id);removeRecordSilent("reminders",duplicate.id)}if(note.alarmEnabled===false || !note.date){if(r){await cancelNativeReminder(r.id);removeRecordSilent("reminders",r.id);if(renderAfter)save();else{localStorage.setItem(KEY,JSON.stringify(data));syncSave()}}return}const o={title:note.title||"یادداشت",amount:0,date:note.date,repeat:note.repeat&&note.repeat!=="none"?note.repeat:"once",type:"note",sourceNoteId:note.id,body:reminderBodyFromNote(note)};if(r){Object.assign(r,o);touch(r);markDirty("reminders",r.id,false,r,r.updatedAt)}else{r=touch({id:uid(),...o});data.reminders.push(r);markDirty("reminders",r.id,false,r,r.updatedAt)}if(renderAfter)save();else{localStorage.setItem(KEY,JSON.stringify(data));syncSave()}await cancelNativeReminder(r.id);await scheduleNativeReminder(r);if((r.type||"")==="note" && (r.repeat||"once")==="once") await addToAndroidClock(r)}
+async function upsertReminderForNote(note,renderAfter=true){if(!note?.id)return;const linked=(data.reminders||[]).filter(x=>x.sourceNoteId===note.id);let r=linked[0];for(const duplicate of linked.slice(1)){await cancelNativeReminder(duplicate.id);removeRecordSilent("reminders",duplicate.id)}if(!note.date){if(r){await cancelNativeReminder(r.id);removeRecordSilent("reminders",r.id);if(renderAfter)save();else{localStorage.setItem(KEY,JSON.stringify(data));syncSave()}}return}const o={title:note.title||"یادداشت",amount:0,date:note.date,repeat:note.repeat&&note.repeat!=="none"?note.repeat:"once",type:"note",sourceNoteId:note.id,body:reminderBodyFromNote(note)};if(r){Object.assign(r,o);touch(r);markDirty("reminders",r.id,false,r,r.updatedAt)}else{r=touch({id:uid(),...o});data.reminders.push(r);markDirty("reminders",r.id,false,r,r.updatedAt)}if(renderAfter)save();else{localStorage.setItem(KEY,JSON.stringify(data));syncSave()}await cancelNativeReminder(r.id);await scheduleNativeReminder(r);if((r.type||"")==="note" && (r.repeat||"once")==="once") await addToAndroidClock(r)}
 async function syncAllNotesToReminders(){let changed=false;const noteIds=new Set((data.notes||[]).map(n=>n.id));for(const n of data.notes||[]){const before=(data.reminders||[]).length;await upsertReminderForNote(n);if((data.reminders||[]).length!==before)changed=true}for(const r of [...(data.reminders||[])]){if(r.sourceNoteId&&!noteIds.has(r.sourceNoteId)){await cancelNativeReminder(r.id);removeRecordSilent("reminders",r.id);changed=true}}if(changed)save();else render();if(sync.db)syncSave()}
 async function removeReminderForNote(noteId){const matches=(data.reminders||[]).filter(r=>r.sourceNoteId===noteId);for(const r of matches){await cancelNativeReminder(r.id);removeRecordSilent("reminders",r.id)}if(matches.length)save()}
+
+/* ---- Web/PWA notification fallback engine ----
+ * The native Capacitor LocalNotifications plugin only works when this app is
+ * built and packaged as a real native app with that plugin installed. When it
+ * is not available (plain browser, PWA, or a Capacitor build without the
+ * plugin), scheduleNativeReminder() above silently does nothing and reminders
+ * never fire. This engine provides a working fallback using the standard
+ * browser Notification API + a periodic due-check, so alarms actually fire
+ * whenever the app is open (foreground or background tab), and it also
+ * "catches up" on missed reminders as soon as the app is reopened. */
+const REMINDER_FIRED_KEY="hesabdar-reminder-fired-v1";
+const REMINDER_CATCHUP_MS=3*24*60*60*1000; // don't resurrect alarms older than 3 days
+let reminderCheckTimer=null;
+function firedMap(){try{return JSON.parse(localStorage.getItem(REMINDER_FIRED_KEY)||"{}")}catch{return {}}}
+function markFired(id,occurrenceISO){try{const m=firedMap();m[id]=occurrenceISO;const ids=new Set((data.reminders||[]).map(r=>r.id));for(const k of Object.keys(m))if(!ids.has(k))delete m[k];localStorage.setItem(REMINDER_FIRED_KEY,JSON.stringify(m))}catch(e){}}
+function lastOccurrenceDue(r,now=new Date()){
+  let d=localDateFromInput(r?.date);if(!d)return null;
+  const rep=r.repeat||"once";
+  if(rep==="once")return d<=now?d:null;
+  let last=null,guard=0;
+  while(d<=now&&guard++<2000){last=d;if(rep==="daily")d=new Date(d.getTime()+86400000);else if(rep==="weekly")d=new Date(d.getTime()+7*86400000);else if(rep==="monthly")d=addMonthsSafe(d,1);else break}
+  return last;
+}
+async function notifyNow(title,body,tag){
+  try{
+    if("Notification"in window&&Notification.permission==="granted"){
+      const reg=("serviceWorker"in navigator)?await navigator.serviceWorker.getRegistration().catch(()=>null):null;
+      if(reg&&reg.showNotification){await reg.showNotification(title,{body,tag,icon:"logo.png",badge:"logo.png",dir:"rtl",lang:"fa"});return true}
+      new Notification(title,{body,tag,icon:"logo.png",dir:"rtl",lang:"fa"});return true
+    }
+  }catch(e){console.warn("notifyNow",e)}
+  return false
+}
+async function fireReminder(r,occurrence){
+  const title=r.title||"یادآوری حسابدار";
+  const body=r.body||(r.amount?`مبلغ: ${money(r.amount)}`:"زمان یادآوری فرا رسیده است.");
+  const shown=await notifyNow(title,body,"reminder-"+r.id);
+  markFired(r.id,occurrence.toISOString());
+  logEvent(shown?"یادآوری فعال شد":"یادآوری سررسید شد","‏"+title+(shown?"":" (اعلان نمایش داده نشد؛ اجازه اعلان را در تنظیمات بررسی کنید)"),"info",false);
+  renderDueSoon();
+}
+async function checkDueReminders(){
+  const now=new Date();const fired=firedMap();
+  for(const r of (data.reminders||[])){
+    if(!r?.date)continue;
+    const occ=lastOccurrenceDue(r,now);
+    if(!occ)continue;
+    if(now.getTime()-occ.getTime()>REMINDER_CATCHUP_MS)continue; // too old, skip silently
+    if(fired[r.id]===occ.toISOString())continue; // already notified for this occurrence
+    await fireReminder(r,occ);
+  }
+}
+function startReminderChecker(){
+  if(reminderCheckTimer)clearInterval(reminderCheckTimer);
+  checkDueReminders().catch(console.error);
+  reminderCheckTimer=setInterval(()=>checkDueReminders().catch(console.error),30000);
+  document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")checkDueReminders().catch(console.error)});
+}
+function upcomingReminders(hoursAhead=24){
+  const now=new Date(),until=new Date(now.getTime()+hoursAhead*3600000);
+  const items=[];
+  for(const r of (data.reminders||[])){
+    if(!r?.date)continue;
+    const overdue=lastOccurrenceDue(r,now);
+    if(overdue){items.push({r,at:overdue,overdue:true});continue}
+    const next=nextReminderDate(r,now);
+    if(next&&next<=until)items.push({r,at:next,overdue:false});
+  }
+  return items.sort((a,b)=>a.at-b.at);
+}
+function renderDueSoon(){
+  const box=$("dueSoon");if(!box)return;
+  const items=upcomingReminders(24);
+  if(!items.length){box.innerHTML="";return}
+  const overdue=items.filter(x=>x.overdue).length;
+  const todayCount=items.length;
+  box.innerHTML=`🔔 ${overdue?`<b>${fa(overdue)} یادآوری دیرشده</b> • `:""}${fa(todayCount)} یادآوری در ۲۴ ساعت آینده`;
+}
 
 const blankData=()=>({accounts:[],transactions:[],people:[],reminders:[],notes:[],checks:[],invoices:[],customers:[],products:[],audit:[],expenseCats:defaultsExpense.map((name,i)=>({id:"e"+i,name})),incomeCats:defaultsIncome.map((name,i)=>({id:"i"+i,name})),pin:"",branding:{storeName:"",logo:"",stamp:"",signature:""},yearSettlements:{}});
 window.addEventListener("error",e=>{console.error(e.error||e.message)});
 window.addEventListener("unhandledrejection",e=>{console.error(e.reason)});
-window.addEventListener("online",async()=>{if(sync.db)sync.db.enableNetwork().catch(console.error);setSyncStatus("🌐 اینترنت برقرار شد؛ در حال بررسی اتصال دو گوشی..."); await verifyTwoPhoneConnection(true); checkForUpdates(false);});
+window.addEventListener("online",async()=>{if(sync.db)sync.db.enableNetwork().catch(console.error);setSyncStatus("🌐 اینترنت برقرار شد؛ در حال بررسی اتصال دو گوشی..."); if(!sync.auth)await initSync(); if(sync.dirty&&sync.dirty.size)syncSave(); await verifyTwoPhoneConnection(true); checkForUpdates(false);});
 window.addEventListener("offline",()=>setSyncStatus("⚠️ اینترنت دستگاه قطع است"));
 
 let data;
@@ -234,11 +311,25 @@ function deviceId(){let id=localStorage.getItem(DEVICE_ID_KEY);if(!id){id=uid();
 async function updateDevicePresence(){if(!sync.user||!sync.db)return false; try{await cloudDoc().collection("devices").doc(deviceId()).set({deviceId:deviceId(),lastSeen:new Date().toISOString(),userAgent:navigator.userAgent.slice(0,120)}, {merge:true}); return true}catch(e){console.warn("presence",e);return false}}
 async function verifyTwoPhoneConnection(manual=false){if(!sync.user||!sync.db){if(manual)setSyncStatus("⚠️ ابتدا با حساب همگام‌سازی وارد شوید");return false} try{await updateDevicePresence(); const snap=await cloudDoc().collection("devices").get(); const now=Date.now(); const others=snap.docs.map(d=>d.data()).filter(x=>x.deviceId!==deviceId()&&x.lastSeen&&(now-new Date(x.lastSeen).getTime())<=DEVICE_PRESENCE_MS); setSyncStatus(others.length?`📱 ${fa(others.length)} گوشی دیگر متصل است • همگام‌سازی فعال`:"📱 گوشی دوم در ۴۵ ثانیه اخیر دیده نشد • در حال بررسی مجدد"); if(others.length)logEvent("بررسی اتصال دو گوشی",`گوشی دیگر فعال است (${others.length})`,"sync",false); return !!others.length}catch(e){setSyncStatus("⚠️ بررسی اتصال دو گوشی ناموفق بود: "+(e.code||e.message));return false}}
 function startDevicePresence(){if(sync.presenceTimer)clearInterval(sync.presenceTimer); updateDevicePresence(); sync.presenceTimer=setInterval(()=>{if(sync.user)verifyTwoPhoneConnection(false)},DEVICE_PRESENCE_INTERVAL)}
+const FIREBASE_SDK_URLS=["https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js","https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js","https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"];
+function loadScriptOnce(src){return new Promise((resolve,reject)=>{if([...document.scripts].some(s=>s.src===src)){resolve();return}const s=document.createElement("script");s.src=src;s.onload=()=>resolve();s.onerror=()=>reject(new Error("script load failed: "+src));document.head.appendChild(s)})}
+let firebaseLoadPromise=null;
+async function ensureFirebaseLoaded(){
+  if(window.firebase)return true;
+  if(!navigator.onLine)return false;
+  if(!firebaseLoadPromise){
+    firebaseLoadPromise=(async()=>{for(const url of FIREBASE_SDK_URLS){await loadScriptOnce(url)}})()
+      .catch(e=>{console.warn("firebase sdk load failed",e);firebaseLoadPromise=null;throw e});
+  }
+  try{await firebaseLoadPromise;return !!window.firebase}catch(e){return false}
+}
 async function initSync(){
-  const cfg=syncConfig();if(!cfg||!window.firebase)return;
+  const cfg=syncConfig();if(!cfg)return;
+  if(!window.firebase){const ok=await ensureFirebaseLoaded().catch(()=>false);if(!ok)return}
   try{
     if(!sync.app)sync.app=firebase.apps.length?firebase.app():firebase.initializeApp(cfg);
     sync.auth=firebase.auth();sync.db=firebase.firestore();
+    try{sync.db.settings({ignoreUndefinedProperties:true})}catch(e){}
     if(sync.authListener)return;
     sync.authListener=true;
     sync.auth.onAuthStateChanged(async user=>{
@@ -271,7 +362,7 @@ async function pullFromCloud(){
   if(!sync.user)return alert("اول با حساب همگام‌سازی وارد شو");
   try{
     const remote=await pullRest();
-    if(!remote)return alert("هنوز اطلاعاتی در ابر وجود ندارد");
+    if(!remote||!remote.length)return alert("هنوز اطلاعاتی در ابر وجود ندارد");
     mergeCloud(remote);localStorage.setItem(KEY,JSON.stringify(data));render();setSyncStatus("☁️ اطلاعات از ابر دریافت شد — "+dataSummary(data));alert("اطلاعات ابری دریافت شد\n"+dataSummary(data));
   }catch(e){alert("دریافت ناموفق: "+(e.code||'')+"\n"+e.message)}
 }
@@ -513,7 +604,7 @@ function exportAccountExcel(id){const a=data.accounts.find(x=>x.id===id);if(!a)r
 function exportCustomerExcel(id){const c=data.customers.find(x=>x.id===id);if(!c)return;const inv=data.invoices.filter(x=>x.customerId===id);const rows=inv.map(x=>[invoiceDateLabel(x.date),x.number||"",x.name||"",invoiceTotal(x),Number(x.paid||0),invoiceRemaining(x),x.status==="paid"?"پرداخت کامل":x.status==="partial"?"پرداخت بخشی":"پرداخت نشده"]);exportXLS(`مشتری-${c.name}`,['تاریخ','شماره فاکتور','عنوان','مبلغ','پرداخت','مانده','وضعیت'],rows)}
 function exportAllCustomersExcel(){const rows=data.customers.map(c=>{const st=customerStats(c);return [c.name,c.phone||"",st.count,st.total,st.paid,st.due]});exportXLS('همه-مشتریان',['نام مشتری','شماره تماس','تعداد فاکتور','مجموع خرید','مجموع پرداخت','مانده'],rows)}
 
-function openPerson(id=null){const p=id&&data.people.find(x=>x.id===id);openModal(`<h2>${p?"ویرایش بدهکار/بستانکار":"بدهکار / بستانکار"}</h2><div class="form"><select id="pt"><option value="debt" ${p?.type==="debt"?"selected":""}>من بدهکارم</option><option value="credit" ${p?.type==="credit"?"selected":""}>من طلبکارم</option></select><input id="pn" placeholder="نام شخص" value="${esc(p?.name||"")}"><input id="pa" type="number" placeholder="مبلغ" value="${Number(p?.amount)||""}"><input id="pd" inputmode="numeric" placeholder="تاریخ شمسی ۱۴۰۵/۰۶/۰۸" value="${esc(jalaliInputValue(p?.due||""))}"><textarea id="pnote" placeholder="توضیحات">${esc(p?.note||"")}</textarea><button class="primary" onclick="savePerson('${p?.id||""}')">${p?"ذخیره تغییرات":"ذخیره"}</button></div>`)}
+function openPerson(id=null){const p=id&&data.people.find(x=>x.id===id);openModal(`<h2>${p?"ویرایش بدهکار/بستانکار":"بدهکار / بستانکار"}</h2><div class="form"><select id="pt"><option value="debt" ${p?.type==="debt"?"selected":""}>من بدهکارم</option><option value="credit" ${p?.type==="credit"?"selected":""}>من طلبکارم</option></select><input id="pn" placeholder="نام شخص" value="${esc(p?.name||"")}"><input id="pa" type="number" placeholder="مبلغ" value="${Number(p?.amount)||""}">${simpleDateField("pd",jalaliInputValue(p?.due||""))}<textarea id="pnote" placeholder="توضیحات">${esc(p?.note||"")}</textarea><button class="primary" onclick="savePerson('${p?.id||""}')">${p?"ذخیره تغییرات":"ذخیره"}</button></div>`)}
 function savePerson(id){const name=$("pn").value.trim(),amount=parseMoney($("pa").value);if(!name||!amount)return alert("نام و مبلغ را وارد کنید");const o={type:$("pt").value,name,amount,due:jalaliToISO($("pd").value),note:$("pnote").value.trim()};if(id){const p=data.people.find(x=>x.id===id);if(!p)return alert("این شخص پیدا نشد");Object.assign(p,o);p.paid=Math.min(Number(p.paid)||0,amount);touch(p);markDirty("people",p.id,false,p,p.updatedAt)}else{const np=touch({id:uid(),paid:0,...o});data.people.push(np);markDirty("people",np.id,false,np,np.updatedAt)}localStorage.setItem(KEY,JSON.stringify(data));render();syncSave();logEvent(id?"ویرایش شخص":"ایجاد شخص",`${name} • ${money(amount)}`,id?"edit":"create");closeModal()}
 function deletePerson(id){if(confirm("این مورد حذف شود؟")){const p=data.people.find(x=>x.id===id);removeRecord("people",id);logEvent("حذف شخص",p?.name||id,"delete")}}
 function payPerson(id){const p=data.people.find(x=>x.id===id);if(!p)return;const remaining=Math.max(0,(Number(p.amount)||0)-(Number(p.paid)||0));const v=prompt("مبلغ تسویه:",String(remaining));if(v!==null){const n=parseMoney(v);if(!n)return alert("مبلغ نامعتبر است");p.paid=Math.min(Number(p.amount)||0,(Number(p.paid)||0)+n);touch(p);markDirty("people",p.id,false,p,p.updatedAt);save();logEvent("تسویه شخص",`${p.name} • ${money(n)}`,"payment")}}
@@ -521,80 +612,99 @@ function payPerson(id){const p=data.people.find(x=>x.id===id);if(!p)return;const
 function pickerDateValue(v){if(!v)return todayJalali();let d=new Date(v);if(Number.isNaN(d.getTime()))return toFaDigits(String(v));let j=gregorianToJalali(d.getFullYear(),d.getMonth()+1,d.getDate());return `${toFaDigits(j[0])}/${padFa(j[1])}/${padFa(j[2])}`;}
 function pickerTimeValue(v){const d=v?new Date(v):new Date(); if(Number.isNaN(d.getTime())) return ""; return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;}
 function pickerToISO(dateId,timeId){const dv=$(dateId)?.value||"", tv=$(timeId)?.value||"00:00"; if(!dv)return ""; return jalaliDateTimeToISO(`${dv} ${tv}`);}
-function pickerBox(dateId,timeId,v){return `<div class="date-time-picker"><label>📅 تاریخ شمسی <input id="${dateId}" inputmode="numeric" autocomplete="off" placeholder="۱۴۰۵/۰۶/۰۸" value="${esc(pickerDateValue(v))}"></label><label>⏰ ساعت <input id="${timeId}" type="time" value="${pickerTimeValue(v)}"></label><small>تاریخ را به‌صورت شمسی وارد کن (۱۴۰۵/۰۶/۰۸)</small></div>`;}
+function simpleDateField(id,value){return `<div class="date-input-row"><input id="${id}" inputmode="numeric" autocomplete="off" placeholder="تاریخ شمسی ۱۴۰۵/۰۶/۰۸" value="${esc(value)}"><button type="button" class="cal-open-btn" onclick="openJalaliCalendar('${id}')" title="باز کردن تقویم">📆</button></div>`}
+function pickerBox(dateId,timeId,v){return `<div class="date-time-picker"><label>📅 تاریخ شمسی <div class="date-input-row"><input id="${dateId}" inputmode="numeric" autocomplete="off" placeholder="۱۴۰۵/۰۶/۰۸" value="${esc(pickerDateValue(v))}"><button type="button" class="cal-open-btn" onclick="openJalaliCalendar('${dateId}')" title="باز کردن تقویم">📆</button></div></label><label>⏰ ساعت <input id="${timeId}" type="time" value="${pickerTimeValue(v)}"></label><small>می‌توانی تاریخ را تایپ کنی یا از تقویم انتخاب کنی (۱۴۰۵/۰۶/۰۸)</small></div>`;}
+
+/* ---- Full Jalali (Shamsi) month-view calendar picker ---- */
+const PERSIAN_MONTHS=["فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند"];
+const PERSIAN_WEEKDAYS=["ش","ی","د","س","چ","پ","ج"];
+let calState={targetId:null,jy:0,jm:0,jd:0};
+function jalaliMonthLength(jy,jm){
+  const g1=jalaliToGregorian(jy,jm,1);
+  const nm=jm===12?1:jm+1, ny=jm===12?jy+1:jy;
+  const g2=jalaliToGregorian(ny,nm,1);
+  const d1=new Date(g1[0],g1[1]-1,g1[2]), d2=new Date(g2[0],g2[1]-1,g2[2]);
+  return Math.round((d2-d1)/86400000);
+}
+function jalaliWeekdayIndex(jy,jm,jd){
+  const g=jalaliToGregorian(jy,jm,jd);
+  const js=new Date(g[0],g[1]-1,g[2]).getDay();
+  return (js+1)%7;
+}
+function openJalaliCalendar(targetId){
+  const cur=$(targetId)?.value||"";
+  let jy,jm,jd;
+  const m=toEnDigits(cur).trim().match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+  if(m){jy=+m[1];jm=+m[2];jd=+m[3]}
+  else{const t=new Date();const j=gregorianToJalali(t.getFullYear(),t.getMonth()+1,t.getDate());jy=j[0];jm=j[1];jd=j[2]}
+  calState={targetId,jy,jm,jd};
+  renderCalModal();
+  $("calModal")?.classList.remove("hidden");
+}
+function closeCalModal(){$("calModal")?.classList.add("hidden")}
+function calNav(dir){
+  calState.jm+=dir;
+  if(calState.jm<1){calState.jm=12;calState.jy--}
+  if(calState.jm>12){calState.jm=1;calState.jy++}
+  renderCalModal();
+}
+function calGoToday(){
+  const t=new Date();const j=gregorianToJalali(t.getFullYear(),t.getMonth()+1,t.getDate());
+  calState.jy=j[0];calState.jm=j[1];calState.jd=j[2];
+  renderCalModal();
+}
+function calPickDay(jd){
+  calState.jd=jd;
+  const val=`${toFaDigits(calState.jy)}/${padFa(calState.jm)}/${padFa(jd)}`;
+  const input=$(calState.targetId);
+  if(input){input.value=val;input.dispatchEvent(new Event("input",{bubbles:true}))}
+  closeCalModal();
+}
+function renderCalModal(){
+  const {jy,jm}=calState;
+  const len=jalaliMonthLength(jy,jm);
+  const startIdx=jalaliWeekdayIndex(jy,jm,1);
+  const t=new Date();const today=gregorianToJalali(t.getFullYear(),t.getMonth()+1,t.getDate());
+  let cells="";
+  for(let i=0;i<startIdx;i++)cells+=`<div class="cal-cell empty"></div>`;
+  for(let d=1;d<=len;d++){
+    const isToday=today[0]===jy&&today[1]===jm&&today[2]===d;
+    const isSel=calState.jd===d;
+    cells+=`<button type="button" class="cal-cell${isToday?" cal-today":""}${isSel?" cal-selected":""}" onclick="calPickDay(${d})">${toFaDigits(d)}</button>`;
+  }
+  const box=$("calBody");if(!box)return;
+  box.innerHTML=`<div class="cal-head"><button type="button" class="cal-nav" onclick="calNav(-1)" aria-label="ماه قبل">❮</button><b>${PERSIAN_MONTHS[jm-1]} ${toFaDigits(jy)}</b><button type="button" class="cal-nav" onclick="calNav(1)" aria-label="ماه بعد">❯</button></div><div class="cal-weekdays">${PERSIAN_WEEKDAYS.map(w=>`<span>${w}</span>`).join("")}</div><div class="cal-grid">${cells}</div><button type="button" class="cal-today-btn" onclick="calGoToday()">امروز</button>`;
+}
 
 function openNote(id=null){
  const n=id&&data.notes.find(x=>x.id===id);
  const items=(n?.items||[]);
- const alarmEnabled=n ? n.alarmEnabled!==false : false;
- const dval=alarmEnabled ? (n?.date||new Date().toISOString()) : "";
- const repeat=n?.repeat||"none";
- openModal(`<div class="ios-reminder-modal">
- <div class="ios-reminder-top"><span class="ios-reminder-icon">✓</span><div><h2>${n?"ویرایش یادآوری":"یادآوری جدید"}</h2><small>یادآوری‌ها با اعلان دستگاه هماهنگ می‌شوند.</small></div></div>
- <div class="form ios-reminder-form">
- <input id="ntitle" class="ios-title-input" placeholder="عنوان یادآوری" value="${esc(n?.title||"")}">
- <div class="ios-switch-row"><div><b>⏰ تاریخ و ساعت</b><small>زمانی که باید یادآوری شوی</small></div><label class="ios-switch"><input id="nalarm" type="checkbox" ${alarmEnabled?"checked":""} onchange="toggleNoteAlarmFields()"><span></span></label></div>
- <div id="noteAlarmFields" class="${alarmEnabled?"":"hidden"}">
-   ${pickerBox("ndatePicker","ntimePicker",dval)}
-   <div class="quick-dates"><button type="button" onclick="noteQuickDate('today')">امروز</button><button type="button" onclick="noteQuickDate('tomorrow')">فردا</button><button type="button" onclick="noteQuickDate('weekend')">این آخر هفته</button></div>
-   <label class="ios-field-label">تکرار<select id="nrepeat">
-    <option value="none" ${repeat==="none"?"selected":""}>هرگز</option>
-    <option value="daily" ${repeat==="daily"?"selected":""}>هر روز</option>
-    <option value="weekly" ${repeat==="weekly"?"selected":""}>هر هفته</option>
-    <option value="monthly" ${repeat==="monthly"?"selected":""}>هر ماه</option>
-    <option value="yearly" ${repeat==="yearly"?"selected":""}>هر سال</option>
-   </select></label>
- </div>
- <div class="ios-switch-row"><div><b>🚩 پرچم‌گذاری</b><small>برای یادآوری مهم</small></div><label class="ios-switch"><input id="nflag" type="checkbox" ${n?.flag?"checked":""}><span></span></label></div>
- <label class="ios-field-label">اولویت<select id="npriority"><option value="none" ${!n?.priority||n.priority==="none"?"selected":""}>بدون اولویت</option><option value="low" ${n?.priority==="low"?"selected":""}>کم</option><option value="medium" ${n?.priority==="medium"?"selected":""}>متوسط</option><option value="high" ${n?.priority==="high"?"selected":""}>زیاد</option></select></label>
- <textarea id="ntext" class="ios-notes-text" placeholder="یادداشت یا توضیحات">${esc(n?.text||"")}</textarea>
- <div class="ios-subtasks"><div class="ios-subtasks-head"><b>☑️ زیرکارها</b><button type="button" class="add-item-btn" onclick="addNoteItemEditor()">＋ افزودن</button></div><div id="noteItemsEditor" class="note-items-editor">${items.map((it,i)=>noteItemEditor(it,i)).join("")}</div></div>
- <button class="primary ios-save-reminder" onclick="saveNote('${n?.id||""}')">${n?"ذخیره یادآوری":"افزودن یادآوری"}</button>
- </div></div>`);
-}
-function toggleNoteAlarmFields(){
- const on=$("nalarm")?.checked, box=$("noteAlarmFields"); if(!box)return;
- box.classList.toggle("hidden",!on);
- if(on && $("ndatePicker") && !$("ndatePicker").value){const d=new Date(Date.now()+3600000);$("ndatePicker").value=pickerDateValue(d.toISOString());$("ntimePicker").value=pickerTimeValue(d.toISOString())}
- if(!on){if($("nrepeat"))$("nrepeat").value="none";}
-}
-function noteQuickDate(kind){
- const now=new Date(), d=new Date(now);
- if(kind==="tomorrow")d.setDate(d.getDate()+1);
- if(kind==="weekend"){const day=d.getDay();let add=(6-day+7)%7;if(add===0)add=6;d.setDate(d.getDate()+add)}
- if($("nalarm"))$("nalarm").checked=true; toggleNoteAlarmFields();
- if($("ndatePicker"))$("ndatePicker").value=pickerDateValue(d.toISOString());
- if($("ntimePicker")&&!$("ntimePicker").value)$("ntimePicker").value="09:00";
+ openModal(`<h2>${n?"ویرایش یادداشت":"یادداشت جدید"}</h2><div class="form"><input id="ntitle" placeholder="عنوان یادداشت، مثلاً خرید" value="${esc(n?.title||"")}">${pickerBox("ndatePicker","ntimePicker",n?.date||new Date().toISOString())}<select id="nrepeat"><option value="none" ${!n?.repeat||n?.repeat==="none"?"selected":""}>بدون تکرار</option><option value="daily" ${n?.repeat==="daily"?"selected":""}>روزانه</option><option value="weekly" ${n?.repeat==="weekly"?"selected":""}>هفتگی</option><option value="monthly" ${n?.repeat==="monthly"?"selected":""}>ماهانه</option></select><textarea id="ntext" placeholder="توضیحات اصلی (اختیاری)">${esc(n?.text||"")}</textarea><div><b>آیتم‌های زیرمجموعه</b><div id="noteItemsEditor" class="note-items-editor">${items.map((it,i)=>noteItemEditor(it,i)).join("")}</div><button type="button" class="add-item-btn" onclick="addNoteItemEditor()">＋ افزودن آیتم</button></div><button class="primary" onclick="saveNote('${n?.id||""}')">${n?"ذخیره تغییرات":"ساخت یادداشت"}</button></div>`);
 }
 function noteItemEditor(it={},i){return `<div class="note-edit-row"><input class="note-item-input" data-note-item="${i}" data-note-item-id="${esc(it.id||"")}" placeholder="مثلاً خرید نان" value="${esc(it.text||"")}"><button type="button" class="mini-danger" onclick="this.parentElement.remove()">🗑</button></div>`}
 function addNoteItemEditor(){const box=$("noteItemsEditor");if(!box)return;const i=box.querySelectorAll(".note-item-input").length;box.insertAdjacentHTML("beforeend",noteItemEditor({},i))}
 async function saveNote(id){
- const title=$("ntitle").value.trim(); if(!title)return alert("عنوان یادآوری را وارد کنید");
- const alarmEnabled=!!$("nalarm")?.checked;
+ const title=$("ntitle").value.trim(); if(!title)return alert("عنوان یادداشت را وارد کنید");
  const inputs=[...document.querySelectorAll(".note-item-input")];
  const old=id?data.notes.find(x=>x.id===id):null; const oldItems=old?.items||[];
- if(alarmEnabled && (!$("ndatePicker")?.value || !$("ntimePicker")?.value))return alert("برای فعال‌کردن آلارم، تاریخ و ساعت را وارد کنید");
  const items=inputs.map((el,i)=>{const oldItem=el.dataset.noteItemId?oldItems.find(x=>x.id===el.dataset.noteItemId):oldItems[i];return {id:oldItem?.id||uid(),text:el.value.trim(),done:!!oldItem?.done}}).filter(x=>x.text);
- const o={title,alarmEnabled,date:alarmEnabled?pickerToISO("ndatePicker","ntimePicker"):"",repeat:alarmEnabled?($("nrepeat")?.value||"none"):"none",flag:!!$("nflag")?.checked,priority:$("npriority")?.value||"none",text:$("ntext").value.trim(),items};
- if(id){if(!old)return alert("یادآوری پیدا نشد");Object.assign(old,o);touch(old);markDirty("notes",old.id,false,old,old.updatedAt);save();await upsertReminderForNote(old)}
+ const o={title,date:pickerToISO("ndatePicker","ntimePicker"),repeat:$("nrepeat").value,text:$("ntext").value.trim(),items};
+ if(id){if(!old)return alert("یادداشت پیدا نشد");Object.assign(old,o);touch(old);markDirty("notes",old.id,false,old,old.updatedAt);save();await upsertReminderForNote(old)}
  else{const nn=touch({id:uid(),...o});data.notes.unshift(nn);markDirty("notes",nn.id,false,nn,nn.updatedAt);save();await upsertReminderForNote(nn)}
- logEvent(id?"ویرایش یادآوری":"ایجاد یادآوری",title,id?"edit":"create");closeModal();
+ logEvent(id?"ویرایش یادداشت":"ایجاد یادداشت",title,id?"edit":"create");closeModal();
 }
 async function toggleNoteItem(noteId,itemId){const n=data.notes.find(x=>x.id===noteId);const it=n?.items?.find(x=>x.id===itemId);if(!it)return;it.done=!it.done;touch(n);markDirty("notes",n.id,false,n,n.updatedAt);localStorage.setItem(KEY,JSON.stringify(data));syncSave();await upsertReminderForNote(n,false);logEvent(it.done?"تکمیل آیتم یادداشت":"بازگردانی آیتم یادداشت",`${n.title} • ${it.text}`,"edit");const row=document.querySelector(`[data-note-row="${CSS.escape(itemId)}"]`);if(row){const span=row.querySelector("span");if(span)span.classList.toggle("done",it.done);const cb=row.querySelector("input[type=checkbox]");if(cb)cb.checked=it.done}const card=document.querySelector(`[data-note-card="${CSS.escape(noteId)}"]`);if(card){const total=(n.items||[]).length,done=(n.items||[]).filter(x=>x.done).length;const count=card.querySelector(".note-count");if(count)count.textContent=total?`${fa(done)} / ${fa(total)}⌄`:"⌄"}}
 async function deleteNote(id){if(confirm("این یادداشت و همه آیتم‌های آن حذف شود؟")){const n=data.notes.find(x=>x.id===id);await removeReminderForNote(id);removeRecord("notes",id);logEvent("حذف یادداشت",n?.title||id,"delete")}}
 async function deleteNoteItem(noteId,itemId){const n=data.notes.find(x=>x.id===noteId);if(!n)return;if(confirm("این آیتم حذف شود؟")){n.items=(n.items||[]).filter(x=>x.id!==itemId);touch(n);markDirty("notes",n.id,false,n,n.updatedAt);localStorage.setItem(KEY,JSON.stringify(data));syncSave();await upsertReminderForNote(n,false);logEvent("حذف آیتم یادداشت",n.title,"delete");const row=document.querySelector(`[data-note-row="${CSS.escape(itemId)}"]`);if(row)row.remove();const card=document.querySelector(`[data-note-card="${CSS.escape(noteId)}"]`);if(card){const total=(n.items||[]).length,done=(n.items||[]).filter(x=>x.done).length;const count=card.querySelector(".note-count");if(count)count.textContent=total?`${fa(done)} / ${fa(total)}⌄`:"⌄";const list=card.querySelector(".note-checklist");if(list&&!total)list.innerHTML='<div class="meta">هنوز آیتمی اضافه نشده</div>';}}}
-function noteRepeatLabel(r){return r==="daily"?"هر روز":r==="weekly"?"هر هفته":r==="monthly"?"هر ماه":r==="yearly"?"هر سال":"هرگز"}
-function notePriorityLabel(p){return p==="high"?"زیاد":p==="medium"?"متوسط":p==="low"?"کم":"بدون اولویت"}
+function noteRepeatLabel(r){return r==="daily"?"روزانه":r==="weekly"?"هفتگی":r==="monthly"?"ماهانه":"بدون تکرار"}
 function noteItemHTML(n,it){
  return '<div class="note-check-row" data-note-row="'+esc(it.id)+'" onclick="event.stopPropagation()"><label onclick="event.stopPropagation()"><input type="checkbox" '+(it.done?'checked':'')+' onclick="event.stopPropagation()" onchange="toggleNoteItem(\''+n.id+'\',\''+it.id+'\')"><span class="'+(it.done?'done':'')+'">'+esc(it.text)+'</span></label><button type="button" class="mini-danger note-item-delete" title="حذف آیتم" onclick="event.stopPropagation();deleteNoteItem(\''+n.id+'\',\''+it.id+'\')">×</button></div>';
 }
 function noteHTML(n){
  const items=n.items||[];
- const list=items.length?items.map(it=>noteItemHTML(n,it)).join(''):'<div class="meta">هنوز زیرکاری اضافه نشده</div>';
- const alarm=n.alarmEnabled!==false && n.date ? `<div class="ios-note-meta">⏰ ${jalaliDateTimeInput(n.date)} • ${noteRepeatLabel(n.repeat)}</div>` : '<div class="ios-note-meta muted">🔕 بدون آلارم</div>';
- const flags=n.flag?'<span class="note-flag">🚩</span> ':'';
- const priority=n.priority&&n.priority!=="none"?`<span class="note-priority">اولویت ${notePriorityLabel(n.priority)}</span>`:"";
- return `<div class="note-card item accordion-card ${n.alarmEnabled!==false&&n.date?"has-alarm":""}" data-note-card="${esc(n.id)}"><button class="accordion-head" type="button" aria-expanded="false" onclick="toggleAccordion(this,event)"><span><span class="note-badge">✓</span> <b>${flags}${esc(n.title)}</b></span><span class="note-count">${items.length?fa(items.filter(x=>x.done).length)+' / '+fa(items.length):''}⌄</span></button><div class="accordion-body"><div class="note-main">${n.text?'<div class="meta note-text">'+esc(n.text)+'</div>':''}${alarm}${priority?'<div class="ios-note-meta">'+priority+'</div>':''}<div class="note-checklist">${list}</div></div><div class="note-actions">${actionButtons('openNote','deleteNote',n.id)}</div></div></div>`;
+ const list=items.length?items.map(it=>noteItemHTML(n,it)).join(''):'<div class="meta">هنوز آیتمی اضافه نشده</div>';
+ const alarm=n.date?`<div class="meta">⏰ آلارم جداگانه: ${jalaliDateTimeInput(n.date)} • ${noteRepeatLabel(n.repeat)}</div>`:'<div class="meta">بدون آلارم</div>';
+ return `<div class="note-card item accordion-card" data-note-card="${esc(n.id)}"><button class="accordion-head" type="button" aria-expanded="false" onclick="toggleAccordion(this,event)"><span><span class="note-badge">📝</span> <b>${esc(n.title)}</b></span><span class="note-count">${items.length?fa(items.filter(x=>x.done).length)+' / '+fa(items.length):''}⌄</span></button><div class="accordion-body"><div class="note-main">${n.text?'<div class="meta note-text">'+esc(n.text)+'</div>':''}${alarm}<div class="note-checklist">${list}</div></div><div class="note-actions">${actionButtons('openNote','deleteNote',n.id)}</div></div></div>`;
 }
 function toggleAccordion(btn,event){if(event)event.stopPropagation();const card=btn?.closest(".accordion-card");if(!card)return;const open=!card.classList.contains("open");card.classList.toggle("open",open);btn.setAttribute("aria-expanded",String(open));}
 
@@ -603,7 +713,7 @@ function openReminder(id=null){const r=id&&data.reminders.find(x=>x.id===id);ope
 async function saveReminder(id){if(!$("rt").value||!$("rdPicker").value)return alert("عنوان و تاریخ لازم است");const o={title:$("rt").value.trim(),amount:parseMoney($("ra").value),date:pickerToISO("rdPicker","rtPicker"),repeat:$("rr").value,type:$("rb").value};if(id){const r=data.reminders.find(x=>x.id===id);Object.assign(r,o);touch(r);markDirty("reminders",r.id,false,r,r.updatedAt);save();await cancelNativeReminder(r.id);await scheduleNativeReminder(r);if((r.type||"")==="note" && (r.repeat||"once")==="once") await addToAndroidClock(r)}else{const nr=touch({id:uid(),...o});data.reminders.push(nr);markDirty("reminders",nr.id,false,nr,nr.updatedAt);save();await scheduleNativeReminder(nr);if((nr.type||"")==="note" && (nr.repeat||"once")==="once") await addToAndroidClock(nr)}logEvent(id?"ویرایش یادآوری":"ایجاد یادآوری",o.title,id?"edit":"create");closeModal()}
 async function deleteReminder(id){if(confirm("این یادآوری حذف شود؟")){const r=data.reminders.find(x=>x.id===id);await cancelNativeReminder(id);removeRecord("reminders",id);logEvent("حذف یادآوری",r?.title||id,"delete")}}
 
-function openCheck(id=null){const c=id&&data.checks.find(x=>x.id===id);openModal(`<h2>${c?"ویرایش چک":"ثبت چک"}</h2><div class="form"><select id="ct"><option value="receive" ${c?.type==="receive"?"selected":""}>چک دریافتی</option><option value="pay" ${c?.type==="pay"?"selected":""}>چک پرداختی</option></select><input id="cn" placeholder="نام شخص" value="${esc(c?.name||"")}"><input id="camount" type="number" placeholder="مبلغ" value="${Number(c?.amount)||""}"><input id="cdate" inputmode="numeric" placeholder="تاریخ شمسی ۱۴۰۵/۰۶/۰۸" value="${esc(jalaliInputValue(c?.date||""))}"><input id="cnum" placeholder="شماره چک" value="${esc(c?.number||"")}"><input id="cbank" placeholder="بانک" value="${esc(c?.bank||"")}"><textarea id="cnote" placeholder="توضیحات">${esc(c?.note||"")}</textarea><button class="primary" onclick="saveCheck('${c?.id||""}')">${c?"ذخیره تغییرات":"ذخیره"}</button></div>`)}
+function openCheck(id=null){const c=id&&data.checks.find(x=>x.id===id);openModal(`<h2>${c?"ویرایش چک":"ثبت چک"}</h2><div class="form"><select id="ct"><option value="receive" ${c?.type==="receive"?"selected":""}>چک دریافتی</option><option value="pay" ${c?.type==="pay"?"selected":""}>چک پرداختی</option></select><input id="cn" placeholder="نام شخص" value="${esc(c?.name||"")}"><input id="camount" type="number" placeholder="مبلغ" value="${Number(c?.amount)||""}">${simpleDateField("cdate",jalaliInputValue(c?.date||""))}<input id="cnum" placeholder="شماره چک" value="${esc(c?.number||"")}"><input id="cbank" placeholder="بانک" value="${esc(c?.bank||"")}"><textarea id="cnote" placeholder="توضیحات">${esc(c?.note||"")}</textarea><button class="primary" onclick="saveCheck('${c?.id||""}')">${c?"ذخیره تغییرات":"ذخیره"}</button></div>`)}
 function saveCheck(id){if(!$("cn").value.trim()||!parseMoney($("camount").value)||!$("cdate").value)return alert("نام، مبلغ و تاریخ لازم است");const o={type:$("ct").value,name:$("cn").value.trim(),amount:parseMoney($("camount").value),date:jalaliToISO($("cdate").value),number:$("cnum").value.trim(),bank:$("cbank").value.trim(),note:$("cnote").value};if(id){const c=data.checks.find(x=>x.id===id);Object.assign(c,o);touch(c);markDirty("checks",c.id,false,c,c.updatedAt)}else{const nc=touch({id:uid(),done:false,...o});data.checks.push(nc);markDirty("checks",nc.id,false,nc,nc.updatedAt)}save();logEvent(id?"ویرایش چک":"ثبت چک",`${o.name} • ${money(o.amount)}`,id?"edit":"create");closeModal()}
 function deleteCheck(id){if(confirm("این چک حذف شود؟")){const c=data.checks.find(x=>x.id===id);removeRecord("checks",id);logEvent("حذف چک",c?.name||id,"delete")}}
 function githubRepo(){return (localStorage.getItem(GITHUB_KEY)||"").trim().replace(/^https?:\/\/github\.com\//i,"").replace(/\.git$/i,"").replace(/\/$/,"")}
@@ -615,8 +725,20 @@ async function notifyUpdate(remote,url){const msg="نسخه جدید حسابد�
 async function checkForUpdates(manual=false){const repo=githubRepo();if($("githubRepo"))$("githubRepo").value=repo;if(!repo){setUpdateStatus("ابتدا مخزن GitHub را در تنظیمات وارد کن.");return false}if(manual)setUpdateStatus("در حال بررسی نسخه جدید...");try{const r=await fetch("https://api.github.com/repos/"+repo+"/releases/latest",{headers:{Accept:"application/vnd.github+json"},cache:"no-store"});if(!r.ok)throw new Error("GitHub "+r.status);const rel=await r.json(),remote=rel.tag_name||rel.name||"";if(isNewerVersion(remote,APP_VERSION)){setUpdateStatus("⚠️ نسخه جدید "+remote+" موجود است");localStorage.setItem("hesabdar-last-update",remote);await notifyUpdate(remote,rel.html_url)}else{setUpdateStatus("✅ برنامه به‌روز است؛ نسخه فعلی "+APP_VERSION);localStorage.setItem("hesabdar-last-update",remote)}return true}catch(e){setUpdateStatus("❌ بررسی GitHub انجام نشد؛ اینترنت و نام مخزن را بررسی کن.");return false}}
 async function updateServiceWorkerNow(){try{if(!('serviceWorker' in navigator))return; const reg=await navigator.serviceWorker.getRegistration(); if(reg){await reg.update();}}catch(e){console.warn("service worker update",e)}}
 function startUpdateChecker(){setTimeout(()=>{checkForUpdates(false);updateServiceWorkerNow()},2500);setInterval(()=>{checkForUpdates(false);updateServiceWorkerNow()},UPDATE_CHECK_MS);setInterval(()=>{if(autoBackupEnabled())createAutoBackup("هر ۶ ساعت")},AUTO_BACKUP_MS)}
-async function testNotifications(){const ok=await requestNativeNotifications();if(!ok)return alert("اعلان‌ها فعال نیستند یا در این محیط در دسترس نیستند."); const test={id:"test-"+Date.now(),title:"تست اعلان حساب‌یار",date:new Date(Date.now()+15000).toISOString(),repeat:"once",type:"note",body:"اگر اعلان را دیدی، سیستم اعلان درست کار می‌کند."}; await scheduleNativeReminder(test); alert("یک اعلان آزمایشی برای حدود ۱۵ ثانیه دیگر زمان‌بندی شد.")}
-async function requestNotifications(){const ok=await requestNativeNotifications();alert(ok?"اعلان‌ها فعال شدند؛ یادآوری‌های زمان‌دار نیز زمان‌بندی شدند.":"اجازه اعلان داده نشد یا قابلیت Native در این محیط در دسترس نیست.")}
+async function testNotifications(){
+  const ok=await requestNativeNotifications();
+  if(!ok)return alert("اجازه اعلان داده نشد. از تنظیمات گوشی/مرورگر اجازه اعلان را برای حساب‌یار فعال کن.");
+  const native=getNativeLocalNotifications();
+  if(native){const test={id:"test-"+Date.now(),title:"تست اعلان حساب‌یار",date:new Date(Date.now()+15000).toISOString(),repeat:"once",type:"note",body:"اگر اعلان را دیدی، سیستم اعلان درست کار می‌کند."};await scheduleNativeReminder(test);alert("یک اعلان آزمایشی برای حدود ۱۵ ثانیه دیگر زمان‌بندی شد.");return}
+  alert("یک اعلان آزمایشی برای حدود ۵ ثانیه دیگر نمایش داده می‌شود. برنامه را نبند و صفحه را باز نگه‌دار.");
+  setTimeout(()=>{notifyNow("تست اعلان حساب‌یار","اگر این را می‌بینی، اعلان‌ها درست کار می‌کنند.","test-notif")},5000);
+}
+async function requestNotifications(){
+  const ok=await requestNativeNotifications();
+  startReminderChecker();
+  if(!ok)return alert("اجازه اعلان داده نشد. از تنظیمات مرورگر یا گوشی، اجازه اعلان را برای حساب‌یار فعال کن، سپس دوباره تلاش کن.");
+  alert(getNativeLocalNotifications()?"اعلان‌ها فعال شدند؛ یادآوری‌های زمان‌دار نیز زمان‌بندی شدند.":"اعلان‌ها فعال شدند. توجه: چون این نسخه به‌صورت وب/PWA اجراست، یادآوری‌ها وقتی برنامه کاملاً بسته باشد ممکن است دیر یا با تأخیر نمایش داده شوند؛ به‌محض باز کردن برنامه، یادآوری‌های عقب‌افتاده فوراً نمایش داده می‌شوند.");
+}
 
 
 let quickTxType="expense";
@@ -652,73 +774,45 @@ function viewImage(id){const t=data.transactions.find(x=>x.id===id);if(!t?.image
 function empty(s){return `<div class="card" style="text-align:center">${s}</div>`}
 
 function invoiceDateLabel(v){return jalaliLabel(v)}
-function invoiceRowHTML(item,i){return `<div class="invoice-row"><select class="inv-product" onchange="invoiceProductPick(this)"><option value="">کالا / خدمت</option>${data.products.map(p=>`<option value="${p.id}" ${p.id===item?.productId?"selected":""}>${esc(p.name)}</option>`).join("")}</select><input class="inv-desc" placeholder="شرح کالا / خدمات" value="${esc(item?.desc||"")}"><input class="inv-qty" oninput="updateInvoiceLiveTotal()" type="number" min="0" step="any" placeholder="تعداد" value="${item?.qty ? Number(item.qty) : ""}"><input class="inv-price" oninput="updateInvoiceLiveTotal()" type="number" min="0" step="any" placeholder="مبلغ واحد" value="${item?.price ? Number(item.price) : ""}"><button type="button" class="danger-icon" onclick="this.parentElement.remove();updateInvoiceLiveTotal()">🗑</button></div>`}
+function invoiceRowHTML(item,i){return `<div class="invoice-row"><select class="inv-product" onchange="invoiceProductPick(this)"><option value="">کالا / خدمت</option>${data.products.map(p=>`<option value="${p.id}" ${p.id===item?.productId?"selected":""}>${esc(p.name)}</option>`).join("")}</select><input class="inv-desc" placeholder="شرح کالا / خدمات" value="${esc(item?.desc||"")}"><input class="inv-qty" oninput="updateInvoiceLiveTotal()" type="number" min="0" step="any" placeholder="تعداد" value="${Number(item?.qty)||""}"><input class="inv-price" oninput="updateInvoiceLiveTotal()" type="number" min="0" step="any" placeholder="مبلغ واحد" value="${Number(item?.price)||""}"><button type="button" class="danger-icon" onclick="this.parentElement.remove();updateInvoiceLiveTotal()">🗑</button></div>`}
 function addInvoiceRow(pref={}){const box=$("invoiceRows");if(!box)return;const div=document.createElement("div");div.innerHTML=invoiceRowHTML(pref,box.children.length);box.appendChild(div.firstElementChild)}
-function invoicePersonHTML(p={}){return `<div class="invoice-person-row"><input class="inv-person-name" placeholder="اسم مشتری" value="${esc(p.name||"")}"><input class="inv-person-debt" type="number" min="0" placeholder="بدهکار" value="${Number(p.debt)||""}"><input class="inv-person-credit" type="number" min="0" placeholder="بستانکار" value="${Number(p.credit)||""}"><button type="button" class="danger-icon" onclick="this.parentElement.remove();updateInvoicePeopleTotals()">🗑</button></div>`}
-function addInvoicePerson(pref={}){const box=$("invoicePeople");if(!box)return;const div=document.createElement("div");div.innerHTML=invoicePersonHTML(pref);box.appendChild(div.firstElementChild);updateInvoicePeopleTotals()}
-function updateInvoicePeopleTotals(){let debt=0,credit=0;document.querySelectorAll("#invoicePeople .invoice-person-row").forEach(r=>{debt+=Number(r.querySelector(".inv-person-debt")?.value)||0;credit+=Number(r.querySelector(".inv-person-credit")?.value)||0});if($("invPeopleDebtTotal"))$("invPeopleDebtTotal").textContent=money(debt);if($("invPeopleCreditTotal"))$("invPeopleCreditTotal").textContent=money(credit)}
 function invoiceProductPick(sel){const p=data.products.find(x=>x.id===sel.value);const row=sel.closest(".invoice-row");if(!p||!row)return;row.querySelector(".inv-desc").value=p.name;row.querySelector(".inv-price").value=p.price||0;updateInvoiceLiveTotal()}
 function openInvoice(id=null){
  const inv=id&&data.invoices.find(x=>x.id===id);
- const items=inv?.items?.length?inv.items:[{desc:"",qty:"",price:""}];
- const people=Array.isArray(inv?.people)?inv.people:[];
+ const items=inv?.items?.length?inv.items:[{desc:"",qty:1,price:""}];
  const cust=inv?.customerId?data.customers.find(c=>c.id===inv.customerId):null;
- const brand=inv?.brandingSnapshot||data.branding||{};
- openModal(`<div class="ios-invoice-modal"><div class="ios-invoice-top"><div class="ios-invoice-icon">🧾</div><div><h2> ${inv?"ویرایش فاکتور":"ثبت / صدور فاکتور"}</h2><small>فاکتور خود را مثل یک فرم مدرن آیفون مدیریت کن</small></div></div><div class="form ios-invoice-form">
+ openModal(`<h2>🧾 ${inv?"ویرایش فاکتور":"ساخت فاکتور"}</h2><div class="form">
  <input id="invName" placeholder="نام فاکتور" value="${esc(inv?.name||"")}">
- <div class="two-fields"><input id="invSeller" placeholder="نام فروشگاه / فروشنده" value="${esc(inv?.seller||brand.storeName||"")}"><select id="invCustomer"><option value="">اسم مشتری</option>${data.customers.map(c=>`<option value="${c.id}" ${c.id===inv?.customerId?"selected":""}>${esc(c.name)}${c.phone?" • "+esc(c.phone):""}</option>`).join("")}</select></div>
- <div class="two-fields"><input id="invDate" inputmode="numeric" placeholder="تاریخ شمسی ۱۴۰۵/۰۶/۰۸" value="${esc(jalaliInputValue(inv?.date)||todayJalali())}"><input id="invNo" placeholder="شماره فاکتور" value="${esc(inv?.number||"")}"></div>
- <div class="two-fields"><select id="invStatus"><option value="unpaid" ${inv?.status!=="paid"&&inv?.status!=="partial"?"selected":""}>🔴 پرداخت نشده</option><option value="partial" ${inv?.status==="partial"?"selected":""}>🟡 پرداخت بخشی</option><option value="paid" ${inv?.status==="paid"?"selected":""}>🟢 پرداخت کامل</option></select><input id="invPaid" oninput="updateInvoiceLiveTotal()" type="number" min="0" placeholder="مبلغ پرداخت‌شده" value="${inv?.paid ? Number(inv.paid) : ""}"></div>
- <div class="invoice-section-title">💸 تخفیف</div><div class="two-fields"><input id="invDiscount" oninput="updateInvoiceLiveTotal()" type="number" min="0" placeholder="تخفیف مبلغی (تومان)" value="${inv?.discount ? Number(inv.discount) : ""}"><input id="invDiscountPercent" oninput="updateInvoiceLiveTotal()" type="number" min="0" max="100" step="0.01" placeholder="تخفیف درصدی (%)" value="${inv?.discountPercent ? Number(inv.discountPercent) : ""}"></div>
- <div class="two-fields"><input id="invTax" oninput="updateInvoiceLiveTotal()" type="number" min="0" placeholder="مالیات (درصد)" value="${inv?.taxRate ? Number(inv.taxRate) : ""}"><input id="invAddress" placeholder="آدرس مشتری" value="${esc(inv?.address||cust?.address||"")}"></div>
- <div class="invoice-section-title">👤 اسم مشتری</div>
- <div class="invoice-table-head invoice-people-head"><span>اسم مشتری</span><span>بدهکار</span><span>بستانکار</span><span></span></div>
- <div id="invoicePeople">${people.map(invoicePersonHTML).join("")}</div>
- <button type="button" onclick="addInvoicePerson()">＋ افزودن نفر</button>
- <div class="invoice-people-totals">جمع بدهکار: <strong id="invPeopleDebtTotal">۰ تومان</strong> • جمع بستانکار: <strong id="invPeopleCreditTotal">۰ تومان</strong></div>
- <textarea id="invNotes" placeholder="توضیحات فاکتور">${esc(inv?.notes||"")}</textarea>
+ <div class="two-fields"><input id="invSeller" placeholder="نام فروشنده / فروشگاه" value="${esc(inv?.seller||(inv?"":data.branding?.storeName||""))}"><select id="invCustomer"><option value="">بدون مشتری</option>${data.customers.map(c=>`<option value="${c.id}" ${c.id===inv?.customerId?"selected":""}>${esc(c.name)}${c.phone?" • "+esc(c.phone):""}</option>`).join("")}</select></div>
+ <div class="two-fields">${simpleDateField("invDate",jalaliInputValue(inv?.date)||todayJalali())}<input id="invNo" placeholder="شماره فاکتور" value="${esc(inv?.number||"")}"></div>
+ <div class="two-fields"><select id="invStatus"><option value="unpaid" ${inv?.status!=="paid"&&inv?.status!=="partial"?"selected":""}>🔴 پرداخت نشده</option><option value="partial" ${inv?.status==="partial"?"selected":""}>🟡 پرداخت بخشی</option><option value="paid" ${inv?.status==="paid"?"selected":""}>🟢 پرداخت کامل</option></select><input id="invPaid" oninput="updateInvoiceLiveTotal()" type="number" min="0" placeholder="مبلغ پرداخت‌شده" value="${Number(inv?.paid)||0}"></div>
+ <div class="two-fields"><input id="invDiscount" oninput="updateInvoiceLiveTotal()" type="number" min="0" placeholder="تخفیف" value="${Number(inv?.discount)||0}"><input id="invTax" oninput="updateInvoiceLiveTotal()" type="number" min="0" placeholder="مالیات (درصد)" value="${Number(inv?.taxRate)||0}"></div>
+ <textarea id="invAddress" placeholder="آدرس / توضیحات مشتری">${esc(inv?.address||cust?.address||"")}</textarea>
  <div class="invoice-table-head"><span>کالا</span><span>توضیحات</span><span>تعداد</span><span>مبلغ واحد</span><span></span></div>
  <div id="invoiceRows">${items.map(invoiceRowHTML).join("")}</div>
  <button type="button" onclick="addInvoiceRow()">＋ افزودن ردیف</button>
- <div class="invoice-total-box"><div>مبلغ قبل از تخفیف: <strong id="invLiveSubtotal">۰ تومان</strong></div><div>تخفیف: <strong id="invLiveDiscount">۰ تومان</strong></div><div>مالیات: <strong id="invLiveTax">۰ تومان</strong></div><div class="final-total">مبلغ نهایی: <strong id="invLiveTotal">۰ تومان</strong></div></div>
- <button class="primary ios-invoice-save" onclick="saveInvoice('${inv?.id||""}')">💾 ${inv?"ذخیره تغییرات":"ثبت و صدور فاکتور"}</button>
- </div></div>`);
- updateInvoiceLiveTotal();updateInvoicePeopleTotals();
+ <div class="invoice-total-box">جمع اقلام: <strong id="invLiveSubtotal">۰ تومان</strong><br>تخفیف و مالیات: <strong id="invLiveAdjust">۰ تومان</strong><br>مبلغ نهایی: <strong id="invLiveTotal">۰ تومان</strong></div>
+ <button class="primary" onclick="saveInvoice('${inv?.id||""}')">💾 ${inv?"ذخیره تغییرات":"ساخت فاکتور"}</button>
+ </div>`);
+ updateInvoiceLiveTotal();
 }
 function invoiceSubtotal(inv){return (inv.items||[]).reduce((s,x)=>s+(Number(x.qty)||0)*(Number(x.price)||0),0)}
-function invoiceDiscount(inv){const sub=invoiceSubtotal(inv),amount=Math.min(sub,Math.max(0,Number(inv.discount)||0)),percent=Math.min(Math.max(0,Number(inv.discountPercent)||0),100),percentAmount=Math.min(sub-amount,Math.round((sub-amount)*percent/100));return amount+percentAmount}
-function invoiceTotal(inv){const sub=invoiceSubtotal(inv),discount=invoiceDiscount(inv),tax=Math.max(0,Math.round((sub-discount)*(Number(inv.taxRate)||0)/100));return Math.max(0,sub-discount+tax)}
+function invoiceTotal(inv){const sub=invoiceSubtotal(inv),discountAmount=Math.min(sub,Math.max(0,Number(inv.discount)||0)),discountPercent=Math.min(100,Math.max(0,Number(inv.discountPercent)||0)),percentAmount=Math.min(sub-discountAmount,Math.round((sub-discountAmount)*discountPercent/100)),discount=discountAmount+percentAmount,tax=Math.max(0,Math.round((sub-discount)*(Number(inv.taxRate)||0)/100));return Math.max(0,sub-discount+tax)}
 function invoiceRemaining(inv){return Math.max(0,invoiceTotal(inv)-(Number(inv.paid)||0))}
 function updateInvoiceLiveTotal(){
  const rows=[...document.querySelectorAll("#invoiceRows .invoice-row")];let sub=0;
  rows.forEach(r=>sub+=(Number(r.querySelector(".inv-qty")?.value)||0)*(Number(r.querySelector(".inv-price")?.value)||0));
  const da=Math.min(sub,Math.max(0,Number($("invDiscount")?.value)||0)),dp=Math.min(100,Math.max(0,Number($("invDiscountPercent")?.value)||0)),dpAmt=Math.min(sub-da,Math.round((sub-da)*dp/100)),dis=da+dpAmt,tax=Math.max(0,Math.round((sub-dis)*(Number($("invTax")?.value)||0)/100)),total=Math.max(0,sub-dis+tax);
- if($("invLiveSubtotal"))$("invLiveSubtotal").textContent=money(sub);
- if($("invLiveDiscount"))$("invLiveDiscount").textContent=money(dis);
- if($("invLiveTax"))$("invLiveTax").textContent=money(tax);
- if($("invLiveTotal"))$("invLiveTotal").textContent=money(total);
-}
-function readInvoicePeople(){
- return [...document.querySelectorAll("#invoicePeople .invoice-person-row")].map(r=>({name:r.querySelector(".inv-person-name")?.value.trim()||"",debt:Math.max(0,Number(r.querySelector(".inv-person-debt")?.value)||0),credit:Math.max(0,Number(r.querySelector(".inv-person-credit")?.value)||0)})).filter(p=>p.name||p.debt||p.credit);
+ if($("invLiveSubtotal"))$("invLiveSubtotal").textContent=money(sub);if($("invLiveAdjust"))$("invLiveAdjust").textContent=money(tax-dis);if($("invLiveTotal"))$("invLiveTotal").textContent=money(total)
 }
 function saveInvoice(id){
- const name=$("invName").value.trim()||"فاکتور جدید", seller=$("invSeller").value.trim()||data.branding?.storeName||"",date=jalaliToISO($("invDate").value)||new Date().toISOString().slice(0,10),number=$("invNo").value.trim();
+ const name=$("invName").value.trim()||"فاکتور جدید", seller=$("invSeller").value.trim(),date=jalaliToISO($("invDate").value)||new Date().toISOString().slice(0,10),number=$("invNo").value.trim();
  const items=[...document.querySelectorAll("#invoiceRows .invoice-row")].map(r=>({productId:r.querySelector(".inv-product")?.value||"",desc:r.querySelector(".inv-desc")?.value.trim()||"",qty:Number(r.querySelector(".inv-qty")?.value)||0,price:Number(r.querySelector(".inv-price")?.value)||0})).filter(x=>x.desc||x.qty||x.price);
  if(!items.length)return alert("حداقل یک ردیف فاکتور وارد کن");
- const old=id?data.invoices.find(v=>v.id===id):null;
- const oldPeople=old?JSON.parse(JSON.stringify(old.people||[])):null;
- const oldDiscount=old?Number(old.discount)||0:null, oldDiscountPercent=old?Number(old.discountPercent)||0:null;
  const discount=Math.max(0,Number($("invDiscount").value)||0),discountPercent=Math.min(100,Math.max(0,Number($("invDiscountPercent").value)||0)),taxRate=Math.max(0,Number($("invTax").value)||0);let paid=Math.max(0,Number($("invPaid").value)||0);
- const people=readInvoicePeople(),snapshot={storeName:data.branding?.storeName||seller,logo:data.branding?.logo||"",stamp:data.branding?.stamp||"",signature:data.branding?.signature||""};
- const o={name,seller,date,number,items,people,customerId:$("invCustomer").value||"",address:$("invAddress").value.trim(),notes:$("invNotes").value.trim(),discount,discountPercent,taxRate,paid,status:$("invStatus").value,total:0,brandingSnapshot:old?.brandingSnapshot||snapshot};
- o.total=invoiceTotal(o);if(o.status==="paid")o.paid=o.total;if(o.paid>=o.total&&o.total>0)o.status="paid";else if(o.paid>0)o.status="partial";else o.status="unpaid";
- if(id){if(!old)return alert("این فاکتور پیدا نشد");adjustStockForInvoice(old,+1);Object.assign(old,o);touch(old);markDirty("invoices",old.id,false,old,old.updatedAt);adjustStockForInvoice(old,-1)}
- else {const x=touch({id:uid(),...o});data.invoices.unshift(x);markDirty("invoices",x.id,false,x,x.updatedAt)}
- save();
- logEvent(id?"ویرایش فاکتور":"ساخت فاکتور",`${name} • ${money(o.total)}`,id?"edit":"create");
- if(old&&JSON.stringify(oldPeople)!==JSON.stringify(people))logEvent("تغییر نفرات فاکتور",`${name} • ${fa(people.length)} نفر`,"edit");
- if(old&&(oldDiscount!==discount || oldDiscountPercent!==discountPercent))logEvent("تغییر تخفیف فاکتور",`${name} • ${money(invoiceDiscount(o))}`,"edit");
- closeModal()
+ const o={name,seller,date,number,items,customerId:$("invCustomer").value||"",address:$("invAddress").value.trim(),discount,discountPercent,taxRate,paid,status:$("invStatus").value,total:0};o.total=invoiceTotal(o);if(o.status==="paid")o.paid=o.total;if(o.paid>=o.total&&o.total>0)o.status="paid";else if(o.paid>0)o.status="partial";else o.status="unpaid";
+ if(id){const x=data.invoices.find(v=>v.id===id);if(x)adjustStockForInvoice(x,+1);Object.assign(x,o);touch(x);markDirty("invoices",x.id,false,x,x.updatedAt);adjustStockForInvoice(x,-1)}else{const x=touch({id:uid(),...o});data.invoices.unshift(x);markDirty("invoices",x.id,false,x,x.updatedAt);adjustStockForInvoice(x,-1)}
+ save();logEvent(id?"ویرایش فاکتور":"ساخت فاکتور",`${name} • ${money(o.total)}`,id?"edit":"create");closeModal()
 }
 function duplicateInvoice(id){const inv=data.invoices.find(x=>x.id===id);if(!inv)return;const x=touch({...JSON.parse(JSON.stringify(inv)),id:uid(),number:"",date:new Date().toISOString().slice(0,10),status:"unpaid",paid:0});data.invoices.unshift(x);markDirty("invoices",x.id,false,x,x.updatedAt);save();logEvent("تکرار فاکتور",x.name,"create")}
 function deleteInvoice(id){if(!confirm("این فاکتور حذف شود؟"))return;const x=data.invoices.find(v=>v.id===id);adjustStockForInvoice(x,+1);removeRecord("invoices",id);logEvent("حذف فاکتور",x?.name||id,"delete")}
@@ -727,43 +821,41 @@ function invoiceHTML(inv){
  return `<div class="item invoice-item"><div><b>🧾 ${esc(inv.name||"فاکتور")}</b><div class="meta">${esc(inv.seller||"فروشنده ثبت نشده")} • ${invoiceDateLabel(inv.date)}${inv.number?" • شماره "+esc(inv.number):""}</div><div class="meta">جمع کل: ${money(total)} • ${inv.status==="paid"?"🟢 پرداخت کامل":inv.status==="partial"?"🟡 پرداخت بخشی":"🔴 پرداخت نشده"} • مانده: ${money(invoiceRemaining(inv))}</div></div><div class="actions"><button onclick="openInvoice('${inv.id}')">✏️</button><button onclick="previewInvoice('${inv.id}')">👁</button><button onclick="duplicateInvoice('${inv.id}')">📄</button><button onclick="shareInvoice('${inv.id}')">📤</button><button class="danger-icon" onclick="deleteInvoice('${inv.id}')">🗑</button></div></div>`
 }
 function previewInvoice(id){
- const inv=data.invoices.find(x=>x.id===id);if(!inv)return;
- const cust=inv.customerId?data.customers.find(c=>c.id===inv.customerId):null;
- const brand=inv.brandingSnapshot||data.branding||{};
+ const inv=data.invoices.find(x=>x.id===id);if(!inv)return; const cust=inv.customerId?data.customers.find(c=>c.id===inv.customerId):null;
+ const b=data.branding||{};
  const rows=(inv.items||[]).map(x=>`<div class="preview-inv-row"><span>${esc(x.desc)}</span><span>${fa(x.qty)}</span><span>${money(x.price)}</span><span>${money((Number(x.qty)||0)*(Number(x.price)||0))}</span></div>`).join("");
- const people=(inv.people||[]).map(p=>`<div class="preview-person-row"><span>${esc(p.name||"—")}</span><span>${money(p.debt||0)}</span><span>${money(p.credit||0)}</span></div>`).join("");
- const debt=(inv.people||[]).reduce((s,p)=>s+Number(p.debt||0),0),credit=(inv.people||[]).reduce((s,p)=>s+Number(p.credit||0),0),sub=invoiceSubtotal(inv),discount=invoiceDiscount(inv),tax=Math.max(0,invoiceTotal(inv)-Math.max(0,sub-discount));
- openModal(`<div id="invoicePreview" class="invoice-preview">
- <div class="invoice-head"><div>${brand.logo?`<img class="invoice-brand-logo" src="${brand.logo}" alt="لوگو">`:""}<h2>فاکتور</h2><b>${esc(brand.storeName||inv.seller||"")}</b>${brand.stamp?`<img class="invoice-brand-stamp" src="${brand.stamp}" alt="مهر">`:""}</div><div>شماره: ${esc(inv.number||"—")}<br>تاریخ: ${invoiceDateLabel(inv.date)}</div></div>
- <h3>${esc(inv.name||"فاکتور")}</h3>${cust?`<div class="meta">مشتری: ${esc(cust.name)}${cust.phone?" • "+esc(cust.phone):""}</div>`:""}
- ${inv.address?`<div class="meta">آدرس: ${esc(inv.address)}</div>`:""}
- <div class="meta">وضعیت: ${inv.status==="paid"?"🟢 پرداخت کامل":inv.status==="partial"?"🟡 پرداخت بخشی":"🔴 پرداخت نشده"} • مانده: ${money(invoiceRemaining(inv))}</div>
- <div class="preview-inv-row head"><b>توضیحات</b><b>تعداد</b><b>مبلغ واحد</b><b>مبلغ</b></div>${rows}
- <div class="invoice-summary"><div>مبلغ قبل از تخفیف: <strong>${money(sub)}</strong></div><div>تخفیف: <strong>${money(discount)}</strong></div><div>مالیات: <strong>${money(tax)}</strong></div><div class="final-total">مبلغ نهایی: <strong>${money(invoiceTotal(inv))}</strong></div></div>
- ${people.length?`<h3>👥 نفرات فاکتور</h3><div class="preview-person-row head"><b>نام</b><b>بدهکار</b><b>بستانکار</b></div>${people}<div class="invoice-summary"><div>جمع بدهکار: <strong>${money(debt)}</strong></div><div>جمع بستانکار: <strong>${money(credit)}</strong></div></div>`:""}
- ${inv.notes?`<div class="card invoice-notes"><b>توضیحات:</b><div>${esc(inv.notes)}</div></div>`:""}
- ${brand.signature?`<div class="invoice-signature"><img src="${brand.signature}" alt="امضا"><small>امضای فروشگاه</small></div>`:""}
- </div><div class="actions"><button class="primary" onclick="printInvoice('${inv.id}')">🖨 چاپ / PDF</button><button class="primary" onclick="shareInvoice('${inv.id}')">📤 ارسال فاکتور</button></div>`)
+ const signRow=(b.stamp||b.signature)?`<div class="invoice-sign-row">${b.stamp?`<div class="invoice-sign-box"><img class="invoice-brand-stamp" src="${b.stamp}" alt="مهر فروشگاه"><small>مهر</small></div>`:"<div></div>"}${b.signature?`<div class="invoice-sign-box"><img class="invoice-brand-signature" src="${b.signature}" alt="امضا"><small>امضا</small></div>`:""}</div>`:"";
+ openModal(`<div id="invoicePreview" class="invoice-preview"><div class="invoice-head"><div>${b.logo?`<img class="invoice-brand-logo" src="${b.logo}" alt="لوگو">`:""}<h2>فاکتور</h2><b>${esc(inv.seller||b.storeName||"")}</b></div><div>شماره: ${esc(inv.number||"—")}<br>تاریخ: ${invoiceDateLabel(inv.date)}</div></div><h3>${esc(inv.name||"فاکتور")}</h3>${cust?`<div class="meta">مشتری: ${esc(cust.name)}${cust.phone?" • "+esc(cust.phone):""}</div>`:""}<div class="meta">وضعیت: ${inv.status==="paid"?"🟢 پرداخت کامل":inv.status==="partial"?"🟡 پرداخت بخشی":"🔴 پرداخت نشده"} • مانده: ${money(invoiceRemaining(inv))}</div><div class="preview-inv-row head"><b>توضیحات</b><b>تعداد</b><b>مبلغ واحد</b><b>مبلغ</b></div>${rows}<div class="preview-total">جمع کل: <strong>${money(invoiceTotal(inv))}</strong></div>${signRow}</div><div class="actions"><button class="primary" onclick="printInvoice('${inv.id}')">🖨 چاپ / PDF</button><button class="primary" onclick="shareInvoice('${inv.id}')">📤 ارسال فاکتور</button></div>`)
 }
-function drawInvoiceCanvas(inv){
- const W=794, rowH=58, H=Math.max(1123,680+(inv.items||[]).length*rowH+(inv.people||[]).length*42);
- const c=document.createElement("canvas");c.width=W;c.height=H;const x=c.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,W,H);x.fillStyle="#17352b";x.textAlign="right";x.direction="rtl";
- const brand=inv.brandingSnapshot||data.branding||{};
+function loadImg(src){return new Promise(resolve=>{if(!src)return resolve(null);const im=new Image();im.onload=()=>resolve(im);im.onerror=()=>resolve(null);im.src=src})}
+async function drawInvoiceCanvas(inv){
+ const b=data.branding||{};
+ const W=794, rowH=58, H=Math.max(1123,560+(inv.items||[]).length*rowH);
+ const [logoImg,stampImg,signImg]=await Promise.all([loadImg(b.logo),loadImg(b.stamp),loadImg(b.signature)]);
+ const c=document.createElement("canvas");c.width=W;c.height=H;const x=c.getContext("2d");
+ x.fillStyle="#fff";x.fillRect(0,0,W,H);x.fillStyle="#17352b";x.textAlign="right";x.direction="rtl";
+ if(logoImg)try{x.drawImage(logoImg,55,25,90,70)}catch(e){}
  x.font="bold 34px sans-serif";x.fillText("فاکتور",W-45,55);
- x.font="bold 22px sans-serif";x.fillText(brand.storeName||inv.seller||"فروشگاه / فروشنده",W-45,95);
+ x.font="bold 22px sans-serif";x.fillText(inv.seller||b.storeName||"فروشگاه / فروشنده",W-45,95);
  x.font="17px sans-serif";x.fillStyle="#56645f";x.fillText("شماره: "+(inv.number||"—"),W-45,130);x.fillText("تاریخ: "+invoiceDateLabel(inv.date),W-245,130);
  x.fillStyle="#17352b";x.font="bold 21px sans-serif";x.fillText(inv.name||"فاکتور",W-45,180);
  let y=245;x.fillStyle="#eaf2ee";x.fillRect(28,y-32,W-56,45);x.fillStyle="#17352b";x.font="bold 14px sans-serif";
  x.fillText("مبلغ",W-38,y-8);x.fillText("مبلغ واحد",W-230,y-8);x.fillText("تعداد",W-400,y-8);x.fillText("توضیحات",W-490,y-8);
  x.font="15px sans-serif";
  (inv.items||[]).forEach((it,i)=>{y+=rowH;x.fillStyle=i%2?"#fafcfb":"#fff";x.fillRect(55,y-50,W-110,rowH);x.fillStyle="#23312c";x.fillText(money((Number(it.qty)||0)*(Number(it.price)||0)),W-38,y);x.fillText(money(it.price),W-230,y);x.fillText(fa(it.qty),W-400,y);x.fillText(it.desc||"—",W-490,y);});
- const sub=invoiceSubtotal(inv),discount=invoiceDiscount(inv),tax=Math.max(0,invoiceTotal(inv)-(sub-discount));y+=55;x.fillStyle="#17352b";x.font="17px sans-serif";x.fillText("مبلغ قبل از تخفیف: "+money(sub),W-45,y);y+=30;x.fillText("تخفیف: "+money(discount),W-45,y);y+=30;x.fillText("مالیات: "+money(tax),W-45,y);y+=38;x.font="bold 21px sans-serif";x.fillText("مبلغ نهایی: "+money(invoiceTotal(inv)),W-45,y);
- if((inv.people||[]).length){y+=55;x.font="bold 18px sans-serif";x.fillText("نفرات فاکتور",W-45,y);y+=28;x.font="14px sans-serif";(inv.people||[]).forEach(p=>{y+=30;x.fillText(`${p.name||"—"} • بدهکار: ${money(p.debt||0)} • بستانکار: ${money(p.credit||0)}`,W-45,y)})}
+ y+=45;x.fillStyle="#17352b";x.font="bold 20px sans-serif";x.fillText("جمع کل: "+money(invoiceTotal(inv)),W-38,y);
+ if(stampImg||signImg){
+   const signY=y+60;
+   x.textAlign="center";x.font="14px sans-serif";x.fillStyle="#56645f";
+   if(stampImg){try{x.drawImage(stampImg,W-220,signY,120,120)}catch(e){}x.fillText("مهر",W-160,signY+140)}
+   if(signImg){try{x.drawImage(signImg,90,signY,120,120)}catch(e){}x.fillText("امضا",150,signY+140)}
+   x.textAlign="right";
+ }
  return c
 }
 async function shareInvoice(id){
  const inv=data.invoices.find(x=>x.id===id);if(!inv)return;
- const c=drawInvoiceCanvas(inv);
+ const c=await drawInvoiceCanvas(inv);
  const blob=await new Promise(r=>c.toBlob(r,"image/jpeg",.9));const file=new File([blob],`${(inv.name||"فاکتور").replace(/[\\/:*?"<>|]/g,"_")}.jpg`,{type:"image/jpeg"});
  try{
   if(navigator.share&&(!navigator.canShare||navigator.canShare({files:[file]}))){await navigator.share({title:inv.name||"فاکتور",text:`${inv.name||"فاکتور"} • ${money(invoiceTotal(inv))}`,files:[file]});return}
@@ -798,7 +890,7 @@ function render(){
  const debt=data.people.filter(p=>p.type==="debt").reduce((s,p)=>s+p.amount-p.paid,0),credit=data.people.filter(p=>p.type==="credit").reduce((s,p)=>s+p.amount-p.paid,0);
  if($("totalDebt"))$("totalDebt").textContent=money(debt);if($("totalCredit"))$("totalCredit").textContent=money(credit);
  if($("reportStats")){const now=new Date(),m=now.getMonth(),y=now.getFullYear();const mt=data.transactions.filter(t=>{const d=new Date(t.date);return !isNaN(d)&&d.getMonth()===m&&d.getFullYear()===y});const mi=mt.filter(t=>t.type==="income").reduce((s,t)=>s+Number(t.amount||0),0),me=mt.filter(t=>t.type==="expense").reduce((s,t)=>s+Number(t.amount||0),0);const cats={};mt.filter(t=>t.type==="expense").forEach(t=>cats[t.category||"سایر"]=(cats[t.category||"سایر"]||0)+Number(t.amount||0));const top=Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,5);$("reportStats").innerHTML=`<div class="grid"><div class="card"><span>تعداد تراکنش</span><b>${fa(data.transactions.length)}</b></div><div class="card"><span>تعداد چک</span><b>${fa(data.checks.length)}</b></div><div class="card"><span>درآمد این ماه</span><b class="income">${money(mi)}</b></div><div class="card"><span>هزینه این ماه</span><b class="expense">${money(me)}</b></div></div><div class="card report-card"><h3>📊 بیشترین دسته‌های هزینه این ماه</h3>${top.map((x,i)=>`<div class="report-row"><span>${fa(i+1)}. ${esc(x[0])}</span><strong>${money(x[1])}</strong></div>`).join("")||`<p class="hint">هنوز هزینه‌ای در این ماه ثبت نشده.</p>`}</div><div class="card report-card"><h3>🏦 مانده حساب‌ها</h3>${data.accounts.map(a=>`<div class="report-row"><span>${esc(a.name)}</span><strong>${money(accountBalance(a.id))}</strong></div>`).join("")||`<p class="hint">حسابی ثبت نشده.</p>`}</div>`;}
- drawChart(inc,exp);renderAudit();renderAdvancedReport();renderYearSettlement();if($("settings" )?.classList.contains("active"))renderBrandingInSettings()}
+ drawChart(inc,exp);renderAudit();renderAdvancedReport();renderYearSettlement();renderDueSoon();if($("settings" )?.classList.contains("active"))renderBrandingInSettings()}
 function renderAdvancedReport(){
  const box=$("advancedReport"); if(!box)return;
  const type=$("reportType")?.value||"all", account=$("reportAccount")?.value||"", from=$("reportFrom")?.value||"", to=$("reportTo")?.value||"";
@@ -814,4 +906,4 @@ function drawChart(inc,exp){const c=$("chart");if(!c)return;const x=c.getContext
 function exportData(){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));a.download="hesabdar-backup.json";a.click();logEvent("پشتیبان‌گیری","فایل JSON صادر شد","settings")}
 function importData(e){const file=e.target.files?.[0];if(!file)return;const r=new FileReader();r.onload=async()=>{try{data=JSON.parse(r.result);normalizeData();await migratePinSecurity();data.audit??=[];data.notes??=[];save();logEvent("بازیابی اطلاعات","پشتیبان وارد شد","settings");showLock();alert("بازیابی شد")}catch{alert("فایل نامعتبر است")}};r.readAsText(file)}
 function clearData(){if(confirm("همه اطلاعات حذف شود؟")){const pin=data.pin,pinHash=data.pinHash,pinSalt=data.pinSalt;data=blankData();data.pin=pin;data.pinHash=pinHash;data.pinSalt=pinSalt;save();logEvent("پاک کردن اطلاعات","اطلاعات برنامه پاک شد","delete");}}
-(async function initApp(){normalizeData();await migratePinSecurity();showLock();render();renderBrandingInSettings();renderSettingsFeatures();createAutoBackup("اجرای برنامه");logEvent("اجرای برنامه","برنامه حسابدار اجرا شد","system");initSync();syncAllNotesToReminders().catch(console.error);rescheduleAllNativeReminders().catch(console.error);startUpdateChecker();})();
+(async function initApp(){normalizeData();await migratePinSecurity();showLock();render();renderBrandingInSettings();renderSettingsFeatures();createAutoBackup("اجرای برنامه");logEvent("اجرای برنامه","برنامه حسابدار اجرا شد","system");await initSync();if(!sync.auth){[4000,12000,30000].forEach(ms=>setTimeout(()=>{if(!sync.auth)initSync()},ms))}syncAllNotesToReminders().catch(console.error);rescheduleAllNativeReminders().catch(console.error);startUpdateChecker();startReminderChecker();})();

@@ -62,7 +62,7 @@ body{font-size:15px;line-height:1.55}
 .invoice-row,.invoice-table-head{grid-template-columns:1.15fr 2.0fr .7fr 1.05fr 38px}
 .invoice-row select{width:100%;padding:10px;border:1px solid #dce7e2;border-radius:12px;background:#fff;font:inherit;font-size:13px;min-width:0}
 @media(max-width:560px){.invoice-row,.invoice-table-head{grid-template-columns:1fr 1.4fr .65fr 1fr 34px}.invoice-row select{padding:9px 5px;font-size:11px}}
-@media print{body{background:#fff!important}.app>header,body>.modal:not(:last-child),.modal .close,.modal .actions button{display:none!important}.invoice-preview{border:0!important;box-shadow:none!important;width:100%!important}.modal{position:static!important;background:#fff!important}.modal .sheet{position:static!important;max-width:none!important;max-height:none!important;overflow:visible!important;box-shadow:none!important}}
+@media print{body{background:#fff!important}.app>header,#menuModal,#calModal,.modal .close,.modal .actions button{display:none!important}.invoice-preview{border:0!important;box-shadow:none!important;width:100%!important}.modal{position:static!important;background:#fff!important}.modal .sheet{position:static!important;max-width:none!important;max-height:none!important;overflow:visible!important;box-shadow:none!important}}
 .date-time-picker{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:10px;border:1px solid #ddd;border-radius:14px;background:#fafafa}.date-time-picker label{display:flex;flex-direction:column;gap:6px;font-weight:700;font-size:13px}.date-time-picker input{width:100%;box-sizing:border-box;padding:11px;border:1px solid #ccc;border-radius:10px;background:#fff;font-size:16px}.date-time-picker small{grid-column:1/-1;color:#777;font-size:12px}@media(max-width:480px){.date-time-picker{grid-template-columns:1fr}.date-time-picker small{grid-column:auto}}
 .brand-head{display:flex;align-items:center;gap:10px}
 .app-logo{width:46px;height:46px;border-radius:12px;object-fit:cover;flex:0 0 auto;box-shadow:0 4px 12px rgba(0,0,0,.12)}
@@ -77,93 +77,30 @@ body{font-size:15px;line-height:1.55}
 
 /* حساب‌یار 3.6 — spacing and interaction fixes */
 .settings-page{gap:18px!important}.settings-intro{margin:4px 3px 16px;line-height:1.9}.settings-group{display:grid;gap:14px;padding:20px!important;margin:0!important;border-radius:24px}.settings-group-head{display:flex;align-items:flex-start;gap:13px;padding-bottom:8px;border-bottom:1px solid rgba(31,55,45,.08)}.settings-group-head>span{font-size:25px;line-height:1}.settings-group-head h3{margin:0 0 5px;font-size:18px}.settings-group-head .hint{margin:0;line-height:1.8}.settings-group input:not([type="checkbox"]),.settings-group select,.settings-group textarea{width:100%;min-height:48px;padding:13px 14px;border:1px solid #dce7e2;border-radius:15px;font:inherit;background:#fbfdfc}.settings-actions{display:grid;gap:10px;margin-top:2px}.settings-group button{min-height:48px;padding:13px 15px;border:1px solid #dce7e2;border-radius:15px;text-align:center;line-height:1.5}.settings-group .primary{border-color:transparent}.settings-group hr{margin:4px 0}.settings-footer{margin-top:18px;line-height:1.9}.security-group{margin-bottom:4px!important}.note-card .accordion-head{position:relative;z-index:2}.note-card .accordion-body{position:relative;z-index:1}.note-check-row{position:relative;z-index:3;touch-action:manipulation}.note-check-row label,.note-check-row input,.note-item-delete{position:relative;z-index:4}.note-check-row input{cursor:pointer}.note-check-row label{cursor:pointer;flex:1}.note-item-delete{cursor:pointer;flex:0 0 auto}.note-count{white-space:nowrap}.dark .settings-group-head{border-color:#ffffff12}.dark .settings-group input:not([type="checkbox"]),.dark .settings-group select,.dark .settings-group textarea{background:#14231e;color:#edf7f2;border-color:#263d35}.dark .settings-group button{border-color:#2b443b}.dark .settings-group-head .hint{color:#93aaa1}@media(max-width:520px){.settings-page{gap:14px!important}.settings-group{padding:17px!important;border-radius:21px}.settings-group-head h3{font-size:17px}.settings-group button{min-height:50px}.note-check-row{padding:10px 8px}}
-
-/* v3.7: compact note checklist on mobile */
-.note-card .accordion-body{padding:0 12px 12px}
-.note-card .note-main{width:100%;}
-.note-checklist{margin-top:8px;gap:5px}
-.note-check-row{min-height:40px;padding:6px 8px;border-radius:10px;gap:6px}
-.note-check-row label{gap:7px;font-size:14px;line-height:1.45}
-.note-check-row input{width:17px;height:17px;flex:0 0 auto}
-.note-check-row span{display:block;min-width:0;overflow-wrap:anywhere}
-.note-item-delete{min-width:26px!important;width:26px!important;height:26px!important;font-size:14px!important}
-.note-actions{flex-direction:row;justify-content:flex-start;align-items:center;gap:6px;margin-top:8px}
-.note-actions .actions{display:flex;gap:6px}
-.note-actions .actions button{width:34px;height:34px;padding:0}
-@media(max-width:520px){.note-card .accordion-head{padding:11px 12px}.note-card .accordion-body{padding:0 10px 10px}.note-check-row{min-height:38px;padding:5px 7px}.note-check-row label{font-size:13.5px}.note-text{font-size:13.5px;line-height:1.7}}
-
-/* حساب‌یار 3.8.2 — invoice persistence / people / discount UI */
-.invoice-section-title{font-weight:900;margin-top:10px;padding:11px 13px;border-radius:14px;background:rgba(33,132,91,.08);border:1px solid rgba(33,132,91,.12)}
-.invoice-person-row{display:grid;grid-template-columns:1.5fr 1fr 1fr 42px;gap:8px;margin:8px 0;align-items:center}
-.invoice-person-row input{width:100%;min-width:0;padding:12px;border:1px solid #dce7e2;border-radius:13px;background:rgba(255,255,255,.72);font:inherit}
-.invoice-people-head{grid-template-columns:1.5fr 1fr 1fr 42px!important}
-.invoice-people-totals{margin:10px 0;padding:12px;border-radius:14px;background:rgba(33,132,91,.07);font-size:13px}
-.invoice-total-box{margin-top:12px;padding:15px;border-radius:18px;background:rgba(33,132,91,.08);border:1px solid rgba(33,132,91,.14);line-height:2}
-.invoice-total-box .final-total{font-size:18px;font-weight:900;margin-top:5px;padding-top:7px;border-top:1px dashed rgba(33,132,91,.25)}
-.invoice-summary{display:grid;gap:7px;margin-top:15px;padding:14px;border-radius:16px;background:#f2f7f4}
-.invoice-summary .final-total{font-size:18px;font-weight:900;border-top:1px dashed #c7d9d0;padding-top:8px}
-.preview-person-row{display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:10px;padding:9px 5px;border-bottom:1px solid rgba(33,55,46,.08)}
-.preview-person-row.head{font-weight:800;background:#edf4f0;border-radius:10px}
-.invoice-brand-stamp{width:75px;height:75px;object-fit:contain;margin-top:8px;display:block}
-.invoice-signature{display:flex;flex-direction:column;align-items:flex-end;gap:4px;margin-top:20px}
-.invoice-signature img{max-width:150px;max-height:75px;object-fit:contain}
-.invoice-signature small{color:#708078}
-.invoice-notes{margin-top:15px;line-height:1.9}
-@media(max-width:560px){.invoice-person-row{grid-template-columns:1fr 1fr 1fr 38px}.invoice-person-row input{padding:10px 8px;font-size:12px}.invoice-people-head{font-size:11px}.preview-person-row{font-size:12px}}
-.dark .invoice-section-title,.dark .invoice-total-box,.dark .invoice-people-totals{background:rgba(33,132,91,.13);border-color:rgba(255,255,255,.08)}
-.dark .invoice-person-row input{background:rgba(255,255,255,.06);color:#edf7f2;border-color:rgba(255,255,255,.1)}
-.dark .invoice-summary{background:#182923}.dark .preview-person-row.head{background:#1b2d26}.dark .preview-person-row{border-color:rgba(255,255,255,.07)}
-
-/* iPhone Reminders inspired notes UI */
-.ios-reminder-modal{max-width:620px;margin:auto}
-.ios-reminder-top{display:flex;gap:12px;align-items:center;margin-bottom:16px}
-.ios-reminder-top h2{margin:0}.ios-reminder-top small{opacity:.7}
-.ios-reminder-icon{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:rgba(0,122,255,.14);color:#007aff;font-size:22px;font-weight:800}
-.ios-reminder-form{gap:10px}
-.ios-title-input{font-size:20px!important;font-weight:700}
-.ios-switch-row{display:flex;justify-content:space-between;align-items:center;padding:13px 14px;border-radius:16px;background:rgba(127,127,127,.09);gap:12px}
-.ios-switch-row small{display:block;opacity:.65;margin-top:3px}
-.ios-switch{position:relative;width:48px;height:28px;display:block;flex:none}
-.ios-switch input{display:none}.ios-switch span{position:absolute;inset:0;border-radius:30px;background:#aaa;transition:.2s}
-.ios-switch span:after{content:"";position:absolute;width:24px;height:24px;top:2px;left:2px;border-radius:50%;background:white;box-shadow:0 1px 4px #5555;transition:.2s}
-.ios-switch input:checked+span{background:#34c759}.ios-switch input:checked+span:after{transform:translateX(20px)}
-.ios-field-label{display:flex;flex-direction:column;gap:6px;font-weight:600}.ios-field-label select{font-weight:500}
-.quick-dates{display:flex;gap:8px;flex-wrap:wrap}.quick-dates button{border:0;border-radius:12px;padding:8px 12px;background:rgba(0,122,255,.1);color:inherit}
-.ios-notes-text{min-height:90px}.ios-subtasks{padding:12px 14px;border-radius:16px;background:rgba(127,127,127,.07)}
-.ios-subtasks-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-.ios-subtasks-head .add-item-btn{margin:0;padding:7px 10px}
-.ios-save-reminder{border-radius:16px!important;font-size:16px}
-.ios-note-meta{font-size:13px;opacity:.78;margin-top:6px}.ios-note-meta.muted{opacity:.55}
-.note-flag{font-size:13px}.note-priority{font-size:12px;opacity:.7}
-.note-card.has-alarm{border-inline-start:3px solid rgba(0,122,255,.65)}
-
-
-/* v3.8.2 — iPhone Reminders-inspired invoice editor theme (theme only; invoice logic incl. discount preserved) */
-.ios-invoice-modal{max-width:640px;margin:auto}
-.ios-invoice-top{display:flex;gap:12px;align-items:center;margin-bottom:16px}
-.ios-invoice-top h2{margin:0;font-size:21px;font-weight:800;letter-spacing:-.2px}
-.ios-invoice-top small{display:block;opacity:.62;margin-top:3px;font-size:12px}
-.ios-invoice-icon{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:rgba(0,122,255,.13);font-size:22px}
-.ios-invoice-form{gap:10px}
-.ios-invoice-form>input,.ios-invoice-form>textarea,.ios-invoice-form>.two-fields input,.ios-invoice-form>.two-fields select,
-.ios-invoice-form .invoice-row input,.ios-invoice-form .invoice-row select,.ios-invoice-form .invoice-person-row input{
-  border:1px solid rgba(60,60,67,.12);background:rgba(118,118,128,.07);border-radius:13px;min-height:46px;box-sizing:border-box;color:inherit
-}
-.ios-invoice-form>input:first-child{font-size:20px;font-weight:700;background:rgba(118,118,128,.06)}
-.ios-invoice-form .two-fields{gap:9px}
-.ios-invoice-form .invoice-section-title{margin-top:8px;padding:12px 14px;border:0;border-radius:14px;background:rgba(118,118,128,.08);font-weight:800;color:inherit}
-.ios-invoice-form .invoice-table-head{color:rgba(60,60,67,.65);font-size:11px;margin-top:5px}
-.ios-invoice-form .invoice-row,.ios-invoice-form .invoice-person-row{gap:7px}
-.ios-invoice-form .invoice-row button,.ios-invoice-form .invoice-person-row button{border-radius:12px}
-.ios-invoice-form>button:not(.primary){border:0;border-radius:13px;background:rgba(0,122,255,.10);color:#007aff;font-weight:700;padding:11px 13px}
-.ios-invoice-form .invoice-people-totals{margin:8px 0;padding:12px 14px;border:0;border-radius:14px;background:rgba(118,118,128,.07);font-size:13px}
-.ios-invoice-form .invoice-total-box{margin-top:8px;padding:15px;border:0;border-radius:16px;background:rgba(118,118,128,.08);line-height:2}
-.ios-invoice-form .invoice-total-box .final-total{border-top:1px solid rgba(60,60,67,.12);font-size:19px;padding-top:8px}
-.ios-invoice-save{border:0!important;border-radius:15px!important;background:#007aff!important;color:#fff!important;min-height:48px;font-size:16px!important;font-weight:800!important;box-shadow:none!important}
-.ios-invoice-form textarea{padding:13px 14px}
-.ios-invoice-form .invoice-row select{font-size:12px}
-.dark .ios-invoice-form>input,.dark .ios-invoice-form>textarea,.dark .ios-invoice-form>.two-fields input,.dark .ios-invoice-form>.two-fields select,
-.dark .ios-invoice-form .invoice-row input,.dark .ios-invoice-form .invoice-row select,.dark .ios-invoice-form .invoice-person-row input{background:rgba(118,118,128,.16);border-color:rgba(255,255,255,.09);color:#f2f2f7}
-.dark .ios-invoice-form .invoice-table-head{color:#aeb0b7}
-.dark .ios-invoice-form .invoice-total-box,.dark .ios-invoice-form .invoice-people-totals,.dark .ios-invoice-form .invoice-section-title{background:rgba(118,118,128,.14)}
-.dark .ios-invoice-form .invoice-total-box .final-total{border-color:rgba(255,255,255,.10)}
+.date-time-picker{display:grid;gap:10px}.date-input-row{display:flex;gap:8px;align-items:stretch}.date-input-row input{flex:1;min-width:0}.cal-open-btn{flex:0 0 auto;width:48px;border:1px solid #dce7e2;border-radius:14px;background:#fff;font-size:19px;cursor:pointer}
+.cal-modal .sheet.cal-sheet{max-width:380px;padding:20px}
+.cal-head{display:flex;align-items:center;justify-content:space-between;margin:6px 0 14px;padding-top:6px}.cal-head b{font-size:17px}.cal-nav{border:1px solid #dce7e2;background:#fff;border-radius:12px;width:38px;height:38px;font-size:16px;cursor:pointer}
+.cal-weekdays{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:6px;text-align:center;color:#708078;font-size:13px}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cal-cell{aspect-ratio:1/1;border:0;border-radius:12px;background:#f3f8f5;font:inherit;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.cal-cell.empty{background:transparent;cursor:default}
+.cal-cell.cal-today{outline:2px solid #21845d;font-weight:800}
+.cal-cell.cal-selected{background:#123d2f;color:#fff}
+.cal-today-btn{width:100%;margin-top:14px;border:0;background:#edf3f0;padding:12px;border-radius:14px;font:inherit;cursor:pointer}
+.dark .cal-open-btn{background:#14231e;color:#edf7f2;border-color:#263d35}
+.dark .cal-nav{background:#14231e;color:#edf7f2;border-color:#263d35}
+.dark .cal-cell{background:#1b2d26;color:#e1eee9}
+.dark .cal-weekdays{color:#93aaa1}
+.dark .cal-today-btn{background:#1b2d26;color:#e1eee9}
+.sync-badge.online{color:#16845b;font-weight:700}
+.sync-badge.offline{color:#708078}
+.sync-badge.error{color:#c24132;font-weight:700}
+.sync-badge.pending{color:#a67c1f}
+.brand-preview-img{max-height:90px;max-width:100%;object-fit:contain;display:block;margin:6px 0;border-radius:10px;border:1px solid #dce7e2;padding:4px;background:#fff}
+.invoice-brand-logo{max-height:64px;max-width:140px;object-fit:contain;display:block;margin-bottom:8px}
+.invoice-sign-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:26px;padding-top:14px;border-top:1px dashed #dce7e2}
+.invoice-sign-box{text-align:center}
+.invoice-sign-box img{max-height:80px;max-width:100%;object-fit:contain}
+.invoice-sign-box small{display:block;color:#708078;margin-top:4px}
+.invoice-brand-stamp{max-height:90px}
+#dueSoon:empty{display:none}
