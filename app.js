@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="4.0";
+const APP_VERSION="5.0";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
@@ -453,6 +453,8 @@ async function removePin(){
  data.pin="";data.pinHash="";data.pinSalt="";save();logEvent("حذف رمز ورود","قفل برنامه غیرفعال شد","settings");alert("رمز حذف شد");
 }
 
+function tapFeedback(){try{if(navigator.vibrate)navigator.vibrate(8)}catch(e){}}
+document.addEventListener("click",e=>{if(e.target.closest("button,.nav,.tab-btn"))tapFeedback()},{passive:true});
 document.querySelectorAll(".nav").forEach(b=>b.addEventListener("click",e=>{
  e.preventDefault();
  document.querySelectorAll(".nav").forEach(x=>x.classList.remove("active"));
@@ -774,24 +776,39 @@ function viewImage(id){const t=data.transactions.find(x=>x.id===id);if(!t?.image
 function empty(s){return `<div class="card" style="text-align:center">${s}</div>`}
 
 function invoiceDateLabel(v){return jalaliLabel(v)}
-function invoiceRowHTML(item,i){return `<div class="invoice-row"><select class="inv-product" onchange="invoiceProductPick(this)"><option value="">کالا / خدمت</option>${data.products.map(p=>`<option value="${p.id}" ${p.id===item?.productId?"selected":""}>${esc(p.name)}</option>`).join("")}</select><input class="inv-desc" placeholder="شرح کالا / خدمات" value="${esc(item?.desc||"")}"><input class="inv-qty" oninput="updateInvoiceLiveTotal()" type="number" min="0" step="any" placeholder="تعداد" value="${Number(item?.qty)||""}"><input class="inv-price" oninput="updateInvoiceLiveTotal()" type="number" min="0" step="any" placeholder="مبلغ واحد" value="${Number(item?.price)||""}"><button type="button" class="danger-icon" onclick="this.parentElement.remove();updateInvoiceLiveTotal()">🗑</button></div>`}
+function invField(label,hint,inner){return `<div class="field"><span class="field-cap">${esc(label)}</span>${inner}${hint?`<small class="field-hint">${esc(hint)}</small>`:""}</div>`}
+function invoiceRowHTML(item,i){return `<div class="invoice-row"><select class="inv-product" onchange="invoiceProductPick(this)"><option value="">کالا / خدمت از انبار (اختیاری)</option>${data.products.map(p=>`<option value="${p.id}" ${p.id===item?.productId?"selected":""}>${esc(p.name)}</option>`).join("")}</select><input class="inv-desc" placeholder="مثلاً: نصب و راه‌اندازی سیستم" value="${esc(item?.desc||"")}"><input class="inv-qty" oninput="updateInvoiceLiveTotal()" type="number" min="0" step="any" placeholder="تعداد" value="${Number(item?.qty)||""}"><input class="inv-price" oninput="updateInvoiceLiveTotal()" type="number" min="0" step="any" placeholder="قیمت هر واحد" value="${Number(item?.price)||""}"><button type="button" class="danger-icon" title="حذف ردیف" onclick="this.parentElement.remove();updateInvoiceLiveTotal()">🗑</button></div>`}
 function addInvoiceRow(pref={}){const box=$("invoiceRows");if(!box)return;const div=document.createElement("div");div.innerHTML=invoiceRowHTML(pref,box.children.length);box.appendChild(div.firstElementChild)}
 function invoiceProductPick(sel){const p=data.products.find(x=>x.id===sel.value);const row=sel.closest(".invoice-row");if(!p||!row)return;row.querySelector(".inv-desc").value=p.name;row.querySelector(".inv-price").value=p.price||0;updateInvoiceLiveTotal()}
 function openInvoice(id=null){
  const inv=id&&data.invoices.find(x=>x.id===id);
  const items=inv?.items?.length?inv.items:[{desc:"",qty:1,price:""}];
  const cust=inv?.customerId?data.customers.find(c=>c.id===inv.customerId):null;
- openModal(`<h2>🧾 ${inv?"ویرایش فاکتور":"ساخت فاکتور"}</h2><div class="form">
- <input id="invName" placeholder="نام فاکتور" value="${esc(inv?.name||"")}">
- <div class="two-fields"><input id="invSeller" placeholder="نام فروشنده / فروشگاه" value="${esc(inv?.seller||(inv?"":data.branding?.storeName||""))}"><select id="invCustomer"><option value="">بدون مشتری</option>${data.customers.map(c=>`<option value="${c.id}" ${c.id===inv?.customerId?"selected":""}>${esc(c.name)}${c.phone?" • "+esc(c.phone):""}</option>`).join("")}</select></div>
- <div class="two-fields">${simpleDateField("invDate",jalaliInputValue(inv?.date)||todayJalali())}<input id="invNo" placeholder="شماره فاکتور" value="${esc(inv?.number||"")}"></div>
- <div class="two-fields"><select id="invStatus"><option value="unpaid" ${inv?.status!=="paid"&&inv?.status!=="partial"?"selected":""}>🔴 پرداخت نشده</option><option value="partial" ${inv?.status==="partial"?"selected":""}>🟡 پرداخت بخشی</option><option value="paid" ${inv?.status==="paid"?"selected":""}>🟢 پرداخت کامل</option></select><input id="invPaid" oninput="updateInvoiceLiveTotal()" type="number" min="0" placeholder="مبلغ پرداخت‌شده" value="${Number(inv?.paid)||0}"></div>
- <div class="two-fields"><input id="invDiscount" oninput="updateInvoiceLiveTotal()" type="number" min="0" placeholder="تخفیف" value="${Number(inv?.discount)||0}"><input id="invTax" oninput="updateInvoiceLiveTotal()" type="number" min="0" placeholder="مالیات (درصد)" value="${Number(inv?.taxRate)||0}"></div>
- <textarea id="invAddress" placeholder="آدرس / توضیحات مشتری">${esc(inv?.address||cust?.address||"")}</textarea>
+ openModal(`<h2>🧾 ${inv?"ویرایش فاکتور":"ساخت فاکتور جدید"}</h2><div class="form invoice-form">
+ ${invField("عنوان فاکتور","برای پیدا کردن آسان‌تر در صندوق فاکتور، مثلاً: فاکتور فروش موبایل",`<input id="invName" placeholder="مثلاً: فاکتور فروش شهریور" value="${esc(inv?.name||"")}">`)}
+ ${invField("نام فروشنده / فروشگاه","اسمی که بالای فاکتور چاپ می‌شود",`<input id="invSeller" placeholder="نام فروشگاه یا کسب‌وکار شما" value="${esc(inv?.seller||(inv?"":data.branding?.storeName||""))}">`)}
+ <div class="two-fields">
+ ${invField("نام مشتری","اسم کسی که فاکتور برایش صادر می‌شود",`<input id="invCustomerName" placeholder="نام و نام خانوادگی مشتری" value="${esc(inv?.customerName||cust?.name||"")}">`)}
+ ${invField("انتخاب از لیست مشتری‌ها","اختیاری؛ برای اتصال فاکتور به پرونده مشتری",`<select id="invCustomer"><option value="">بدون اتصال به پرونده مشتری</option>${data.customers.map(c=>`<option value="${c.id}" ${c.id===inv?.customerId?"selected":""}>${esc(c.name)}${c.phone?" • "+esc(c.phone):""}</option>`).join("")}</select>`)}
+ </div>
+ <div class="two-fields">
+ ${invField("تاریخ فاکتور","تاریخ صدور به تقویم شمسی",simpleDateField("invDate",jalaliInputValue(inv?.date)||todayJalali()))}
+ ${invField("شماره فاکتور","اختیاری؛ برای پیگیری و مرتب کردن فاکتورها",`<input id="invNo" placeholder="مثلاً: ۱۰۰۱" value="${esc(inv?.number||"")}">`)}
+ </div>
+ <div class="two-fields">
+ ${invField("وضعیت پرداخت","بر اساس مبلغ دریافتی به‌صورت خودکار هم به‌روزرسانی می‌شود",`<select id="invStatus"><option value="unpaid" ${inv?.status!=="paid"&&inv?.status!=="partial"?"selected":""}>🔴 پرداخت نشده</option><option value="partial" ${inv?.status==="partial"?"selected":""}>🟡 پرداخت بخشی</option><option value="paid" ${inv?.status==="paid"?"selected":""}>🟢 پرداخت کامل</option></select>`)}
+ ${invField("مبلغ دریافت‌شده","تا امروز از مشتری چقدر گرفته‌ای (تومان)",`<input id="invPaid" oninput="updateInvoiceLiveTotal()" type="number" min="0" placeholder="۰" value="${Number(inv?.paid)||0}">`)}
+ </div>
+ <div class="two-fields">
+ ${invField("تخفیف مبلغی","مبلغ ثابتی که از جمع کل کم می‌شود (تومان)",`<input id="invDiscount" oninput="updateInvoiceLiveTotal()" type="number" min="0" placeholder="۰" value="${Number(inv?.discount)||0}">`)}
+ ${invField("تخفیف درصدی","درصدی که بعد از تخفیف مبلغی کم می‌شود (٪)",`<input id="invDiscountPercent" oninput="updateInvoiceLiveTotal()" type="number" min="0" max="100" placeholder="۰" value="${Number(inv?.discountPercent)||0}">`)}
+ </div>
+ ${invField("مالیات بر ارزش‌افزوده","درصدی که بعد از کسر تخفیف به قیمت اضافه می‌شود (٪)",`<input id="invTax" oninput="updateInvoiceLiveTotal()" type="number" min="0" placeholder="۰" value="${Number(inv?.taxRate)||0}">`)}
+ ${invField("آدرس یا توضیحات مشتری","اختیاری؛ آدرس، شماره تماس یا هر توضیح دیگر",`<textarea id="invAddress" placeholder="مثلاً: تهران، خیابان ... - ۰۹۱۲xxxxxxx">${esc(inv?.address||cust?.address||"")}</textarea>`)}
  <div class="invoice-table-head"><span>کالا</span><span>توضیحات</span><span>تعداد</span><span>مبلغ واحد</span><span></span></div>
  <div id="invoiceRows">${items.map(invoiceRowHTML).join("")}</div>
- <button type="button" onclick="addInvoiceRow()">＋ افزودن ردیف</button>
- <div class="invoice-total-box">جمع اقلام: <strong id="invLiveSubtotal">۰ تومان</strong><br>تخفیف و مالیات: <strong id="invLiveAdjust">۰ تومان</strong><br>مبلغ نهایی: <strong id="invLiveTotal">۰ تومان</strong></div>
+ <button type="button" class="ghost-btn" onclick="addInvoiceRow()">＋ افزودن ردیف کالا یا خدمت</button>
+ <div class="invoice-total-box"><div class="inv-total-row"><span>جمع اقلام</span><strong id="invLiveSubtotal">۰ تومان</strong></div><div class="inv-total-row"><span>تخفیف و مالیات</span><strong id="invLiveAdjust">۰ تومان</strong></div><div class="inv-total-row inv-total-final"><span>مبلغ نهایی فاکتور</span><strong id="invLiveTotal">۰ تومان</strong></div></div>
  <button class="primary" onclick="saveInvoice('${inv?.id||""}')">💾 ${inv?"ذخیره تغییرات":"ساخت فاکتور"}</button>
  </div>`);
  updateInvoiceLiveTotal();
@@ -810,22 +827,26 @@ function saveInvoice(id){
  const items=[...document.querySelectorAll("#invoiceRows .invoice-row")].map(r=>({productId:r.querySelector(".inv-product")?.value||"",desc:r.querySelector(".inv-desc")?.value.trim()||"",qty:Number(r.querySelector(".inv-qty")?.value)||0,price:Number(r.querySelector(".inv-price")?.value)||0})).filter(x=>x.desc||x.qty||x.price);
  if(!items.length)return alert("حداقل یک ردیف فاکتور وارد کن");
  const discount=Math.max(0,Number($("invDiscount").value)||0),discountPercent=Math.min(100,Math.max(0,Number($("invDiscountPercent").value)||0)),taxRate=Math.max(0,Number($("invTax").value)||0);let paid=Math.max(0,Number($("invPaid").value)||0);
- const o={name,seller,date,number,items,customerId:$("invCustomer").value||"",address:$("invAddress").value.trim(),discount,discountPercent,taxRate,paid,status:$("invStatus").value,total:0};o.total=invoiceTotal(o);if(o.status==="paid")o.paid=o.total;if(o.paid>=o.total&&o.total>0)o.status="paid";else if(o.paid>0)o.status="partial";else o.status="unpaid";
+ const customerName=$("invCustomerName")?.value.trim()||"";
+ const o={name,seller,date,number,items,customerId:$("invCustomer").value||"",customerName,address:$("invAddress").value.trim(),discount,discountPercent,taxRate,paid,status:$("invStatus").value,total:0};o.total=invoiceTotal(o);if(o.status==="paid")o.paid=o.total;if(o.paid>=o.total&&o.total>0)o.status="paid";else if(o.paid>0)o.status="partial";else o.status="unpaid";
  if(id){const x=data.invoices.find(v=>v.id===id);if(x)adjustStockForInvoice(x,+1);Object.assign(x,o);touch(x);markDirty("invoices",x.id,false,x,x.updatedAt);adjustStockForInvoice(x,-1)}else{const x=touch({id:uid(),...o});data.invoices.unshift(x);markDirty("invoices",x.id,false,x,x.updatedAt);adjustStockForInvoice(x,-1)}
  save();logEvent(id?"ویرایش فاکتور":"ساخت فاکتور",`${name} • ${money(o.total)}`,id?"edit":"create");closeModal()
 }
 function duplicateInvoice(id){const inv=data.invoices.find(x=>x.id===id);if(!inv)return;const x=touch({...JSON.parse(JSON.stringify(inv)),id:uid(),number:"",date:new Date().toISOString().slice(0,10),status:"unpaid",paid:0});data.invoices.unshift(x);markDirty("invoices",x.id,false,x,x.updatedAt);save();logEvent("تکرار فاکتور",x.name,"create")}
 function deleteInvoice(id){if(!confirm("این فاکتور حذف شود؟"))return;const x=data.invoices.find(v=>v.id===id);adjustStockForInvoice(x,+1);removeRecord("invoices",id);logEvent("حذف فاکتور",x?.name||id,"delete")}
+function invoiceCustomerLabel(inv){if(inv.customerName)return inv.customerName;const c=inv.customerId?data.customers.find(x=>x.id===inv.customerId):null;return c?.name||""}
 function invoiceHTML(inv){
  const total=invoiceTotal(inv);
- return `<div class="item invoice-item"><div><b>🧾 ${esc(inv.name||"فاکتور")}</b><div class="meta">${esc(inv.seller||"فروشنده ثبت نشده")} • ${invoiceDateLabel(inv.date)}${inv.number?" • شماره "+esc(inv.number):""}</div><div class="meta">جمع کل: ${money(total)} • ${inv.status==="paid"?"🟢 پرداخت کامل":inv.status==="partial"?"🟡 پرداخت بخشی":"🔴 پرداخت نشده"} • مانده: ${money(invoiceRemaining(inv))}</div></div><div class="actions"><button onclick="openInvoice('${inv.id}')">✏️</button><button onclick="previewInvoice('${inv.id}')">👁</button><button onclick="duplicateInvoice('${inv.id}')">📄</button><button onclick="shareInvoice('${inv.id}')">📤</button><button class="danger-icon" onclick="deleteInvoice('${inv.id}')">🗑</button></div></div>`
+ const custName=invoiceCustomerLabel(inv);
+ return `<div class="item invoice-item"><div><b>🧾 ${esc(inv.name||"فاکتور")}</b><div class="meta">${esc(inv.seller||"فروشنده ثبت نشده")}${custName?" • مشتری: "+esc(custName):""} • ${invoiceDateLabel(inv.date)}${inv.number?" • شماره "+esc(inv.number):""}</div><div class="meta">جمع کل: ${money(total)} • ${inv.status==="paid"?"🟢 پرداخت کامل":inv.status==="partial"?"🟡 پرداخت بخشی":"🔴 پرداخت نشده"} • مانده: ${money(invoiceRemaining(inv))}</div></div><div class="actions"><button onclick="openInvoice('${inv.id}')">✏️</button><button onclick="previewInvoice('${inv.id}')">👁</button><button onclick="duplicateInvoice('${inv.id}')">📄</button><button onclick="shareInvoice('${inv.id}')">📤</button><button class="danger-icon" onclick="deleteInvoice('${inv.id}')">🗑</button></div></div>`
 }
 function previewInvoice(id){
  const inv=data.invoices.find(x=>x.id===id);if(!inv)return; const cust=inv.customerId?data.customers.find(c=>c.id===inv.customerId):null;
  const b=data.branding||{};
  const rows=(inv.items||[]).map(x=>`<div class="preview-inv-row"><span>${esc(x.desc)}</span><span>${fa(x.qty)}</span><span>${money(x.price)}</span><span>${money((Number(x.qty)||0)*(Number(x.price)||0))}</span></div>`).join("");
  const signRow=(b.stamp||b.signature)?`<div class="invoice-sign-row">${b.stamp?`<div class="invoice-sign-box"><img class="invoice-brand-stamp" src="${b.stamp}" alt="مهر فروشگاه"><small>مهر</small></div>`:"<div></div>"}${b.signature?`<div class="invoice-sign-box"><img class="invoice-brand-signature" src="${b.signature}" alt="امضا"><small>امضا</small></div>`:""}</div>`:"";
- openModal(`<div id="invoicePreview" class="invoice-preview"><div class="invoice-head"><div>${b.logo?`<img class="invoice-brand-logo" src="${b.logo}" alt="لوگو">`:""}<h2>فاکتور</h2><b>${esc(inv.seller||b.storeName||"")}</b></div><div>شماره: ${esc(inv.number||"—")}<br>تاریخ: ${invoiceDateLabel(inv.date)}</div></div><h3>${esc(inv.name||"فاکتور")}</h3>${cust?`<div class="meta">مشتری: ${esc(cust.name)}${cust.phone?" • "+esc(cust.phone):""}</div>`:""}<div class="meta">وضعیت: ${inv.status==="paid"?"🟢 پرداخت کامل":inv.status==="partial"?"🟡 پرداخت بخشی":"🔴 پرداخت نشده"} • مانده: ${money(invoiceRemaining(inv))}</div><div class="preview-inv-row head"><b>توضیحات</b><b>تعداد</b><b>مبلغ واحد</b><b>مبلغ</b></div>${rows}<div class="preview-total">جمع کل: <strong>${money(invoiceTotal(inv))}</strong></div>${signRow}</div><div class="actions"><button class="primary" onclick="printInvoice('${inv.id}')">🖨 چاپ / PDF</button><button class="primary" onclick="shareInvoice('${inv.id}')">📤 ارسال فاکتور</button></div>`)
+ const custName=invoiceCustomerLabel(inv);
+ openModal(`<div id="invoicePreview" class="invoice-preview"><div class="invoice-head"><div>${b.logo?`<img class="invoice-brand-logo" src="${b.logo}" alt="لوگو">`:""}<h2>فاکتور</h2><b>${esc(inv.seller||b.storeName||"")}</b></div><div>شماره: ${esc(inv.number||"—")}<br>تاریخ: ${invoiceDateLabel(inv.date)}</div></div><h3>${esc(inv.name||"فاکتور")}</h3>${custName?`<div class="meta">مشتری: ${esc(custName)}${cust?.phone?" • "+esc(cust.phone):""}</div>`:""}<div class="meta">وضعیت: ${inv.status==="paid"?"🟢 پرداخت کامل":inv.status==="partial"?"🟡 پرداخت بخشی":"🔴 پرداخت نشده"} • مانده: ${money(invoiceRemaining(inv))}</div><div class="preview-inv-row head"><b>توضیحات</b><b>تعداد</b><b>مبلغ واحد</b><b>مبلغ</b></div>${rows}<div class="preview-total">جمع کل: <strong>${money(invoiceTotal(inv))}</strong></div>${signRow}</div><div class="actions"><button class="primary" onclick="printInvoice('${inv.id}')">🖨 چاپ / PDF</button><button class="primary" onclick="shareInvoice('${inv.id}')">📤 ارسال فاکتور</button></div>`)
 }
 function loadImg(src){return new Promise(resolve=>{if(!src)return resolve(null);const im=new Image();im.onload=()=>resolve(im);im.onerror=()=>resolve(null);im.src=src})}
 async function drawInvoiceCanvas(inv){
@@ -839,6 +860,8 @@ async function drawInvoiceCanvas(inv){
  x.font="bold 22px sans-serif";x.fillText(inv.seller||b.storeName||"فروشگاه / فروشنده",W-45,95);
  x.font="17px sans-serif";x.fillStyle="#56645f";x.fillText("شماره: "+(inv.number||"—"),W-45,130);x.fillText("تاریخ: "+invoiceDateLabel(inv.date),W-245,130);
  x.fillStyle="#17352b";x.font="bold 21px sans-serif";x.fillText(inv.name||"فاکتور",W-45,180);
+ const custLabel=invoiceCustomerLabel(inv);
+ if(custLabel){x.font="16px sans-serif";x.fillStyle="#56645f";x.fillText("مشتری: "+custLabel,W-45,208)}
  let y=245;x.fillStyle="#eaf2ee";x.fillRect(28,y-32,W-56,45);x.fillStyle="#17352b";x.font="bold 14px sans-serif";
  x.fillText("مبلغ",W-38,y-8);x.fillText("مبلغ واحد",W-230,y-8);x.fillText("تعداد",W-400,y-8);x.fillText("توضیحات",W-490,y-8);
  x.font="15px sans-serif";
