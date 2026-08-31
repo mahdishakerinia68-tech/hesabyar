@@ -1,6 +1,6 @@
 {
-  "name": "حساب‌یار 3.2",
-  "short_name": "حساب‌یار 3.2",
+  "name": "حساب‌یار 3.4",
+  "short_name": "حساب‌یار 3.4",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#f4f7fb",
@@ -8,5 +8,5 @@
   "lang": "fa",
   "dir": "rtl",
   "icons": [{"src":"logo.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}],
-  "version": "3.2"
+  "version": "3.4"
 }
