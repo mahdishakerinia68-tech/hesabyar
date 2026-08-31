@@ -3,10 +3,13 @@ const SYNC_KEY="hesabdar-firebase-config-v1";
 const APP_VERSION="3.3";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
-const SYNC_INTERVAL=5000;
-const DEVICE_HEARTBEAT_MS=15000;
-const DEVICE_ACTIVE_MS=45000;
+const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
+const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v1";
+const AUTO_BACKUP_MS=6*60*60*1000;
 const DEVICE_ID_KEY="hesabdar-device-id-v1";
+const DEVICE_PRESENCE_MS=45*1000;
+const DEVICE_PRESENCE_INTERVAL=20*1000;
+const SYNC_INTERVAL=5000;
 // Firebase project configuration supplied for this app.
 // This is safe to ship in a web app; access is protected by Firebase Authentication + Firestore Rules.
 const DEFAULT_SYNC_CONFIG={
@@ -18,26 +21,16 @@ const DEFAULT_SYNC_CONFIG={
   appId:"1:1048332879407:web:d1168138d754d28c8d68da",
   measurementId:"G-562NVEJKZT"
 };
-let sync={app:null,auth:null,db:null,user:null,unsubscribe:null,ready:false,saving:false,queued:false,hydrating:false,authListener:false,dirty:new Map(),timer:null,heartbeatTimer:null,deviceId:null};
+let sync={app:null,auth:null,db:null,user:null,unsubscribe:null,ready:false,saving:false,queued:false,hydrating:false,authListener:false,dirty:new Map()};
 function syncConfig(){try{return JSON.parse(localStorage.getItem(SYNC_KEY)||"null")||DEFAULT_SYNC_CONFIG}catch{return DEFAULT_SYNC_CONFIG}}
+function autoBackupEnabled(){return localStorage.getItem(AUTO_BACKUP_ENABLED_KEY)!=="false"}
+function setAutoBackupEnabled(v){localStorage.setItem(AUTO_BACKUP_ENABLED_KEY,v?"true":"false"); if(v) createAutoBackup("فعال‌سازی پشتیبان خودکار"); logEvent(v?"پشتیبان خودکار فعال شد":"پشتیبان خودکار غیرفعال شد",v?"پشتیبان‌گیری خودکار هر ۶ ساعت فعال است":"پشتیبان‌گیری خودکار خاموش شد","settings",false); renderSettingsFeatures()}
+function createAutoBackup(reason="زمان‌بندی"){try{if(!autoBackupEnabled())return false; const raw=JSON.stringify(data); const list=JSON.parse(localStorage.getItem(AUTO_BACKUP_KEY)||"[]"); list.unshift({at:new Date().toISOString(),reason,data:JSON.parse(raw)}); while(list.length>5)list.pop(); localStorage.setItem(AUTO_BACKUP_KEY,JSON.stringify(list)); localStorage.setItem(AUTO_BACKUP_KEY+"-last",new Date().toISOString()); return true}catch(e){console.warn("auto backup",e);return false}}
+function getAutoBackupInfo(){try{const last=localStorage.getItem(AUTO_BACKUP_KEY+"-last");return last?new Date(last):null}catch{return null}}
+function restoreLatestAutoBackup(){try{const list=JSON.parse(localStorage.getItem(AUTO_BACKUP_KEY)||"[]"); if(!list.length)return alert("هنوز پشتیبان خودکاری وجود ندارد."); if(!confirm("آخرین پشتیبان خودکار جایگزین اطلاعات فعلی شود؟"))return; data=list[0].data; normalizeData(); save(); logEvent("بازیابی پشتیبان خودکار",new Date(list[0].at).toLocaleString("fa-IR"),"settings"); alert("آخرین پشتیبان خودکار بازیابی شد.")}catch(e){alert("پشتیبان خودکار قابل بازیابی نیست.")}}
+function normalizeData(){data=data||blankData(); for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats","audit"]){data[k]??=[];} data.pin=typeof data.pin==="string"?data.pin:""; data.branding??={storeName:"",logo:"",stamp:"",signature:""}; data.yearSettlements??={}; data._sync??={tombstones:{}}; data._sync.tombstones??={}; for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats"]){for(const r of data[k]){r.id??=uid();r.updatedAt??=new Date().toISOString();}}}
+function renderSettingsFeatures(){const e=$("autoBackupToggle");if(e)e.checked=autoBackupEnabled(); const last=$("autoBackupLast"); if(last){const d=getAutoBackupInfo();last.textContent=d?"آخرین پشتیبان: "+d.toLocaleString("fa-IR"):"هنوز پشتیبان خودکاری ساخته نشده";} const v=$("appVersionText");if(v)v.textContent=APP_VERSION;}
 function setSyncStatus(t){const e=$("syncStatus");if(e)e.textContent=t||""}
-function getDeviceId(){try{let id=localStorage.getItem(DEVICE_ID_KEY);if(!id){id=uid();localStorage.setItem(DEVICE_ID_KEY,id)}return id}catch(e){return "device-"+Math.random().toString(36).slice(2)}}
-async function updateDevicePresence(){if(!sync.user||!sync.db)return;try{sync.deviceId=sync.deviceId||getDeviceId();await cloudDoc().set({devices:{[sync.deviceId]:firebase.firestore.FieldValue.serverTimestamp()},lastConnectionCheck:firebase.firestore.FieldValue.serverTimestamp()},{merge:true})}catch(e){console.warn("device heartbeat",e)}}
-function startDeviceHeartbeat(){if(sync.heartbeatTimer)clearInterval(sync.heartbeatTimer);sync.deviceId=getDeviceId();updateDevicePresence();sync.heartbeatTimer=setInterval(updateDevicePresence,DEVICE_HEARTBEAT_MS)}
-async function stopDeviceHeartbeat(){if(sync.heartbeatTimer){clearInterval(sync.heartbeatTimer);sync.heartbeatTimer=null}if(sync.user&&sync.db&&sync.deviceId){try{await cloudDoc().set({devices:{[sync.deviceId]:firebase.firestore.FieldValue.delete()}},{merge:true})}catch(e){console.warn("device presence cleanup",e)}}}
-async function checkTwoPhoneConnection(){
-  if(!sync.user||!sync.db){setSyncStatus("⚠️ برای بررسی اتصال، ابتدا وارد حساب مشترک شوید");return false}
-  setSyncStatus("🔎 در حال بررسی اتصال دو گوشی...");
-  try{
-    await updateDevicePresence();
-    const snap=await cloudDoc().get();
-    const devices=snap.data()?.devices||{},now=Date.now(),active=Object.entries(devices).filter(([id,v])=>{const t=v?.toMillis?v.toMillis():0;return t&&now-t<DEVICE_ACTIVE_MS});
-    const count=active.length;
-    if(count>=2){setSyncStatus("🟢 اتصال دو گوشی برقرار است • "+fa(count)+" دستگاه فعال");logEvent("بررسی اتصال دو گوشی","دو دستگاه فعال در حساب همگام‌سازی شناسایی شد","sync");alert("🟢 اتصال دو گوشی برقرار است.\n\n"+fa(count)+" دستگاه در ۴۵ ثانیه اخیر فعال بوده‌اند.")}
-    else{setSyncStatus("🟡 فقط این گوشی فعال است؛ گوشی دوم را به همین حساب وارد کن");logEvent("بررسی اتصال دو گوشی","گوشی دوم فعال شناسایی نشد","sync");alert("🟡 گوشی دوم فعال شناسایی نشد.\n\nروی گوشی دوم با همین ایمیل و رمز وارد حساب شو و چند ثانیه صبر کن.")}
-    return count>=2;
-  }catch(e){setSyncStatus("🔴 بررسی اتصال ناموفق: "+(e.code||e.message));return false}
-}
 
 const defaultsExpense=["بنزین","غذا و رستوران","خرید خانه","خرید روزانه","قبض","اینترنت و شارژ","حمل‌ونقل","پوشاک","درمان","تفریح","هدیه","سایر"];
 const defaultsIncome=["حقوق","پاداش","واریز","فروش","دریافت از شخص","سایر"];
@@ -83,12 +76,13 @@ async function removeReminderForNote(noteId){const matches=(data.reminders||[]).
 const blankData=()=>({accounts:[],transactions:[],people:[],reminders:[],notes:[],checks:[],invoices:[],customers:[],products:[],audit:[],expenseCats:defaultsExpense.map((name,i)=>({id:"e"+i,name})),incomeCats:defaultsIncome.map((name,i)=>({id:"i"+i,name})),pin:"",branding:{storeName:"",logo:"",stamp:"",signature:""},yearSettlements:{}});
 window.addEventListener("error",e=>{console.error(e.error||e.message)});
 window.addEventListener("unhandledrejection",e=>{console.error(e.reason)});
-window.addEventListener("online",()=>{if(sync.db)sync.db.enableNetwork().catch(console.error);setSyncStatus("🌐 اینترنت برقرار شد؛ در حال اتصال به ابر...")});
+window.addEventListener("online",async()=>{if(sync.db)sync.db.enableNetwork().catch(console.error);setSyncStatus("🌐 اینترنت برقرار شد؛ در حال بررسی اتصال دو گوشی..."); await verifyTwoPhoneConnection(true); checkForUpdates(false);});
 window.addEventListener("offline",()=>setSyncStatus("⚠️ اینترنت دستگاه قطع است"));
 
 let data;
 try{data=JSON.parse(localStorage.getItem(KEY)||localStorage.getItem("hesabdar-v20")||localStorage.getItem("hesabdar-v11")||"null")}catch{data=null}
 data=data||blankData();
+normalizeData();
 data.accounts??=[];
 if(!data.accounts.some(a=>String(a.name||"").trim()==="کیف پول نقدی")){const cash=touch({id:uid(),name:"کیف پول نقدی",bank:"",sender:"",card:"",balance:0,default:true});data.accounts.unshift(cash);localStorage.setItem(KEY,JSON.stringify(data));}
 data.transactions??=[];data.people??=[];data.customers??=[];data.products??=[];data.reminders??=[];data.notes??=[];data.checks??=[];data.invoices??=[];data.audit??=[];data.expenseCats??=defaultsExpense.map((name,i)=>({id:"e"+i,name}));data.incomeCats??=defaultsIncome.map((name,i)=>({id:"i"+i,name}));data.pin=typeof data.pin==="string"?data.pin:"";data.branding??={storeName:"",logo:"",stamp:"",signature:""};data.branding.storeName??="";data.branding.logo??="";data.branding.stamp??="";data.branding.signature??="";data.yearSettlements??={};data._sync??={tombstones:{}};data._sync.tombstones??={};for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats"]){for(const r of data[k]){r.id??=uid();r.updatedAt??=new Date().toISOString()}}
@@ -111,7 +105,7 @@ function renderAudit(){
   box.innerHTML=logs.map(e=>`<div class="audit-item"><div class="audit-icon">${auditIcon(e.kind)}</div><div class="audit-main"><b>${esc(e.action)}</b>${e.detail?`<div class="meta">${esc(e.detail)}</div>`:""}<small>${new Intl.DateTimeFormat("fa-IR-u-ca-persian",{dateStyle:"short",timeStyle:"short"}).format(new Date(e.at))}</small></div></div>`).join("")||empty("هنوز گزارشی ثبت نشده است");
 }
 function clearAudit(){if(!data.audit?.length)return alert("گزارشی برای پاک کردن وجود ندارد");if(confirm("همه گزارش‌های فعالیت پاک شوند؟")){const old=data.audit.slice();data.audit=[];for(const e of old)markDirty("audit",e.id,true,{id:e.id},new Date().toISOString());save();logEvent("گزارش‌ها پاک شدند","سابقه فعالیت قبلی حذف شد","system")}}
-function save(){localStorage.setItem(KEY,JSON.stringify(data));render();syncSave()}
+function save(){localStorage.setItem(KEY,JSON.stringify(data)); if(autoBackupEnabled()){const last=getAutoBackupInfo();if(!last||Date.now()-last.getTime()>=AUTO_BACKUP_MS)createAutoBackup("ذخیره زمان‌بندی‌شده")};render();syncSave()}
 function hasMeaningfulData(d){
   if(!d||typeof d!=="object")return false;
   return ["accounts","transactions","people","reminders","notes","checks","invoices"].some(k=>Array.isArray(d[k])&&d[k].length>0);
@@ -220,6 +214,10 @@ async function syncTick(){
   try{if(sync.dirty.size)await pushRest();setSyncStatus("☁️ آنلاین • همگام‌سازی لحظه‌ای")}catch(e){console.error(e)}
 }
 function dataSummary(d){return `حساب ${fa(d.accounts?.length||0)} • تراکنش ${fa(d.transactions?.length||0)} • افراد ${fa(d.people?.length||0)} • یادداشت ${fa(d.notes?.length||0)}`}
+function deviceId(){let id=localStorage.getItem(DEVICE_ID_KEY);if(!id){id=uid();localStorage.setItem(DEVICE_ID_KEY,id)}return id}
+async function updateDevicePresence(){if(!sync.user||!sync.db)return false; try{await cloudDoc().collection("devices").doc(deviceId()).set({deviceId:deviceId(),lastSeen:new Date().toISOString(),userAgent:navigator.userAgent.slice(0,120)}, {merge:true}); return true}catch(e){console.warn("presence",e);return false}}
+async function verifyTwoPhoneConnection(manual=false){if(!sync.user||!sync.db){if(manual)setSyncStatus("⚠️ ابتدا با حساب همگام‌سازی وارد شوید");return false} try{await updateDevicePresence(); const snap=await cloudDoc().collection("devices").get(); const now=Date.now(); const others=snap.docs.map(d=>d.data()).filter(x=>x.deviceId!==deviceId()&&x.lastSeen&&(now-new Date(x.lastSeen).getTime())<=DEVICE_PRESENCE_MS); setSyncStatus(others.length?`📱 ${fa(others.length)} گوشی دیگر متصل است • همگام‌سازی فعال`:"📱 گوشی دوم در ۴۵ ثانیه اخیر دیده نشد • در حال بررسی مجدد"); if(others.length)logEvent("بررسی اتصال دو گوشی",`گوشی دیگر فعال است (${others.length})`,"sync",false); return !!others.length}catch(e){setSyncStatus("⚠️ بررسی اتصال دو گوشی ناموفق بود: "+(e.code||e.message));return false}}
+function startDevicePresence(){if(sync.presenceTimer)clearInterval(sync.presenceTimer); updateDevicePresence(); sync.presenceTimer=setInterval(()=>{if(sync.user)verifyTwoPhoneConnection(false)},DEVICE_PRESENCE_INTERVAL)}
 async function initSync(){
   const cfg=syncConfig();if(!cfg||!window.firebase)return;
   try{
@@ -229,8 +227,9 @@ async function initSync(){
     sync.authListener=true;
     sync.auth.onAuthStateChanged(async user=>{
       sync.user=user;fillSettingsSyncEmail();
-      if(sync.timer)clearInterval(sync.timer);if(sync.unsubscribe){sync.unsubscribe();sync.unsubscribe=null}if(!user){sync.ready=false;await stopDeviceHeartbeat();setSyncStatus("☁️ برای همگام‌سازی وارد شوید");return}
-      sync.ready=true;await hydrateSync();await rescheduleAllNativeReminders();startDeviceHeartbeat();
+      if(sync.timer)clearInterval(sync.timer);if(sync.unsubscribe){sync.unsubscribe();sync.unsubscribe=null}
+      if(!user){sync.ready=false;if(sync.presenceTimer)clearInterval(sync.presenceTimer);setSyncStatus("☁️ برای همگام‌سازی وارد شوید");return}
+      sync.ready=true;await hydrateSync();await rescheduleAllNativeReminders();startDevicePresence();await verifyTwoPhoneConnection(false);
       sync.unsubscribe=recordsCollection().onSnapshot(snap=>{
         if(sync.hydrating)return;
         const remote=snap.docs.map(d=>d.data());
@@ -530,8 +529,11 @@ function noteItemHTML(n,it){
 function noteHTML(n){
  const items=n.items||[];
  const list=items.length?items.map(it=>noteItemHTML(n,it)).join(''):'<div class="meta">هنوز آیتمی اضافه نشده</div>';
- return '<div class="note-card item"><div class="note-main"><div class="note-title"><span class="note-badge">📝</span><b>'+esc(n.title)+'</b></div>'+(n.text?'<div class="meta note-text">'+esc(n.text)+'</div>':'')+(n.date?'<div class="meta">⏰ '+jalaliDateTimeInput(n.date)+' • '+noteRepeatLabel(n.repeat)+'</div>':'<div class="meta">بدون زمان یادآوری</div>')+'<div class="note-checklist">'+list+'</div></div><div class="note-actions"><strong>'+(items.length?fa(items.filter(x=>x.done).length)+' / '+fa(items.length):'')+'</strong>'+actionButtons('openNote','deleteNote',n.id)+'</div></div>';
+ const alarm=n.date?`<div class="meta">⏰ آلارم جداگانه: ${jalaliDateTimeInput(n.date)} • ${noteRepeatLabel(n.repeat)}</div>`:'<div class="meta">بدون آلارم</div>';
+ return `<div class="note-card item accordion-card"><button class="accordion-head" type="button" onclick="toggleAccordion(this)"><span><span class="note-badge">📝</span> <b>${esc(n.title)}</b></span><span>${items.length?fa(items.filter(x=>x.done).length)+' / '+fa(items.length):''}⌄</span></button><div class="accordion-body"><div class="note-main">${n.text?'<div class="meta note-text">'+esc(n.text)+'</div>':''}${alarm}<div class="note-checklist">${list}</div></div><div class="note-actions">${actionButtons('openNote','deleteNote',n.id)}</div></div></div>`;
 }
+function toggleAccordion(btn){const card=btn?.closest('.accordion-card');if(!card)return;card.classList.toggle('open');}
+
 
 function openReminder(id=null){const r=id&&data.reminders.find(x=>x.id===id);openModal(`<h2>${r?"ویرایش یادآوری":"یادآوری"}</h2><div class="form"><input id="rt" placeholder="عنوان" value="${esc(r?.title||"")}"><input id="ra" type="number" placeholder="مبلغ" value="${Number(r?.amount)||""}">${pickerBox("rdPicker","rtPicker",r?.date||new Date().toISOString())}<select id="rr"><option value="once" ${r?.repeat==="once"?"selected":""}>یک‌بار</option><option value="monthly" ${r?.repeat==="monthly"?"selected":""}>ماهانه</option><option value="weekly" ${r?.repeat==="weekly"?"selected":""}>هفتگی</option></select><select id="rb"><option value="expense" ${r?.type==="expense"?"selected":""}>پرداخت</option><option value="income" ${r?.type==="income"?"selected":""}>دریافت</option></select><button class="primary" onclick="saveReminder('${r?.id||""}')">${r?"ذخیره تغییرات":"ذخیره"}</button></div>`)}
 async function saveReminder(id){if(!$("rt").value||!$("rdPicker").value)return alert("عنوان و تاریخ لازم است");const o={title:$("rt").value.trim(),amount:parseMoney($("ra").value),date:pickerToISO("rdPicker","rtPicker"),repeat:$("rr").value,type:$("rb").value};if(id){const r=data.reminders.find(x=>x.id===id);Object.assign(r,o);touch(r);markDirty("reminders",r.id,false,r,r.updatedAt);save();await cancelNativeReminder(r.id);await scheduleNativeReminder(r);if((r.type||"")==="note" && (r.repeat||"once")==="once") await addToAndroidClock(r)}else{const nr=touch({id:uid(),...o});data.reminders.push(nr);markDirty("reminders",nr.id,false,nr,nr.updatedAt);save();await scheduleNativeReminder(nr);if((nr.type||"")==="note" && (nr.repeat||"once")==="once") await addToAndroidClock(nr)}logEvent(id?"ویرایش یادآوری":"ایجاد یادآوری",o.title,id?"edit":"create");closeModal()}
@@ -546,24 +548,10 @@ function setUpdateStatus(t){const e=$("updateStatus");if(e)e.textContent=t||""}
 function versionParts(v){return String(v||"").replace(/^v/i,"").split(".").map(x=>parseInt(x,10)||0)}
 function isNewerVersion(remote,local){const a=versionParts(remote),b=versionParts(local);for(let i=0;i<Math.max(a.length,b.length);i++){if((a[i]||0)>(b[i]||0))return true;if((a[i]||0)<(b[i]||0))return false}return false}
 async function notifyUpdate(remote,url){const msg="نسخه جدید حسابدار "+remote+" منتشر شده است";try{if("Notification" in window && Notification.permission==="granted")new Notification("بروزرسانی حسابدار",{body:msg});else if("Notification" in window && Notification.permission!=="denied")await Notification.requestPermission().then(p=>{if(p==="granted")new Notification("بروزرسانی حسابدار",{body:msg})})}catch(e){} if(url && confirm(msg+"\n\nبرای مشاهده صفحه انتشار باز شود؟"))window.open(url,"_blank","noopener,noreferrer")}
-async function checkForUpdates(manual=false){const repo=githubRepo();if($("githubRepo"))$("githubRepo").value=repo;if(!repo){setUpdateStatus("ابتدا مخزن GitHub را در تنظیمات وارد کن.");return false}if(!navigator.onLine){setUpdateStatus("📴 اینترنت قطع است؛ بررسی بروزرسانی بعد از اتصال انجام می‌شود.");return false}if(manual)setUpdateStatus("در حال بررسی نسخه جدید و بروزرسانی خودکار...");try{
-  const r=await fetch("https://api.github.com/repos/"+repo+"/releases/latest",{headers:{Accept:"application/vnd.github+json"},cache:"no-store"});if(!r.ok)throw new Error("GitHub "+r.status);
-  const rel=await r.json(),remote=rel.tag_name||rel.name||"";localStorage.setItem("hesabdar-last-update-check",new Date().toISOString());
-  if(isNewerVersion(remote,APP_VERSION)){setUpdateStatus("⚠️ نسخه جدید "+remote+" موجود است؛ بروزرسانی بررسی شد");if(localStorage.getItem("hesabdar-last-notified-update")!==remote){localStorage.setItem("hesabdar-last-notified-update",remote);await notifyUpdate(remote,rel.html_url)}}else{setUpdateStatus("✅ برنامه به‌روز است؛ نسخه فعلی "+APP_VERSION);localStorage.setItem("hesabdar-last-update",remote)}
-  await updateServiceWorker(true);return true;
-}catch(e){setUpdateStatus("❌ بررسی بروزرسانی انجام نشد؛ اینترنت و نام مخزن را بررسی کن.");return false}}
-async function updateServiceWorker(force=false){
-  if(!("serviceWorker" in navigator))return false;
-  try{
-    const reg=await navigator.serviceWorker.getRegistration();
-    if(!reg)return false;
-    await reg.update();
-    if(force && reg.waiting)reg.waiting.postMessage({type:"SKIP_WAITING"});
-    return true;
-  }catch(e){console.warn("service worker update",e);return false}
-}
-
-function startUpdateChecker(){setTimeout(()=>checkForUpdates(false),2500);setInterval(()=>checkForUpdates(false),UPDATE_CHECK_MS);window.addEventListener("online",()=>setTimeout(()=>checkForUpdates(false),1500));if("serviceWorker" in navigator)navigator.serviceWorker.addEventListener("controllerchange",()=>location.reload())}
+async function checkForUpdates(manual=false){const repo=githubRepo();if($("githubRepo"))$("githubRepo").value=repo;if(!repo){setUpdateStatus("ابتدا مخزن GitHub را در تنظیمات وارد کن.");return false}if(manual)setUpdateStatus("در حال بررسی نسخه جدید...");try{const r=await fetch("https://api.github.com/repos/"+repo+"/releases/latest",{headers:{Accept:"application/vnd.github+json"},cache:"no-store"});if(!r.ok)throw new Error("GitHub "+r.status);const rel=await r.json(),remote=rel.tag_name||rel.name||"";if(isNewerVersion(remote,APP_VERSION)){setUpdateStatus("⚠️ نسخه جدید "+remote+" موجود است");localStorage.setItem("hesabdar-last-update",remote);await notifyUpdate(remote,rel.html_url)}else{setUpdateStatus("✅ برنامه به‌روز است؛ نسخه فعلی "+APP_VERSION);localStorage.setItem("hesabdar-last-update",remote)}return true}catch(e){setUpdateStatus("❌ بررسی GitHub انجام نشد؛ اینترنت و نام مخزن را بررسی کن.");return false}}
+async function updateServiceWorkerNow(){try{if(!('serviceWorker' in navigator))return; const reg=await navigator.serviceWorker.getRegistration(); if(reg){await reg.update();}}catch(e){console.warn("service worker update",e)}}
+function startUpdateChecker(){setTimeout(()=>{checkForUpdates(false);updateServiceWorkerNow()},2500);setInterval(()=>{checkForUpdates(false);updateServiceWorkerNow()},UPDATE_CHECK_MS);setInterval(()=>{if(autoBackupEnabled())createAutoBackup("هر ۶ ساعت")},AUTO_BACKUP_MS)}
+async function testNotifications(){const ok=await requestNativeNotifications();if(!ok)return alert("اعلان‌ها فعال نیستند یا در این محیط در دسترس نیستند."); const test={id:"test-"+Date.now(),title:"تست اعلان حساب‌یار",date:new Date(Date.now()+15000).toISOString(),repeat:"once",type:"note",body:"اگر اعلان را دیدی، سیستم اعلان درست کار می‌کند."}; await scheduleNativeReminder(test); alert("یک اعلان آزمایشی برای حدود ۱۵ ثانیه دیگر زمان‌بندی شد.")}
 async function requestNotifications(){const ok=await requestNativeNotifications();alert(ok?"اعلان‌ها فعال شدند؛ یادآوری‌های زمان‌دار نیز زمان‌بندی شدند.":"اجازه اعلان داده نشد یا قابلیت Native در این محیط در دسترس نیست.")}
 
 
@@ -696,7 +684,7 @@ function render(){
  if($("txList"))$("txList").innerHTML=data.transactions.filter(t=>(!q||String(t.title).includes(q)||String(t.category||"").includes(q))&&(!ft||t.type===ft)&&(!fc||t.category===fc)).map(txHTML).join("")||empty("تراکنشی پیدا نشد");
  if($("customerList"))renderCustomers();
  if($("peopleList"))$("peopleList").innerHTML=data.people.filter(p=>(p.type||"debt")===peopleMode).map(p=>{const total=Number(p.amount)||0,paid=Math.min(Number(p.paid)||0,total),remaining=Math.max(0,total-paid);return `<div class="item"><div><b>${esc(p.name)}</b><div class="meta">${p.due?"سررسید: "+p.due:""}${p.note?" • "+esc(p.note):""}</div><div class="meta">کل: ${money(total)} • تسویه: ${money(paid)}</div></div><div><strong>${money(remaining)}</strong><div class="actions"><button type="button" onclick="payPerson('${p.id}')">تسویه</button>${actionButtons("openPerson","deletePerson",p.id)}</div></div></div>`}).join("")||empty(peopleMode==="debt"?"هنوز بدهکاری ثبت نشده":"هنوز طلبی ثبت نشده");
- if($("reminderList"))$("reminderList").innerHTML=data.reminders.map(r=>`<div class="item"><div><b>${esc(r.title)}</b><div class="meta">${jalaliLabel(r.date)} • ${r.repeat==="once"?"یک‌بار":r.repeat==="weekly"?"هفتگی":"ماهانه"}</div></div><div><strong>${r.amount?money(r.amount):""}</strong>${actionButtons("openReminder","deleteReminder",r.id)}</div></div>`).join("")||empty("یادآوری ندارید");
+ if($("reminderList")){const normalReminders=data.reminders.filter(r=>!r.sourceNoteId); const noteAlarms=data.reminders.filter(r=>r.sourceNoteId); const normal=normalReminders.map(r=>`<div class="item accordion-card"><button class="accordion-head" type="button" onclick="toggleAccordion(this)"><span>🔔 <b>${esc(r.title)}</b></span><span>⌄</span></button><div class="accordion-body"><div class="meta">${jalaliLabel(r.date)} • ${r.repeat==="once"?"یک‌بار":r.repeat==="weekly"?"هفتگی":"ماهانه"}</div><div class="accordion-actions"><strong>${r.amount?money(r.amount):""}</strong>${actionButtons("openReminder","deleteReminder",r.id)}</div></div></div>`).join(""); $("reminderList").innerHTML=`<div class="section-label">🔔 یادآوری‌های مستقل</div>${normal||empty("یادآوری مستقلی ندارید")}${noteAlarms.length?`<div class="section-label">📝⏰ آلارم یادداشت‌ها</div>`+noteAlarms.map(r=>`<div class="item accordion-card"><button class="accordion-head" type="button" onclick="toggleAccordion(this)"><span>📝 <b>${esc(r.title)}</b></span><span>⌄</span></button><div class="accordion-body"><div class="meta">${jalaliLabel(r.date)} • ${r.repeat==="once"?"یک‌بار":r.repeat==="weekly"?"هفتگی":"ماهانه"}</div></div></div>`).join(""):``}`;}
  if($("noteList"))$("noteList").innerHTML=data.notes.map(noteHTML).join("")||empty("یادداشتی ندارید");
  if($("invoiceList"))$("invoiceList").innerHTML=data.invoices.map(invoiceHTML).join("")||empty("هنوز فاکتوری ساخته نشده است");
  if($("checkList"))$("checkList").innerHTML=data.checks.map(c=>`<div class="item"><div><b>${c.type==="receive"?"دریافتی":"پرداختی"} • ${esc(c.name)}</b><div class="meta">${jalaliLabel(c.date)}${c.bank?" • "+esc(c.bank):""}</div></div><div><strong>${money(c.amount)}</strong>${actionButtons("openCheck","deleteCheck",c.id)}</div></div>`).join("")||empty("چکی ثبت نشده");
@@ -720,4 +708,4 @@ function drawChart(inc,exp){const c=$("chart");if(!c)return;const x=c.getContext
 function exportData(){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));a.download="hesabdar-backup.json";a.click();logEvent("پشتیبان‌گیری","فایل JSON صادر شد","settings")}
 function importData(e){const file=e.target.files?.[0];if(!file)return;const r=new FileReader();r.onload=()=>{try{data=JSON.parse(r.result);data.audit??=[];data.notes??=[];save();logEvent("بازیابی اطلاعات","پشتیبان وارد شد","settings");showLock();alert("بازیابی شد")}catch{alert("فایل نامعتبر است")}};r.readAsText(file)}
 function clearData(){if(confirm("همه اطلاعات حذف شود؟")){const pin=data.pin;data=blankData();data.pin=pin;save();logEvent("پاک کردن اطلاعات","اطلاعات برنامه پاک شد","delete");}}
-showLock();render();renderBrandingInSettings();logEvent("اجرای برنامه","برنامه حسابدار اجرا شد","system");initSync();syncAllNotesToReminders().catch(console.error);rescheduleAllNativeReminders().catch(console.error);startUpdateChecker();
+showLock();render();renderBrandingInSettings();renderSettingsFeatures();createAutoBackup("اجرای برنامه");logEvent("اجرای برنامه","برنامه حسابدار اجرا شد","system");initSync();syncAllNotesToReminders().catch(console.error);rescheduleAllNativeReminders().catch(console.error);startUpdateChecker();
