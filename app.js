@@ -1,9 +1,12 @@
 const KEY="hesabdar-v40";
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="3.2";
+const APP_VERSION="3.3";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
 const SYNC_INTERVAL=5000;
+const DEVICE_HEARTBEAT_MS=15000;
+const DEVICE_ACTIVE_MS=45000;
+const DEVICE_ID_KEY="hesabdar-device-id-v1";
 // Firebase project configuration supplied for this app.
 // This is safe to ship in a web app; access is protected by Firebase Authentication + Firestore Rules.
 const DEFAULT_SYNC_CONFIG={
@@ -15,9 +18,26 @@ const DEFAULT_SYNC_CONFIG={
   appId:"1:1048332879407:web:d1168138d754d28c8d68da",
   measurementId:"G-562NVEJKZT"
 };
-let sync={app:null,auth:null,db:null,user:null,unsubscribe:null,ready:false,saving:false,queued:false,hydrating:false,authListener:false,dirty:new Map()};
+let sync={app:null,auth:null,db:null,user:null,unsubscribe:null,ready:false,saving:false,queued:false,hydrating:false,authListener:false,dirty:new Map(),timer:null,heartbeatTimer:null,deviceId:null};
 function syncConfig(){try{return JSON.parse(localStorage.getItem(SYNC_KEY)||"null")||DEFAULT_SYNC_CONFIG}catch{return DEFAULT_SYNC_CONFIG}}
 function setSyncStatus(t){const e=$("syncStatus");if(e)e.textContent=t||""}
+function getDeviceId(){try{let id=localStorage.getItem(DEVICE_ID_KEY);if(!id){id=uid();localStorage.setItem(DEVICE_ID_KEY,id)}return id}catch(e){return "device-"+Math.random().toString(36).slice(2)}}
+async function updateDevicePresence(){if(!sync.user||!sync.db)return;try{sync.deviceId=sync.deviceId||getDeviceId();await cloudDoc().set({devices:{[sync.deviceId]:firebase.firestore.FieldValue.serverTimestamp()},lastConnectionCheck:firebase.firestore.FieldValue.serverTimestamp()},{merge:true})}catch(e){console.warn("device heartbeat",e)}}
+function startDeviceHeartbeat(){if(sync.heartbeatTimer)clearInterval(sync.heartbeatTimer);sync.deviceId=getDeviceId();updateDevicePresence();sync.heartbeatTimer=setInterval(updateDevicePresence,DEVICE_HEARTBEAT_MS)}
+async function stopDeviceHeartbeat(){if(sync.heartbeatTimer){clearInterval(sync.heartbeatTimer);sync.heartbeatTimer=null}if(sync.user&&sync.db&&sync.deviceId){try{await cloudDoc().set({devices:{[sync.deviceId]:firebase.firestore.FieldValue.delete()}},{merge:true})}catch(e){console.warn("device presence cleanup",e)}}}
+async function checkTwoPhoneConnection(){
+  if(!sync.user||!sync.db){setSyncStatus("⚠️ برای بررسی اتصال، ابتدا وارد حساب مشترک شوید");return false}
+  setSyncStatus("🔎 در حال بررسی اتصال دو گوشی...");
+  try{
+    await updateDevicePresence();
+    const snap=await cloudDoc().get();
+    const devices=snap.data()?.devices||{},now=Date.now(),active=Object.entries(devices).filter(([id,v])=>{const t=v?.toMillis?v.toMillis():0;return t&&now-t<DEVICE_ACTIVE_MS});
+    const count=active.length;
+    if(count>=2){setSyncStatus("🟢 اتصال دو گوشی برقرار است • "+fa(count)+" دستگاه فعال");logEvent("بررسی اتصال دو گوشی","دو دستگاه فعال در حساب همگام‌سازی شناسایی شد","sync");alert("🟢 اتصال دو گوشی برقرار است.\n\n"+fa(count)+" دستگاه در ۴۵ ثانیه اخیر فعال بوده‌اند.")}
+    else{setSyncStatus("🟡 فقط این گوشی فعال است؛ گوشی دوم را به همین حساب وارد کن");logEvent("بررسی اتصال دو گوشی","گوشی دوم فعال شناسایی نشد","sync");alert("🟡 گوشی دوم فعال شناسایی نشد.\n\nروی گوشی دوم با همین ایمیل و رمز وارد حساب شو و چند ثانیه صبر کن.")}
+    return count>=2;
+  }catch(e){setSyncStatus("🔴 بررسی اتصال ناموفق: "+(e.code||e.message));return false}
+}
 
 const defaultsExpense=["بنزین","غذا و رستوران","خرید خانه","خرید روزانه","قبض","اینترنت و شارژ","حمل‌ونقل","پوشاک","درمان","تفریح","هدیه","سایر"];
 const defaultsIncome=["حقوق","پاداش","واریز","فروش","دریافت از شخص","سایر"];
@@ -209,9 +229,8 @@ async function initSync(){
     sync.authListener=true;
     sync.auth.onAuthStateChanged(async user=>{
       sync.user=user;fillSettingsSyncEmail();
-      if(sync.timer)clearInterval(sync.timer);if(sync.unsubscribe){sync.unsubscribe();sync.unsubscribe=null}
-      if(!user){sync.ready=false;setSyncStatus("☁️ برای همگام‌سازی وارد شوید");return}
-      sync.ready=true;await hydrateSync();await rescheduleAllNativeReminders();
+      if(sync.timer)clearInterval(sync.timer);if(sync.unsubscribe){sync.unsubscribe();sync.unsubscribe=null}if(!user){sync.ready=false;await stopDeviceHeartbeat();setSyncStatus("☁️ برای همگام‌سازی وارد شوید");return}
+      sync.ready=true;await hydrateSync();await rescheduleAllNativeReminders();startDeviceHeartbeat();
       sync.unsubscribe=recordsCollection().onSnapshot(snap=>{
         if(sync.hydrating)return;
         const remote=snap.docs.map(d=>d.data());
@@ -527,8 +546,14 @@ function setUpdateStatus(t){const e=$("updateStatus");if(e)e.textContent=t||""}
 function versionParts(v){return String(v||"").replace(/^v/i,"").split(".").map(x=>parseInt(x,10)||0)}
 function isNewerVersion(remote,local){const a=versionParts(remote),b=versionParts(local);for(let i=0;i<Math.max(a.length,b.length);i++){if((a[i]||0)>(b[i]||0))return true;if((a[i]||0)<(b[i]||0))return false}return false}
 async function notifyUpdate(remote,url){const msg="نسخه جدید حسابدار "+remote+" منتشر شده است";try{if("Notification" in window && Notification.permission==="granted")new Notification("بروزرسانی حسابدار",{body:msg});else if("Notification" in window && Notification.permission!=="denied")await Notification.requestPermission().then(p=>{if(p==="granted")new Notification("بروزرسانی حسابدار",{body:msg})})}catch(e){} if(url && confirm(msg+"\n\nبرای مشاهده صفحه انتشار باز شود؟"))window.open(url,"_blank","noopener,noreferrer")}
-async function checkForUpdates(manual=false){const repo=githubRepo();if($("githubRepo"))$("githubRepo").value=repo;if(!repo){setUpdateStatus("ابتدا مخزن GitHub را در تنظیمات وارد کن.");return false}if(manual)setUpdateStatus("در حال بررسی نسخه جدید...");try{const r=await fetch("https://api.github.com/repos/"+repo+"/releases/latest",{headers:{Accept:"application/vnd.github+json"},cache:"no-store"});if(!r.ok)throw new Error("GitHub "+r.status);const rel=await r.json(),remote=rel.tag_name||rel.name||"";if(isNewerVersion(remote,APP_VERSION)){setUpdateStatus("⚠️ نسخه جدید "+remote+" موجود است");localStorage.setItem("hesabdar-last-update",remote);await notifyUpdate(remote,rel.html_url)}else{setUpdateStatus("✅ برنامه به‌روز است؛ نسخه فعلی "+APP_VERSION);localStorage.setItem("hesabdar-last-update",remote)}return true}catch(e){setUpdateStatus("❌ بررسی GitHub انجام نشد؛ اینترنت و نام مخزن را بررسی کن.");return false}}
-function startUpdateChecker(){setTimeout(()=>checkForUpdates(false),2500);setInterval(()=>checkForUpdates(false),UPDATE_CHECK_MS)}
+async function checkForUpdates(manual=false){const repo=githubRepo();if($("githubRepo"))$("githubRepo").value=repo;if(!repo){setUpdateStatus("ابتدا مخزن GitHub را در تنظیمات وارد کن.");return false}if(!navigator.onLine){setUpdateStatus("📴 اینترنت قطع است؛ بررسی بروزرسانی بعد از اتصال انجام می‌شود.");return false}if(manual)setUpdateStatus("در حال بررسی نسخه جدید و بروزرسانی خودکار...");try{
+  const r=await fetch("https://api.github.com/repos/"+repo+"/releases/latest",{headers:{Accept:"application/vnd.github+json"},cache:"no-store"});if(!r.ok)throw new Error("GitHub "+r.status);
+  const rel=await r.json(),remote=rel.tag_name||rel.name||"";localStorage.setItem("hesabdar-last-update-check",new Date().toISOString());
+  if(isNewerVersion(remote,APP_VERSION)){setUpdateStatus("⚠️ نسخه جدید "+remote+" موجود است؛ بروزرسانی بررسی شد");if(localStorage.getItem("hesabdar-last-notified-update")!==remote){localStorage.setItem("hesabdar-last-notified-update",remote);await notifyUpdate(remote,rel.html_url)}}else{setUpdateStatus("✅ برنامه به‌روز است؛ نسخه فعلی "+APP_VERSION);localStorage.setItem("hesabdar-last-update",remote)}
+  await updateServiceWorker(true);return true;
+}catch(e){setUpdateStatus("❌ بررسی بروزرسانی انجام نشد؛ اینترنت و نام مخزن را بررسی کن.");return false}}
+async function updateServiceWorker(force=false){if(!("serviceWorker" in navigator))return false;try{const reg=await navigator.serviceWorker.ready;if(force||reg.update)await reg.update();return true}catch(e){console.warn("service worker update",e);return false}}
+function startUpdateChecker(){setTimeout(()=>checkForUpdates(false),2500);setInterval(()=>checkForUpdates(false),UPDATE_CHECK_MS);window.addEventListener("online",()=>setTimeout(()=>checkForUpdates(false),1500));if("serviceWorker" in navigator)navigator.serviceWorker.addEventListener("controllerchange",()=>{if(!sessionStorage.getItem("hesabdar-sw-reloaded")){sessionStorage.setItem("hesabdar-sw-reloaded","1");location.reload()}})}
 async function requestNotifications(){const ok=await requestNativeNotifications();alert(ok?"اعلان‌ها فعال شدند؛ یادآوری‌های زمان‌دار نیز زمان‌بندی شدند.":"اجازه اعلان داده نشد یا قابلیت Native در این محیط در دسترس نیست.")}
 
 
