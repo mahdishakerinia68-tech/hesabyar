@@ -7,6 +7,13 @@
   "theme_color": "#111827",
   "lang": "fa",
   "dir": "rtl",
-  "icons": [{"src":"logo.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}],
-  "version": "3.7.1"
+  "icons": [
+    {
+      "src": "logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "version": "3.7.3"
 }

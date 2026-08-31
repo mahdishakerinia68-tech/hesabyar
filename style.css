@@ -113,3 +113,26 @@ body{font-size:15px;line-height:1.55}
 .dark .invoice-section-title,.dark .invoice-total-box,.dark .invoice-people-totals{background:rgba(33,132,91,.13);border-color:rgba(255,255,255,.08)}
 .dark .invoice-person-row input{background:rgba(255,255,255,.06);color:#edf7f2;border-color:rgba(255,255,255,.1)}
 .dark .invoice-summary{background:#182923}.dark .preview-person-row.head{background:#1b2d26}.dark .preview-person-row{border-color:rgba(255,255,255,.07)}
+
+/* iPhone Reminders inspired notes UI */
+.ios-reminder-modal{max-width:620px;margin:auto}
+.ios-reminder-top{display:flex;gap:12px;align-items:center;margin-bottom:16px}
+.ios-reminder-top h2{margin:0}.ios-reminder-top small{opacity:.7}
+.ios-reminder-icon{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:rgba(0,122,255,.14);color:#007aff;font-size:22px;font-weight:800}
+.ios-reminder-form{gap:10px}
+.ios-title-input{font-size:20px!important;font-weight:700}
+.ios-switch-row{display:flex;justify-content:space-between;align-items:center;padding:13px 14px;border-radius:16px;background:rgba(127,127,127,.09);gap:12px}
+.ios-switch-row small{display:block;opacity:.65;margin-top:3px}
+.ios-switch{position:relative;width:48px;height:28px;display:block;flex:none}
+.ios-switch input{display:none}.ios-switch span{position:absolute;inset:0;border-radius:30px;background:#aaa;transition:.2s}
+.ios-switch span:after{content:"";position:absolute;width:24px;height:24px;top:2px;left:2px;border-radius:50%;background:white;box-shadow:0 1px 4px #5555;transition:.2s}
+.ios-switch input:checked+span{background:#34c759}.ios-switch input:checked+span:after{transform:translateX(20px)}
+.ios-field-label{display:flex;flex-direction:column;gap:6px;font-weight:600}.ios-field-label select{font-weight:500}
+.quick-dates{display:flex;gap:8px;flex-wrap:wrap}.quick-dates button{border:0;border-radius:12px;padding:8px 12px;background:rgba(0,122,255,.1);color:inherit}
+.ios-notes-text{min-height:90px}.ios-subtasks{padding:12px 14px;border-radius:16px;background:rgba(127,127,127,.07)}
+.ios-subtasks-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.ios-subtasks-head .add-item-btn{margin:0;padding:7px 10px}
+.ios-save-reminder{border-radius:16px!important;font-size:16px}
+.ios-note-meta{font-size:13px;opacity:.78;margin-top:6px}.ios-note-meta.muted{opacity:.55}
+.note-flag{font-size:13px}.note-priority{font-size:12px;opacity:.7}
+.note-card.has-alarm{border-inline-start:3px solid rgba(0,122,255,.65)}

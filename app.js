@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="3.7.1";
+const APP_VERSION="3.7.3";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
@@ -63,15 +63,15 @@ function getNativeLocalNotifications(){try{if(nativeNotifications)return nativeN
 function notificationIdForReminder(id){let h=0;for(const ch of String(id||""))h=((h<<5)-h+ch.charCodeAt(0))|0;return NATIVE_NOTIFICATION_ID_PREFIX+(Math.abs(h)%100000000)}
 function localDateFromInput(v){if(!v)return null;const d=new Date(v);return Number.isNaN(d.getTime())?null:d}
 function addMonthsSafe(d,n){const out=new Date(d.getTime()),day=out.getDate();out.setDate(1);out.setMonth(out.getMonth()+n);const last=new Date(out.getFullYear(),out.getMonth()+1,0).getDate();out.setDate(Math.min(day,last));return out}
-function nextReminderDate(r,now=new Date()){let d=localDateFromInput(r?.date);if(!d)return null;const rep=r.repeat||"once";if(rep==="once")return d>now?d:null;let guard=0;while(d<=now&&guard++<500){if(rep==="daily")d=new Date(d.getTime()+86400000);else if(rep==="weekly")d=new Date(d.getTime()+7*86400000);else if(rep==="monthly")d=addMonthsSafe(d,1);else return null}return d>now?d:null}
+function nextReminderDate(r,now=new Date()){let d=localDateFromInput(r?.date);if(!d)return null;const rep=r.repeat||"once";if(rep==="once")return d>now?d:null;let guard=0;while(d<=now&&guard++<500){if(rep==="daily")d=new Date(d.getTime()+86400000);else if(rep==="weekly")d=new Date(d.getTime()+7*86400000);else if(rep==="monthly")d=addMonthsSafe(d,1);else if(rep==="yearly")d=addMonthsSafe(d,12);else return null}return d>now?d:null}
 async function cancelNativeReminder(id){const p=getNativeLocalNotifications();if(!p)return;try{await p.cancel({notifications:[{id:notificationIdForReminder(id)}]})}catch(e){console.warn("cancel reminder",e)}}
-function repeatSchedule(rep){if(rep==="daily")return {repeats:true,every:"day"};if(rep==="weekly")return {repeats:true,every:"week"};if(rep==="monthly")return {repeats:true,every:"month"};return {repeats:false}}
+function repeatSchedule(rep){if(rep==="daily")return {repeats:true,every:"day"};if(rep==="weekly")return {repeats:true,every:"week"};if(rep==="monthly")return {repeats:true,every:"month"};if(rep==="yearly")return {repeats:true,every:"year"};return {repeats:false}}
 async function scheduleNativeReminder(r){const p=getNativeLocalNotifications();if(!p)return false;const at=nextReminderDate(r);if(!at)return false;try{await p.schedule({notifications:[{id:notificationIdForReminder(r.id),title:r.title||"یادآوری حسابدار",body:r.body||"زمان یادآوری فرا رسیده است.",schedule:{at,...repeatSchedule(r.repeat||"once")},extra:{reminderId:r.id,sourceNoteId:r.sourceNoteId||null}}]});return true}catch(e){console.warn("schedule reminder",e);return false}}
 async function rescheduleAllNativeReminders(){if(!getNativeLocalNotifications())return;for(const r of data.reminders||[]){await cancelNativeReminder(r.id);await scheduleNativeReminder(r)}}
 async function requestNativeNotifications(){const p=getNativeLocalNotifications();if(p){try{const perm=await p.requestPermissions();if(perm.display!=="granted")return false;if(typeof p.checkExactNotificationSetting==="function"){const exact=await p.checkExactNotificationSetting();if(exact.value!=="granted"&&typeof p.changeExactNotificationSetting==="function")try{await p.changeExactNotificationSetting()}catch(e){console.warn("exact notification setting",e)}}await rescheduleAllNativeReminders();return true}catch(e){console.warn("native notification permission",e);return false}}if("Notification"in window){try{return (await Notification.requestPermission())==="granted"}catch(e){}}return false}
 function reminderBodyFromNote(note){const parts=[];if(note?.text)parts.push(note.text);const pending=(note?.items||[]).filter(x=>!x.done).map(x=>x.text).filter(Boolean);if(pending.length)parts.push(pending.join(" • "));return parts.join(" — ")||"یادآوری یادداشت"}
 function removeRecordSilent(type,id){const i=data[type].findIndex(x=>x.id===id);if(i<0)return;data[type].splice(i,1);markDeleted(type,id)}
-async function upsertReminderForNote(note,renderAfter=true){if(!note?.id)return;const linked=(data.reminders||[]).filter(x=>x.sourceNoteId===note.id);let r=linked[0];for(const duplicate of linked.slice(1)){await cancelNativeReminder(duplicate.id);removeRecordSilent("reminders",duplicate.id)}if(!note.date){if(r){await cancelNativeReminder(r.id);removeRecordSilent("reminders",r.id);if(renderAfter)save();else{localStorage.setItem(KEY,JSON.stringify(data));syncSave()}}return}const o={title:note.title||"یادداشت",amount:0,date:note.date,repeat:note.repeat&&note.repeat!=="none"?note.repeat:"once",type:"note",sourceNoteId:note.id,body:reminderBodyFromNote(note)};if(r){Object.assign(r,o);touch(r);markDirty("reminders",r.id,false,r,r.updatedAt)}else{r=touch({id:uid(),...o});data.reminders.push(r);markDirty("reminders",r.id,false,r,r.updatedAt)}if(renderAfter)save();else{localStorage.setItem(KEY,JSON.stringify(data));syncSave()}await cancelNativeReminder(r.id);await scheduleNativeReminder(r);if((r.type||"")==="note" && (r.repeat||"once")==="once") await addToAndroidClock(r)}
+async function upsertReminderForNote(note,renderAfter=true){if(!note?.id)return;const linked=(data.reminders||[]).filter(x=>x.sourceNoteId===note.id);let r=linked[0];for(const duplicate of linked.slice(1)){await cancelNativeReminder(duplicate.id);removeRecordSilent("reminders",duplicate.id)}if(note.alarmEnabled===false || !note.date){if(r){await cancelNativeReminder(r.id);removeRecordSilent("reminders",r.id);if(renderAfter)save();else{localStorage.setItem(KEY,JSON.stringify(data));syncSave()}}return}const o={title:note.title||"یادداشت",amount:0,date:note.date,repeat:note.repeat&&note.repeat!=="none"?note.repeat:"once",type:"note",sourceNoteId:note.id,body:reminderBodyFromNote(note)};if(r){Object.assign(r,o);touch(r);markDirty("reminders",r.id,false,r,r.updatedAt)}else{r=touch({id:uid(),...o});data.reminders.push(r);markDirty("reminders",r.id,false,r,r.updatedAt)}if(renderAfter)save();else{localStorage.setItem(KEY,JSON.stringify(data));syncSave()}await cancelNativeReminder(r.id);await scheduleNativeReminder(r);if((r.type||"")==="note" && (r.repeat||"once")==="once") await addToAndroidClock(r)}
 async function syncAllNotesToReminders(){let changed=false;const noteIds=new Set((data.notes||[]).map(n=>n.id));for(const n of data.notes||[]){const before=(data.reminders||[]).length;await upsertReminderForNote(n);if((data.reminders||[]).length!==before)changed=true}for(const r of [...(data.reminders||[])]){if(r.sourceNoteId&&!noteIds.has(r.sourceNoteId)){await cancelNativeReminder(r.id);removeRecordSilent("reminders",r.id);changed=true}}if(changed)save();else render();if(sync.db)syncSave()}
 async function removeReminderForNote(noteId){const matches=(data.reminders||[]).filter(r=>r.sourceNoteId===noteId);for(const r of matches){await cancelNativeReminder(r.id);removeRecordSilent("reminders",r.id)}if(matches.length)save()}
 
@@ -526,32 +526,75 @@ function pickerBox(dateId,timeId,v){return `<div class="date-time-picker"><label
 function openNote(id=null){
  const n=id&&data.notes.find(x=>x.id===id);
  const items=(n?.items||[]);
- openModal(`<h2>${n?"ویرایش یادداشت":"یادداشت جدید"}</h2><div class="form"><input id="ntitle" placeholder="عنوان یادداشت، مثلاً خرید" value="${esc(n?.title||"")}">${pickerBox("ndatePicker","ntimePicker",n?.date||new Date().toISOString())}<select id="nrepeat"><option value="none" ${!n?.repeat||n?.repeat==="none"?"selected":""}>بدون تکرار</option><option value="daily" ${n?.repeat==="daily"?"selected":""}>روزانه</option><option value="weekly" ${n?.repeat==="weekly"?"selected":""}>هفتگی</option><option value="monthly" ${n?.repeat==="monthly"?"selected":""}>ماهانه</option></select><textarea id="ntext" placeholder="توضیحات اصلی (اختیاری)">${esc(n?.text||"")}</textarea><div><b>آیتم‌های زیرمجموعه</b><div id="noteItemsEditor" class="note-items-editor">${items.map((it,i)=>noteItemEditor(it,i)).join("")}</div><button type="button" class="add-item-btn" onclick="addNoteItemEditor()">＋ افزودن آیتم</button></div><button class="primary" onclick="saveNote('${n?.id||""}')">${n?"ذخیره تغییرات":"ساخت یادداشت"}</button></div>`);
+ const alarmEnabled=n ? n.alarmEnabled!==false : false;
+ const dval=alarmEnabled ? (n?.date||new Date().toISOString()) : "";
+ const repeat=n?.repeat||"none";
+ openModal(`<div class="ios-reminder-modal">
+ <div class="ios-reminder-top"><span class="ios-reminder-icon">✓</span><div><h2>${n?"ویرایش یادآوری":"یادآوری جدید"}</h2><small>یادآوری‌ها با اعلان دستگاه هماهنگ می‌شوند.</small></div></div>
+ <div class="form ios-reminder-form">
+ <input id="ntitle" class="ios-title-input" placeholder="عنوان یادآوری" value="${esc(n?.title||"")}">
+ <div class="ios-switch-row"><div><b>⏰ تاریخ و ساعت</b><small>زمانی که باید یادآوری شوی</small></div><label class="ios-switch"><input id="nalarm" type="checkbox" ${alarmEnabled?"checked":""} onchange="toggleNoteAlarmFields()"><span></span></label></div>
+ <div id="noteAlarmFields" class="${alarmEnabled?"":"hidden"}">
+   ${pickerBox("ndatePicker","ntimePicker",dval)}
+   <div class="quick-dates"><button type="button" onclick="noteQuickDate('today')">امروز</button><button type="button" onclick="noteQuickDate('tomorrow')">فردا</button><button type="button" onclick="noteQuickDate('weekend')">این آخر هفته</button></div>
+   <label class="ios-field-label">تکرار<select id="nrepeat">
+    <option value="none" ${repeat==="none"?"selected":""}>هرگز</option>
+    <option value="daily" ${repeat==="daily"?"selected":""}>هر روز</option>
+    <option value="weekly" ${repeat==="weekly"?"selected":""}>هر هفته</option>
+    <option value="monthly" ${repeat==="monthly"?"selected":""}>هر ماه</option>
+    <option value="yearly" ${repeat==="yearly"?"selected":""}>هر سال</option>
+   </select></label>
+ </div>
+ <div class="ios-switch-row"><div><b>🚩 پرچم‌گذاری</b><small>برای یادآوری مهم</small></div><label class="ios-switch"><input id="nflag" type="checkbox" ${n?.flag?"checked":""}><span></span></label></div>
+ <label class="ios-field-label">اولویت<select id="npriority"><option value="none" ${!n?.priority||n.priority==="none"?"selected":""}>بدون اولویت</option><option value="low" ${n?.priority==="low"?"selected":""}>کم</option><option value="medium" ${n?.priority==="medium"?"selected":""}>متوسط</option><option value="high" ${n?.priority==="high"?"selected":""}>زیاد</option></select></label>
+ <textarea id="ntext" class="ios-notes-text" placeholder="یادداشت یا توضیحات">${esc(n?.text||"")}</textarea>
+ <div class="ios-subtasks"><div class="ios-subtasks-head"><b>☑️ زیرکارها</b><button type="button" class="add-item-btn" onclick="addNoteItemEditor()">＋ افزودن</button></div><div id="noteItemsEditor" class="note-items-editor">${items.map((it,i)=>noteItemEditor(it,i)).join("")}</div></div>
+ <button class="primary ios-save-reminder" onclick="saveNote('${n?.id||""}')">${n?"ذخیره یادآوری":"افزودن یادآوری"}</button>
+ </div></div>`);
+}
+function toggleNoteAlarmFields(){
+ const on=$("nalarm")?.checked, box=$("noteAlarmFields"); if(!box)return;
+ box.classList.toggle("hidden",!on);
+ if(on && $("ndatePicker") && !$("ndatePicker").value){const d=new Date(Date.now()+3600000);$("ndatePicker").value=pickerDateValue(d.toISOString());$("ntimePicker").value=pickerTimeValue(d.toISOString())}
+ if(!on){if($("nrepeat"))$("nrepeat").value="none";}
+}
+function noteQuickDate(kind){
+ const now=new Date(), d=new Date(now);
+ if(kind==="tomorrow")d.setDate(d.getDate()+1);
+ if(kind==="weekend"){const day=d.getDay();let add=(6-day+7)%7;if(add===0)add=6;d.setDate(d.getDate()+add)}
+ if($("nalarm"))$("nalarm").checked=true; toggleNoteAlarmFields();
+ if($("ndatePicker"))$("ndatePicker").value=pickerDateValue(d.toISOString());
+ if($("ntimePicker")&&!$("ntimePicker").value)$("ntimePicker").value="09:00";
 }
 function noteItemEditor(it={},i){return `<div class="note-edit-row"><input class="note-item-input" data-note-item="${i}" data-note-item-id="${esc(it.id||"")}" placeholder="مثلاً خرید نان" value="${esc(it.text||"")}"><button type="button" class="mini-danger" onclick="this.parentElement.remove()">🗑</button></div>`}
 function addNoteItemEditor(){const box=$("noteItemsEditor");if(!box)return;const i=box.querySelectorAll(".note-item-input").length;box.insertAdjacentHTML("beforeend",noteItemEditor({},i))}
 async function saveNote(id){
- const title=$("ntitle").value.trim(); if(!title)return alert("عنوان یادداشت را وارد کنید");
+ const title=$("ntitle").value.trim(); if(!title)return alert("عنوان یادآوری را وارد کنید");
+ const alarmEnabled=!!$("nalarm")?.checked;
  const inputs=[...document.querySelectorAll(".note-item-input")];
  const old=id?data.notes.find(x=>x.id===id):null; const oldItems=old?.items||[];
+ if(alarmEnabled && (!$("ndatePicker")?.value || !$("ntimePicker")?.value))return alert("برای فعال‌کردن آلارم، تاریخ و ساعت را وارد کنید");
  const items=inputs.map((el,i)=>{const oldItem=el.dataset.noteItemId?oldItems.find(x=>x.id===el.dataset.noteItemId):oldItems[i];return {id:oldItem?.id||uid(),text:el.value.trim(),done:!!oldItem?.done}}).filter(x=>x.text);
- const o={title,date:pickerToISO("ndatePicker","ntimePicker"),repeat:$("nrepeat").value,text:$("ntext").value.trim(),items};
- if(id){if(!old)return alert("یادداشت پیدا نشد");Object.assign(old,o);touch(old);markDirty("notes",old.id,false,old,old.updatedAt);save();await upsertReminderForNote(old)}
+ const o={title,alarmEnabled,date:alarmEnabled?pickerToISO("ndatePicker","ntimePicker"):"",repeat:alarmEnabled?($("nrepeat")?.value||"none"):"none",flag:!!$("nflag")?.checked,priority:$("npriority")?.value||"none",text:$("ntext").value.trim(),items};
+ if(id){if(!old)return alert("یادآوری پیدا نشد");Object.assign(old,o);touch(old);markDirty("notes",old.id,false,old,old.updatedAt);save();await upsertReminderForNote(old)}
  else{const nn=touch({id:uid(),...o});data.notes.unshift(nn);markDirty("notes",nn.id,false,nn,nn.updatedAt);save();await upsertReminderForNote(nn)}
- logEvent(id?"ویرایش یادداشت":"ایجاد یادداشت",title,id?"edit":"create");closeModal();
+ logEvent(id?"ویرایش یادآوری":"ایجاد یادآوری",title,id?"edit":"create");closeModal();
 }
 async function toggleNoteItem(noteId,itemId){const n=data.notes.find(x=>x.id===noteId);const it=n?.items?.find(x=>x.id===itemId);if(!it)return;it.done=!it.done;touch(n);markDirty("notes",n.id,false,n,n.updatedAt);localStorage.setItem(KEY,JSON.stringify(data));syncSave();await upsertReminderForNote(n,false);logEvent(it.done?"تکمیل آیتم یادداشت":"بازگردانی آیتم یادداشت",`${n.title} • ${it.text}`,"edit");const row=document.querySelector(`[data-note-row="${CSS.escape(itemId)}"]`);if(row){const span=row.querySelector("span");if(span)span.classList.toggle("done",it.done);const cb=row.querySelector("input[type=checkbox]");if(cb)cb.checked=it.done}const card=document.querySelector(`[data-note-card="${CSS.escape(noteId)}"]`);if(card){const total=(n.items||[]).length,done=(n.items||[]).filter(x=>x.done).length;const count=card.querySelector(".note-count");if(count)count.textContent=total?`${fa(done)} / ${fa(total)}⌄`:"⌄"}}
 async function deleteNote(id){if(confirm("این یادداشت و همه آیتم‌های آن حذف شود؟")){const n=data.notes.find(x=>x.id===id);await removeReminderForNote(id);removeRecord("notes",id);logEvent("حذف یادداشت",n?.title||id,"delete")}}
 async function deleteNoteItem(noteId,itemId){const n=data.notes.find(x=>x.id===noteId);if(!n)return;if(confirm("این آیتم حذف شود؟")){n.items=(n.items||[]).filter(x=>x.id!==itemId);touch(n);markDirty("notes",n.id,false,n,n.updatedAt);localStorage.setItem(KEY,JSON.stringify(data));syncSave();await upsertReminderForNote(n,false);logEvent("حذف آیتم یادداشت",n.title,"delete");const row=document.querySelector(`[data-note-row="${CSS.escape(itemId)}"]`);if(row)row.remove();const card=document.querySelector(`[data-note-card="${CSS.escape(noteId)}"]`);if(card){const total=(n.items||[]).length,done=(n.items||[]).filter(x=>x.done).length;const count=card.querySelector(".note-count");if(count)count.textContent=total?`${fa(done)} / ${fa(total)}⌄`:"⌄";const list=card.querySelector(".note-checklist");if(list&&!total)list.innerHTML='<div class="meta">هنوز آیتمی اضافه نشده</div>';}}}
-function noteRepeatLabel(r){return r==="daily"?"روزانه":r==="weekly"?"هفتگی":r==="monthly"?"ماهانه":"بدون تکرار"}
+function noteRepeatLabel(r){return r==="daily"?"هر روز":r==="weekly"?"هر هفته":r==="monthly"?"هر ماه":r==="yearly"?"هر سال":"هرگز"}
+function notePriorityLabel(p){return p==="high"?"زیاد":p==="medium"?"متوسط":p==="low"?"کم":"بدون اولویت"}
 function noteItemHTML(n,it){
  return '<div class="note-check-row" data-note-row="'+esc(it.id)+'" onclick="event.stopPropagation()"><label onclick="event.stopPropagation()"><input type="checkbox" '+(it.done?'checked':'')+' onclick="event.stopPropagation()" onchange="toggleNoteItem(\''+n.id+'\',\''+it.id+'\')"><span class="'+(it.done?'done':'')+'">'+esc(it.text)+'</span></label><button type="button" class="mini-danger note-item-delete" title="حذف آیتم" onclick="event.stopPropagation();deleteNoteItem(\''+n.id+'\',\''+it.id+'\')">×</button></div>';
 }
 function noteHTML(n){
  const items=n.items||[];
- const list=items.length?items.map(it=>noteItemHTML(n,it)).join(''):'<div class="meta">هنوز آیتمی اضافه نشده</div>';
- const alarm=n.date?`<div class="meta">⏰ آلارم جداگانه: ${jalaliDateTimeInput(n.date)} • ${noteRepeatLabel(n.repeat)}</div>`:'<div class="meta">بدون آلارم</div>';
- return `<div class="note-card item accordion-card" data-note-card="${esc(n.id)}"><button class="accordion-head" type="button" aria-expanded="false" onclick="toggleAccordion(this,event)"><span><span class="note-badge">📝</span> <b>${esc(n.title)}</b></span><span class="note-count">${items.length?fa(items.filter(x=>x.done).length)+' / '+fa(items.length):''}⌄</span></button><div class="accordion-body"><div class="note-main">${n.text?'<div class="meta note-text">'+esc(n.text)+'</div>':''}${alarm}<div class="note-checklist">${list}</div></div><div class="note-actions">${actionButtons('openNote','deleteNote',n.id)}</div></div></div>`;
+ const list=items.length?items.map(it=>noteItemHTML(n,it)).join(''):'<div class="meta">هنوز زیرکاری اضافه نشده</div>';
+ const alarm=n.alarmEnabled!==false && n.date ? `<div class="ios-note-meta">⏰ ${jalaliDateTimeInput(n.date)} • ${noteRepeatLabel(n.repeat)}</div>` : '<div class="ios-note-meta muted">🔕 بدون آلارم</div>';
+ const flags=n.flag?'<span class="note-flag">🚩</span> ':'';
+ const priority=n.priority&&n.priority!=="none"?`<span class="note-priority">اولویت ${notePriorityLabel(n.priority)}</span>`:"";
+ return `<div class="note-card item accordion-card ${n.alarmEnabled!==false&&n.date?"has-alarm":""}" data-note-card="${esc(n.id)}"><button class="accordion-head" type="button" aria-expanded="false" onclick="toggleAccordion(this,event)"><span><span class="note-badge">✓</span> <b>${flags}${esc(n.title)}</b></span><span class="note-count">${items.length?fa(items.filter(x=>x.done).length)+' / '+fa(items.length):''}⌄</span></button><div class="accordion-body"><div class="note-main">${n.text?'<div class="meta note-text">'+esc(n.text)+'</div>':''}${alarm}${priority?'<div class="ios-note-meta">'+priority+'</div>':''}<div class="note-checklist">${list}</div></div><div class="note-actions">${actionButtons('openNote','deleteNote',n.id)}</div></div></div>`;
 }
 function toggleAccordion(btn,event){if(event)event.stopPropagation();const card=btn?.closest(".accordion-card");if(!card)return;const open=!card.classList.contains("open");card.classList.toggle("open",open);btn.setAttribute("aria-expanded",String(open));}
 
