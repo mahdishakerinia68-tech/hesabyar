@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="3.7";
+const APP_VERSION="3.7.1";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
@@ -29,7 +29,7 @@ function setAutoBackupEnabled(v){localStorage.setItem(AUTO_BACKUP_ENABLED_KEY,v?
 function createAutoBackup(reason="زمان‌بندی"){try{if(!autoBackupEnabled())return false; const raw=JSON.stringify(data); const list=JSON.parse(localStorage.getItem(AUTO_BACKUP_KEY)||"[]"); list.unshift({at:new Date().toISOString(),reason,data:JSON.parse(raw)}); while(list.length>5)list.pop(); localStorage.setItem(AUTO_BACKUP_KEY,JSON.stringify(list)); localStorage.setItem(AUTO_BACKUP_KEY+"-last",new Date().toISOString()); return true}catch(e){console.warn("auto backup",e);return false}}
 function getAutoBackupInfo(){try{const last=localStorage.getItem(AUTO_BACKUP_KEY+"-last");return last?new Date(last):null}catch{return null}}
 function restoreLatestAutoBackup(){try{const list=JSON.parse(localStorage.getItem(AUTO_BACKUP_KEY)||"[]"); if(!list.length)return alert("هنوز پشتیبان خودکاری وجود ندارد."); if(!confirm("آخرین پشتیبان خودکار جایگزین اطلاعات فعلی شود؟"))return; data=list[0].data; normalizeData(); save(); logEvent("بازیابی پشتیبان خودکار",new Intl.DateTimeFormat("fa-IR-u-ca-persian",{dateStyle:"short",timeStyle:"short"}).format(new Date(list[0].at)),"settings"); alert("آخرین پشتیبان خودکار بازیابی شد.")}catch(e){alert("پشتیبان خودکار قابل بازیابی نیست.")}}
-function normalizeData(){data=data||blankData(); for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats","audit"]){data[k]??=[];} data.pin=typeof data.pin==="string"?data.pin:""; data.pinHash=typeof data.pinHash==="string"?data.pinHash:""; data.pinSalt=typeof data.pinSalt==="string"?data.pinSalt:""; data.branding??={storeName:"",logo:"",stamp:"",signature:""}; data.yearSettlements??={}; data._sync??={tombstones:{}}; data._sync.tombstones??={}; for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats"]){for(const r of data[k]){r.id??=uid();r.updatedAt??=new Date().toISOString();}}}
+function normalizeData(){data=data||blankData(); for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats","audit"]){data[k]??=[];} data.pin=typeof data.pin==="string"?data.pin:""; data.pinHash=typeof data.pinHash==="string"?data.pinHash:""; data.pinSalt=typeof data.pinSalt==="string"?data.pinSalt:""; data.branding??={storeName:"",logo:"",stamp:"",signature:""}; data.branding.storeName??="";data.branding.logo??="";data.branding.stamp??="";data.branding.signature??=""; data.yearSettlements??={}; data._sync??={tombstones:{}}; data._sync.tombstones??={}; for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats"]){for(const r of data[k]){r.id??=uid();r.updatedAt??=new Date().toISOString();}} for(const inv of data.invoices){inv.people=Array.isArray(inv.people)?inv.people:[];inv.discount=Number(inv.discount)||0;inv.discountPercent=Number(inv.discountPercent)||0;inv.total=invoiceTotal(inv);inv.brandingSnapshot??={storeName:data.branding.storeName||"",logo:data.branding.logo||"",stamp:data.branding.stamp||"",signature:data.branding.signature||""};}}
 function renderSettingsFeatures(){const e=$("autoBackupToggle");if(e)e.checked=autoBackupEnabled(); const last=$("autoBackupLast"); if(last){const d=getAutoBackupInfo();last.textContent=d?"آخرین پشتیبان: "+new Intl.DateTimeFormat("fa-IR-u-ca-persian",{dateStyle:"short",timeStyle:"short"}).format(d):"هنوز پشتیبان خودکاری ساخته نشده";} const v=$("appVersionText");if(v)v.textContent=APP_VERSION;}
 function setSyncStatus(t){const e=$("syncStatus");if(e)e.textContent=t||""}
 
@@ -611,43 +611,71 @@ function empty(s){return `<div class="card" style="text-align:center">${s}</div>
 function invoiceDateLabel(v){return jalaliLabel(v)}
 function invoiceRowHTML(item,i){return `<div class="invoice-row"><select class="inv-product" onchange="invoiceProductPick(this)"><option value="">کالا / خدمت</option>${data.products.map(p=>`<option value="${p.id}" ${p.id===item?.productId?"selected":""}>${esc(p.name)}</option>`).join("")}</select><input class="inv-desc" placeholder="شرح کالا / خدمات" value="${esc(item?.desc||"")}"><input class="inv-qty" oninput="updateInvoiceLiveTotal()" type="number" min="0" step="any" placeholder="تعداد" value="${Number(item?.qty)||""}"><input class="inv-price" oninput="updateInvoiceLiveTotal()" type="number" min="0" step="any" placeholder="مبلغ واحد" value="${Number(item?.price)||""}"><button type="button" class="danger-icon" onclick="this.parentElement.remove();updateInvoiceLiveTotal()">🗑</button></div>`}
 function addInvoiceRow(pref={}){const box=$("invoiceRows");if(!box)return;const div=document.createElement("div");div.innerHTML=invoiceRowHTML(pref,box.children.length);box.appendChild(div.firstElementChild)}
+function invoicePersonHTML(p={}){return `<div class="invoice-person-row"><input class="inv-person-name" placeholder="نام نفر" value="${esc(p.name||"")}"><input class="inv-person-debt" type="number" min="0" placeholder="بدهکار" value="${Number(p.debt)||""}"><input class="inv-person-credit" type="number" min="0" placeholder="بستانکار" value="${Number(p.credit)||""}"><button type="button" class="danger-icon" onclick="this.parentElement.remove();updateInvoicePeopleTotals()">🗑</button></div>`}
+function addInvoicePerson(pref={}){const box=$("invoicePeople");if(!box)return;const div=document.createElement("div");div.innerHTML=invoicePersonHTML(pref);box.appendChild(div.firstElementChild);updateInvoicePeopleTotals()}
+function updateInvoicePeopleTotals(){let debt=0,credit=0;document.querySelectorAll("#invoicePeople .invoice-person-row").forEach(r=>{debt+=Number(r.querySelector(".inv-person-debt")?.value)||0;credit+=Number(r.querySelector(".inv-person-credit")?.value)||0});if($("invPeopleDebtTotal"))$("invPeopleDebtTotal").textContent=money(debt);if($("invPeopleCreditTotal"))$("invPeopleCreditTotal").textContent=money(credit)}
 function invoiceProductPick(sel){const p=data.products.find(x=>x.id===sel.value);const row=sel.closest(".invoice-row");if(!p||!row)return;row.querySelector(".inv-desc").value=p.name;row.querySelector(".inv-price").value=p.price||0;updateInvoiceLiveTotal()}
 function openInvoice(id=null){
  const inv=id&&data.invoices.find(x=>x.id===id);
  const items=inv?.items?.length?inv.items:[{desc:"",qty:1,price:""}];
+ const people=Array.isArray(inv?.people)?inv.people:[];
  const cust=inv?.customerId?data.customers.find(c=>c.id===inv.customerId):null;
- openModal(`<h2>🧾 ${inv?"ویرایش فاکتور":"ساخت فاکتور"}</h2><div class="form">
+ const brand=inv?.brandingSnapshot||data.branding||{};
+ openModal(`<h2>🧾 ${inv?"ویرایش فاکتور":"ثبت / صدور فاکتور"}</h2><div class="form">
  <input id="invName" placeholder="نام فاکتور" value="${esc(inv?.name||"")}">
- <div class="two-fields"><input id="invSeller" placeholder="نام فروشنده / فروشگاه" value="${esc(inv?.seller||"")}"><select id="invCustomer"><option value="">بدون مشتری</option>${data.customers.map(c=>`<option value="${c.id}" ${c.id===inv?.customerId?"selected":""}>${esc(c.name)}${c.phone?" • "+esc(c.phone):""}</option>`).join("")}</select></div>
+ <div class="two-fields"><input id="invSeller" placeholder="نام فروشگاه / فروشنده" value="${esc(inv?.seller||brand.storeName||"")}"><select id="invCustomer"><option value="">بدون مشتری</option>${data.customers.map(c=>`<option value="${c.id}" ${c.id===inv?.customerId?"selected":""}>${esc(c.name)}${c.phone?" • "+esc(c.phone):""}</option>`).join("")}</select></div>
  <div class="two-fields"><input id="invDate" inputmode="numeric" placeholder="تاریخ شمسی ۱۴۰۵/۰۶/۰۸" value="${esc(jalaliInputValue(inv?.date)||todayJalali())}"><input id="invNo" placeholder="شماره فاکتور" value="${esc(inv?.number||"")}"></div>
  <div class="two-fields"><select id="invStatus"><option value="unpaid" ${inv?.status!=="paid"&&inv?.status!=="partial"?"selected":""}>🔴 پرداخت نشده</option><option value="partial" ${inv?.status==="partial"?"selected":""}>🟡 پرداخت بخشی</option><option value="paid" ${inv?.status==="paid"?"selected":""}>🟢 پرداخت کامل</option></select><input id="invPaid" oninput="updateInvoiceLiveTotal()" type="number" min="0" placeholder="مبلغ پرداخت‌شده" value="${Number(inv?.paid)||0}"></div>
- <div class="two-fields"><input id="invDiscount" oninput="updateInvoiceLiveTotal()" type="number" min="0" placeholder="تخفیف" value="${Number(inv?.discount)||0}"><input id="invTax" oninput="updateInvoiceLiveTotal()" type="number" min="0" placeholder="مالیات (درصد)" value="${Number(inv?.taxRate)||0}"></div>
- <textarea id="invAddress" placeholder="آدرس / توضیحات مشتری">${esc(inv?.address||cust?.address||"")}</textarea>
+ <div class="invoice-section-title">💸 تخفیف</div><div class="two-fields"><input id="invDiscount" oninput="updateInvoiceLiveTotal()" type="number" min="0" placeholder="تخفیف مبلغی (تومان)" value="${Number(inv?.discount)||0}"><input id="invDiscountPercent" oninput="updateInvoiceLiveTotal()" type="number" min="0" max="100" step="0.01" placeholder="تخفیف درصدی (%)" value="${Number(inv?.discountPercent)||0}"></div>
+ <div class="two-fields"><input id="invTax" oninput="updateInvoiceLiveTotal()" type="number" min="0" placeholder="مالیات (درصد)" value="${Number(inv?.taxRate)||0}"><input id="invAddress" placeholder="آدرس مشتری" value="${esc(inv?.address||cust?.address||"")}"></div>
+ <div class="invoice-section-title">👥 نفرات فاکتور</div>
+ <div class="invoice-table-head invoice-people-head"><span>نام نفر</span><span>بدهکار</span><span>بستانکار</span><span></span></div>
+ <div id="invoicePeople">${people.map(invoicePersonHTML).join("")}</div>
+ <button type="button" onclick="addInvoicePerson()">＋ افزودن نفر</button>
+ <div class="invoice-people-totals">جمع بدهکار: <strong id="invPeopleDebtTotal">۰ تومان</strong> • جمع بستانکار: <strong id="invPeopleCreditTotal">۰ تومان</strong></div>
+ <textarea id="invNotes" placeholder="توضیحات فاکتور">${esc(inv?.notes||"")}</textarea>
  <div class="invoice-table-head"><span>کالا</span><span>توضیحات</span><span>تعداد</span><span>مبلغ واحد</span><span></span></div>
  <div id="invoiceRows">${items.map(invoiceRowHTML).join("")}</div>
  <button type="button" onclick="addInvoiceRow()">＋ افزودن ردیف</button>
- <div class="invoice-total-box">جمع اقلام: <strong id="invLiveSubtotal">۰ تومان</strong><br>تخفیف و مالیات: <strong id="invLiveAdjust">۰ تومان</strong><br>مبلغ نهایی: <strong id="invLiveTotal">۰ تومان</strong></div>
- <button class="primary" onclick="saveInvoice('${inv?.id||""}')">💾 ${inv?"ذخیره تغییرات":"ساخت فاکتور"}</button>
+ <div class="invoice-total-box"><div>مبلغ قبل از تخفیف: <strong id="invLiveSubtotal">۰ تومان</strong></div><div>تخفیف: <strong id="invLiveDiscount">۰ تومان</strong></div><div>مالیات: <strong id="invLiveTax">۰ تومان</strong></div><div class="final-total">مبلغ نهایی: <strong id="invLiveTotal">۰ تومان</strong></div></div>
+ <button class="primary" onclick="saveInvoice('${inv?.id||""}')">💾 ${inv?"ذخیره تغییرات":"ثبت و صدور فاکتور"}</button>
  </div>`);
- updateInvoiceLiveTotal();
+ updateInvoiceLiveTotal();updateInvoicePeopleTotals();
 }
 function invoiceSubtotal(inv){return (inv.items||[]).reduce((s,x)=>s+(Number(x.qty)||0)*(Number(x.price)||0),0)}
-function invoiceTotal(inv){const sub=invoiceSubtotal(inv),discountAmount=Math.min(sub,Math.max(0,Number(inv.discount)||0)),discountPercent=Math.min(100,Math.max(0,Number(inv.discountPercent)||0)),percentAmount=Math.min(sub-discountAmount,Math.round((sub-discountAmount)*discountPercent/100)),discount=discountAmount+percentAmount,tax=Math.max(0,Math.round((sub-discount)*(Number(inv.taxRate)||0)/100));return Math.max(0,sub-discount+tax)}
+function invoiceDiscount(inv){const sub=invoiceSubtotal(inv),amount=Math.min(sub,Math.max(0,Number(inv.discount)||0)),percent=Math.min(Math.max(0,Number(inv.discountPercent)||0),100),percentAmount=Math.min(sub-amount,Math.round((sub-amount)*percent/100));return amount+percentAmount}
+function invoiceTotal(inv){const sub=invoiceSubtotal(inv),discount=invoiceDiscount(inv),tax=Math.max(0,Math.round((sub-discount)*(Number(inv.taxRate)||0)/100));return Math.max(0,sub-discount+tax)}
 function invoiceRemaining(inv){return Math.max(0,invoiceTotal(inv)-(Number(inv.paid)||0))}
 function updateInvoiceLiveTotal(){
  const rows=[...document.querySelectorAll("#invoiceRows .invoice-row")];let sub=0;
  rows.forEach(r=>sub+=(Number(r.querySelector(".inv-qty")?.value)||0)*(Number(r.querySelector(".inv-price")?.value)||0));
  const da=Math.min(sub,Math.max(0,Number($("invDiscount")?.value)||0)),dp=Math.min(100,Math.max(0,Number($("invDiscountPercent")?.value)||0)),dpAmt=Math.min(sub-da,Math.round((sub-da)*dp/100)),dis=da+dpAmt,tax=Math.max(0,Math.round((sub-dis)*(Number($("invTax")?.value)||0)/100)),total=Math.max(0,sub-dis+tax);
- if($("invLiveSubtotal"))$("invLiveSubtotal").textContent=money(sub);if($("invLiveAdjust"))$("invLiveAdjust").textContent=money(tax-dis);if($("invLiveTotal"))$("invLiveTotal").textContent=money(total)
+ if($("invLiveSubtotal"))$("invLiveSubtotal").textContent=money(sub);
+ if($("invLiveDiscount"))$("invLiveDiscount").textContent=money(dis);
+ if($("invLiveTax"))$("invLiveTax").textContent=money(tax);
+ if($("invLiveTotal"))$("invLiveTotal").textContent=money(total);
+}
+function readInvoicePeople(){
+ return [...document.querySelectorAll("#invoicePeople .invoice-person-row")].map(r=>({name:r.querySelector(".inv-person-name")?.value.trim()||"",debt:Math.max(0,Number(r.querySelector(".inv-person-debt")?.value)||0),credit:Math.max(0,Number(r.querySelector(".inv-person-credit")?.value)||0)})).filter(p=>p.name||p.debt||p.credit);
 }
 function saveInvoice(id){
- const name=$("invName").value.trim()||"فاکتور جدید", seller=$("invSeller").value.trim(),date=jalaliToISO($("invDate").value)||new Date().toISOString().slice(0,10),number=$("invNo").value.trim();
+ const name=$("invName").value.trim()||"فاکتور جدید", seller=$("invSeller").value.trim()||data.branding?.storeName||"",date=jalaliToISO($("invDate").value)||new Date().toISOString().slice(0,10),number=$("invNo").value.trim();
  const items=[...document.querySelectorAll("#invoiceRows .invoice-row")].map(r=>({productId:r.querySelector(".inv-product")?.value||"",desc:r.querySelector(".inv-desc")?.value.trim()||"",qty:Number(r.querySelector(".inv-qty")?.value)||0,price:Number(r.querySelector(".inv-price")?.value)||0})).filter(x=>x.desc||x.qty||x.price);
  if(!items.length)return alert("حداقل یک ردیف فاکتور وارد کن");
+ const old=id?data.invoices.find(v=>v.id===id):null;
+ const oldPeople=old?JSON.parse(JSON.stringify(old.people||[])):null;
+ const oldDiscount=old?Number(old.discount)||0:null, oldDiscountPercent=old?Number(old.discountPercent)||0:null;
  const discount=Math.max(0,Number($("invDiscount").value)||0),discountPercent=Math.min(100,Math.max(0,Number($("invDiscountPercent").value)||0)),taxRate=Math.max(0,Number($("invTax").value)||0);let paid=Math.max(0,Number($("invPaid").value)||0);
- const o={name,seller,date,number,items,customerId:$("invCustomer").value||"",address:$("invAddress").value.trim(),discount,discountPercent,taxRate,paid,status:$("invStatus").value,total:0};o.total=invoiceTotal(o);if(o.status==="paid")o.paid=o.total;if(o.paid>=o.total&&o.total>0)o.status="paid";else if(o.paid>0)o.status="partial";else o.status="unpaid";
- if(id){const x=data.invoices.find(v=>v.id===id);if(x)adjustStockForInvoice(x,+1);Object.assign(x,o);touch(x);markDirty("invoices",x.id,false,x,x.updatedAt);adjustStockForInvoice(x,-1)}else{const x=touch({id:uid(),...o});data.invoices.unshift(x);markDirty("invoices",x.id,false,x,x.updatedAt);adjustStockForInvoice(x,-1)}
- save();logEvent(id?"ویرایش فاکتور":"ساخت فاکتور",`${name} • ${money(o.total)}`,id?"edit":"create");closeModal()
+ const people=readInvoicePeople(),snapshot={storeName:data.branding?.storeName||seller,logo:data.branding?.logo||"",stamp:data.branding?.stamp||"",signature:data.branding?.signature||""};
+ const o={name,seller,date,number,items,people,customerId:$("invCustomer").value||"",address:$("invAddress").value.trim(),notes:$("invNotes").value.trim(),discount,discountPercent,taxRate,paid,status:$("invStatus").value,total:0,brandingSnapshot:old?.brandingSnapshot||snapshot};
+ o.total=invoiceTotal(o);if(o.status==="paid")o.paid=o.total;if(o.paid>=o.total&&o.total>0)o.status="paid";else if(o.paid>0)o.status="partial";else o.status="unpaid";
+ if(id){if(!old)return alert("این فاکتور پیدا نشد");adjustStockForInvoice(old,+1);Object.assign(old,o);touch(old);markDirty("invoices",old.id,false,old,old.updatedAt);adjustStockForInvoice(old,-1)}
+ else {const x=touch({id:uid(),...o});data.invoices.unshift(x);markDirty("invoices",x.id,false,x,x.updatedAt)}
+ save();
+ logEvent(id?"ویرایش فاکتور":"ساخت فاکتور",`${name} • ${money(o.total)}`,id?"edit":"create");
+ if(old&&JSON.stringify(oldPeople)!==JSON.stringify(people))logEvent("تغییر نفرات فاکتور",`${name} • ${fa(people.length)} نفر`,"edit");
+ if(old&&(oldDiscount!==discount || oldDiscountPercent!==discountPercent))logEvent("تغییر تخفیف فاکتور",`${name} • ${money(invoiceDiscount(o))}`,"edit");
+ closeModal()
 }
 function duplicateInvoice(id){const inv=data.invoices.find(x=>x.id===id);if(!inv)return;const x=touch({...JSON.parse(JSON.stringify(inv)),id:uid(),number:"",date:new Date().toISOString().slice(0,10),status:"unpaid",paid:0});data.invoices.unshift(x);markDirty("invoices",x.id,false,x,x.updatedAt);save();logEvent("تکرار فاکتور",x.name,"create")}
 function deleteInvoice(id){if(!confirm("این فاکتور حذف شود؟"))return;const x=data.invoices.find(v=>v.id===id);adjustStockForInvoice(x,+1);removeRecord("invoices",id);logEvent("حذف فاکتور",x?.name||id,"delete")}
@@ -656,23 +684,38 @@ function invoiceHTML(inv){
  return `<div class="item invoice-item"><div><b>🧾 ${esc(inv.name||"فاکتور")}</b><div class="meta">${esc(inv.seller||"فروشنده ثبت نشده")} • ${invoiceDateLabel(inv.date)}${inv.number?" • شماره "+esc(inv.number):""}</div><div class="meta">جمع کل: ${money(total)} • ${inv.status==="paid"?"🟢 پرداخت کامل":inv.status==="partial"?"🟡 پرداخت بخشی":"🔴 پرداخت نشده"} • مانده: ${money(invoiceRemaining(inv))}</div></div><div class="actions"><button onclick="openInvoice('${inv.id}')">✏️</button><button onclick="previewInvoice('${inv.id}')">👁</button><button onclick="duplicateInvoice('${inv.id}')">📄</button><button onclick="shareInvoice('${inv.id}')">📤</button><button class="danger-icon" onclick="deleteInvoice('${inv.id}')">🗑</button></div></div>`
 }
 function previewInvoice(id){
- const inv=data.invoices.find(x=>x.id===id);if(!inv)return; const cust=inv.customerId?data.customers.find(c=>c.id===inv.customerId):null;
+ const inv=data.invoices.find(x=>x.id===id);if(!inv)return;
+ const cust=inv.customerId?data.customers.find(c=>c.id===inv.customerId):null;
+ const brand=inv.brandingSnapshot||data.branding||{};
  const rows=(inv.items||[]).map(x=>`<div class="preview-inv-row"><span>${esc(x.desc)}</span><span>${fa(x.qty)}</span><span>${money(x.price)}</span><span>${money((Number(x.qty)||0)*(Number(x.price)||0))}</span></div>`).join("");
- openModal(`<div id="invoicePreview" class="invoice-preview"><div class="invoice-head"><div>${data.branding?.logo?`<img class="invoice-brand-logo" src="${data.branding.logo}" alt="لوگو">`:""}<h2>فاکتور</h2><b>${esc(inv.seller||data.branding?.storeName||"")}</b></div><div>شماره: ${esc(inv.number||"—")}<br>تاریخ: ${invoiceDateLabel(inv.date)}</div></div><h3>${esc(inv.name||"فاکتور")}</h3>${cust?`<div class="meta">مشتری: ${esc(cust.name)}${cust.phone?" • "+esc(cust.phone):""}</div>`:""}<div class="meta">وضعیت: ${inv.status==="paid"?"🟢 پرداخت کامل":inv.status==="partial"?"🟡 پرداخت بخشی":"🔴 پرداخت نشده"} • مانده: ${money(invoiceRemaining(inv))}</div><div class="preview-inv-row head"><b>توضیحات</b><b>تعداد</b><b>مبلغ واحد</b><b>مبلغ</b></div>${rows}<div class="preview-total">جمع کل: <strong>${money(invoiceTotal(inv))}</strong></div></div><div class="actions"><button class="primary" onclick="printInvoice('${inv.id}')">🖨 چاپ / PDF</button><button class="primary" onclick="shareInvoice('${inv.id}')">📤 ارسال فاکتور</button></div>`)
+ const people=(inv.people||[]).map(p=>`<div class="preview-person-row"><span>${esc(p.name||"—")}</span><span>${money(p.debt||0)}</span><span>${money(p.credit||0)}</span></div>`).join("");
+ const debt=(inv.people||[]).reduce((s,p)=>s+Number(p.debt||0),0),credit=(inv.people||[]).reduce((s,p)=>s+Number(p.credit||0),0),sub=invoiceSubtotal(inv),discount=invoiceDiscount(inv),tax=Math.max(0,invoiceTotal(inv)-Math.max(0,sub-discount));
+ openModal(`<div id="invoicePreview" class="invoice-preview">
+ <div class="invoice-head"><div>${brand.logo?`<img class="invoice-brand-logo" src="${brand.logo}" alt="لوگو">`:""}<h2>فاکتور</h2><b>${esc(brand.storeName||inv.seller||"")}</b>${brand.stamp?`<img class="invoice-brand-stamp" src="${brand.stamp}" alt="مهر">`:""}</div><div>شماره: ${esc(inv.number||"—")}<br>تاریخ: ${invoiceDateLabel(inv.date)}</div></div>
+ <h3>${esc(inv.name||"فاکتور")}</h3>${cust?`<div class="meta">مشتری: ${esc(cust.name)}${cust.phone?" • "+esc(cust.phone):""}</div>`:""}
+ ${inv.address?`<div class="meta">آدرس: ${esc(inv.address)}</div>`:""}
+ <div class="meta">وضعیت: ${inv.status==="paid"?"🟢 پرداخت کامل":inv.status==="partial"?"🟡 پرداخت بخشی":"🔴 پرداخت نشده"} • مانده: ${money(invoiceRemaining(inv))}</div>
+ <div class="preview-inv-row head"><b>توضیحات</b><b>تعداد</b><b>مبلغ واحد</b><b>مبلغ</b></div>${rows}
+ <div class="invoice-summary"><div>مبلغ قبل از تخفیف: <strong>${money(sub)}</strong></div><div>تخفیف: <strong>${money(discount)}</strong></div><div>مالیات: <strong>${money(tax)}</strong></div><div class="final-total">مبلغ نهایی: <strong>${money(invoiceTotal(inv))}</strong></div></div>
+ ${people.length?`<h3>👥 نفرات فاکتور</h3><div class="preview-person-row head"><b>نام</b><b>بدهکار</b><b>بستانکار</b></div>${people}<div class="invoice-summary"><div>جمع بدهکار: <strong>${money(debt)}</strong></div><div>جمع بستانکار: <strong>${money(credit)}</strong></div></div>`:""}
+ ${inv.notes?`<div class="card invoice-notes"><b>توضیحات:</b><div>${esc(inv.notes)}</div></div>`:""}
+ ${brand.signature?`<div class="invoice-signature"><img src="${brand.signature}" alt="امضا"><small>امضای فروشگاه</small></div>`:""}
+ </div><div class="actions"><button class="primary" onclick="printInvoice('${inv.id}')">🖨 چاپ / PDF</button><button class="primary" onclick="shareInvoice('${inv.id}')">📤 ارسال فاکتور</button></div>`)
 }
 function drawInvoiceCanvas(inv){
- const W=794, rowH=58, H=Math.max(1123,520+(inv.items||[]).length*rowH);
- const c=document.createElement("canvas");c.width=W;c.height=H;const x=c.getContext("2d");
- x.fillStyle="#fff";x.fillRect(0,0,W,H);x.fillStyle="#17352b";x.textAlign="right";x.direction="rtl";
- if(data.branding?.logo){try{const im=new Image();im.src=data.branding.logo;if(im.complete)x.drawImage(im,55,25,90,70)}catch(e){}} x.font="bold 34px sans-serif";x.fillText("فاکتور",W-45,55);
- x.font="bold 22px sans-serif";x.fillText(inv.seller||"فروشگاه / فروشنده",W-45,95);
+ const W=794, rowH=58, H=Math.max(1123,680+(inv.items||[]).length*rowH+(inv.people||[]).length*42);
+ const c=document.createElement("canvas");c.width=W;c.height=H;const x=c.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,W,H);x.fillStyle="#17352b";x.textAlign="right";x.direction="rtl";
+ const brand=inv.brandingSnapshot||data.branding||{};
+ x.font="bold 34px sans-serif";x.fillText("فاکتور",W-45,55);
+ x.font="bold 22px sans-serif";x.fillText(brand.storeName||inv.seller||"فروشگاه / فروشنده",W-45,95);
  x.font="17px sans-serif";x.fillStyle="#56645f";x.fillText("شماره: "+(inv.number||"—"),W-45,130);x.fillText("تاریخ: "+invoiceDateLabel(inv.date),W-245,130);
  x.fillStyle="#17352b";x.font="bold 21px sans-serif";x.fillText(inv.name||"فاکتور",W-45,180);
  let y=245;x.fillStyle="#eaf2ee";x.fillRect(28,y-32,W-56,45);x.fillStyle="#17352b";x.font="bold 14px sans-serif";
  x.fillText("مبلغ",W-38,y-8);x.fillText("مبلغ واحد",W-230,y-8);x.fillText("تعداد",W-400,y-8);x.fillText("توضیحات",W-490,y-8);
  x.font="15px sans-serif";
  (inv.items||[]).forEach((it,i)=>{y+=rowH;x.fillStyle=i%2?"#fafcfb":"#fff";x.fillRect(55,y-50,W-110,rowH);x.fillStyle="#23312c";x.fillText(money((Number(it.qty)||0)*(Number(it.price)||0)),W-38,y);x.fillText(money(it.price),W-230,y);x.fillText(fa(it.qty),W-400,y);x.fillText(it.desc||"—",W-490,y);});
- y+=45;x.fillStyle="#17352b";x.font="bold 20px sans-serif";x.fillText("جمع کل: "+money(invoiceTotal(inv)),W-38,y);
+ const sub=invoiceSubtotal(inv),discount=invoiceDiscount(inv),tax=Math.max(0,invoiceTotal(inv)-(sub-discount));y+=55;x.fillStyle="#17352b";x.font="17px sans-serif";x.fillText("مبلغ قبل از تخفیف: "+money(sub),W-45,y);y+=30;x.fillText("تخفیف: "+money(discount),W-45,y);y+=30;x.fillText("مالیات: "+money(tax),W-45,y);y+=38;x.font="bold 21px sans-serif";x.fillText("مبلغ نهایی: "+money(invoiceTotal(inv)),W-45,y);
+ if((inv.people||[]).length){y+=55;x.font="bold 18px sans-serif";x.fillText("نفرات فاکتور",W-45,y);y+=28;x.font="14px sans-serif";(inv.people||[]).forEach(p=>{y+=30;x.fillText(`${p.name||"—"} • بدهکار: ${money(p.debt||0)} • بستانکار: ${money(p.credit||0)}`,W-45,y)})}
  return c
 }
 async function shareInvoice(id){

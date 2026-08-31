@@ -77,3 +77,39 @@ body{font-size:15px;line-height:1.55}
 
 /* حساب‌یار 3.6 — spacing and interaction fixes */
 .settings-page{gap:18px!important}.settings-intro{margin:4px 3px 16px;line-height:1.9}.settings-group{display:grid;gap:14px;padding:20px!important;margin:0!important;border-radius:24px}.settings-group-head{display:flex;align-items:flex-start;gap:13px;padding-bottom:8px;border-bottom:1px solid rgba(31,55,45,.08)}.settings-group-head>span{font-size:25px;line-height:1}.settings-group-head h3{margin:0 0 5px;font-size:18px}.settings-group-head .hint{margin:0;line-height:1.8}.settings-group input:not([type="checkbox"]),.settings-group select,.settings-group textarea{width:100%;min-height:48px;padding:13px 14px;border:1px solid #dce7e2;border-radius:15px;font:inherit;background:#fbfdfc}.settings-actions{display:grid;gap:10px;margin-top:2px}.settings-group button{min-height:48px;padding:13px 15px;border:1px solid #dce7e2;border-radius:15px;text-align:center;line-height:1.5}.settings-group .primary{border-color:transparent}.settings-group hr{margin:4px 0}.settings-footer{margin-top:18px;line-height:1.9}.security-group{margin-bottom:4px!important}.note-card .accordion-head{position:relative;z-index:2}.note-card .accordion-body{position:relative;z-index:1}.note-check-row{position:relative;z-index:3;touch-action:manipulation}.note-check-row label,.note-check-row input,.note-item-delete{position:relative;z-index:4}.note-check-row input{cursor:pointer}.note-check-row label{cursor:pointer;flex:1}.note-item-delete{cursor:pointer;flex:0 0 auto}.note-count{white-space:nowrap}.dark .settings-group-head{border-color:#ffffff12}.dark .settings-group input:not([type="checkbox"]),.dark .settings-group select,.dark .settings-group textarea{background:#14231e;color:#edf7f2;border-color:#263d35}.dark .settings-group button{border-color:#2b443b}.dark .settings-group-head .hint{color:#93aaa1}@media(max-width:520px){.settings-page{gap:14px!important}.settings-group{padding:17px!important;border-radius:21px}.settings-group-head h3{font-size:17px}.settings-group button{min-height:50px}.note-check-row{padding:10px 8px}}
+
+/* v3.7: compact note checklist on mobile */
+.note-card .accordion-body{padding:0 12px 12px}
+.note-card .note-main{width:100%;}
+.note-checklist{margin-top:8px;gap:5px}
+.note-check-row{min-height:40px;padding:6px 8px;border-radius:10px;gap:6px}
+.note-check-row label{gap:7px;font-size:14px;line-height:1.45}
+.note-check-row input{width:17px;height:17px;flex:0 0 auto}
+.note-check-row span{display:block;min-width:0;overflow-wrap:anywhere}
+.note-item-delete{min-width:26px!important;width:26px!important;height:26px!important;font-size:14px!important}
+.note-actions{flex-direction:row;justify-content:flex-start;align-items:center;gap:6px;margin-top:8px}
+.note-actions .actions{display:flex;gap:6px}
+.note-actions .actions button{width:34px;height:34px;padding:0}
+@media(max-width:520px){.note-card .accordion-head{padding:11px 12px}.note-card .accordion-body{padding:0 10px 10px}.note-check-row{min-height:38px;padding:5px 7px}.note-check-row label{font-size:13.5px}.note-text{font-size:13.5px;line-height:1.7}}
+
+/* حساب‌یار 3.7.1 — invoice persistence / people / discount UI */
+.invoice-section-title{font-weight:900;margin-top:10px;padding:11px 13px;border-radius:14px;background:rgba(33,132,91,.08);border:1px solid rgba(33,132,91,.12)}
+.invoice-person-row{display:grid;grid-template-columns:1.5fr 1fr 1fr 42px;gap:8px;margin:8px 0;align-items:center}
+.invoice-person-row input{width:100%;min-width:0;padding:12px;border:1px solid #dce7e2;border-radius:13px;background:rgba(255,255,255,.72);font:inherit}
+.invoice-people-head{grid-template-columns:1.5fr 1fr 1fr 42px!important}
+.invoice-people-totals{margin:10px 0;padding:12px;border-radius:14px;background:rgba(33,132,91,.07);font-size:13px}
+.invoice-total-box{margin-top:12px;padding:15px;border-radius:18px;background:rgba(33,132,91,.08);border:1px solid rgba(33,132,91,.14);line-height:2}
+.invoice-total-box .final-total{font-size:18px;font-weight:900;margin-top:5px;padding-top:7px;border-top:1px dashed rgba(33,132,91,.25)}
+.invoice-summary{display:grid;gap:7px;margin-top:15px;padding:14px;border-radius:16px;background:#f2f7f4}
+.invoice-summary .final-total{font-size:18px;font-weight:900;border-top:1px dashed #c7d9d0;padding-top:8px}
+.preview-person-row{display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:10px;padding:9px 5px;border-bottom:1px solid rgba(33,55,46,.08)}
+.preview-person-row.head{font-weight:800;background:#edf4f0;border-radius:10px}
+.invoice-brand-stamp{width:75px;height:75px;object-fit:contain;margin-top:8px;display:block}
+.invoice-signature{display:flex;flex-direction:column;align-items:flex-end;gap:4px;margin-top:20px}
+.invoice-signature img{max-width:150px;max-height:75px;object-fit:contain}
+.invoice-signature small{color:#708078}
+.invoice-notes{margin-top:15px;line-height:1.9}
+@media(max-width:560px){.invoice-person-row{grid-template-columns:1fr 1fr 1fr 38px}.invoice-person-row input{padding:10px 8px;font-size:12px}.invoice-people-head{font-size:11px}.preview-person-row{font-size:12px}}
+.dark .invoice-section-title,.dark .invoice-total-box,.dark .invoice-people-totals{background:rgba(33,132,91,.13);border-color:rgba(255,255,255,.08)}
+.dark .invoice-person-row input{background:rgba(255,255,255,.06);color:#edf7f2;border-color:rgba(255,255,255,.1)}
+.dark .invoice-summary{background:#182923}.dark .preview-person-row.head{background:#1b2d26}.dark .preview-person-row{border-color:rgba(255,255,255,.07)}
