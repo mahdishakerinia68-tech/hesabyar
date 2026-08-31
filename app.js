@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="3.8";
+const APP_VERSION="3.8.2";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
@@ -652,27 +652,27 @@ function viewImage(id){const t=data.transactions.find(x=>x.id===id);if(!t?.image
 function empty(s){return `<div class="card" style="text-align:center">${s}</div>`}
 
 function invoiceDateLabel(v){return jalaliLabel(v)}
-function invoiceRowHTML(item,i){return `<div class="invoice-row"><select class="inv-product" onchange="invoiceProductPick(this)"><option value="">کالا / خدمت</option>${data.products.map(p=>`<option value="${p.id}" ${p.id===item?.productId?"selected":""}>${esc(p.name)}</option>`).join("")}</select><input class="inv-desc" placeholder="شرح کالا / خدمات" value="${esc(item?.desc||"")}"><input class="inv-qty" oninput="updateInvoiceLiveTotal()" type="number" min="0" step="any" placeholder="تعداد" value="${Number(item?.qty)||""}"><input class="inv-price" oninput="updateInvoiceLiveTotal()" type="number" min="0" step="any" placeholder="مبلغ واحد" value="${Number(item?.price)||""}"><button type="button" class="danger-icon" onclick="this.parentElement.remove();updateInvoiceLiveTotal()">🗑</button></div>`}
+function invoiceRowHTML(item,i){return `<div class="invoice-row"><select class="inv-product" onchange="invoiceProductPick(this)"><option value="">کالا / خدمت</option>${data.products.map(p=>`<option value="${p.id}" ${p.id===item?.productId?"selected":""}>${esc(p.name)}</option>`).join("")}</select><input class="inv-desc" placeholder="شرح کالا / خدمات" value="${esc(item?.desc||"")}"><input class="inv-qty" oninput="updateInvoiceLiveTotal()" type="number" min="0" step="any" placeholder="تعداد" value="${item?.qty ? Number(item.qty) : ""}"><input class="inv-price" oninput="updateInvoiceLiveTotal()" type="number" min="0" step="any" placeholder="مبلغ واحد" value="${item?.price ? Number(item.price) : ""}"><button type="button" class="danger-icon" onclick="this.parentElement.remove();updateInvoiceLiveTotal()">🗑</button></div>`}
 function addInvoiceRow(pref={}){const box=$("invoiceRows");if(!box)return;const div=document.createElement("div");div.innerHTML=invoiceRowHTML(pref,box.children.length);box.appendChild(div.firstElementChild)}
-function invoicePersonHTML(p={}){return `<div class="invoice-person-row"><input class="inv-person-name" placeholder="نام نفر" value="${esc(p.name||"")}"><input class="inv-person-debt" type="number" min="0" placeholder="بدهکار" value="${Number(p.debt)||""}"><input class="inv-person-credit" type="number" min="0" placeholder="بستانکار" value="${Number(p.credit)||""}"><button type="button" class="danger-icon" onclick="this.parentElement.remove();updateInvoicePeopleTotals()">🗑</button></div>`}
+function invoicePersonHTML(p={}){return `<div class="invoice-person-row"><input class="inv-person-name" placeholder="اسم مشتری" value="${esc(p.name||"")}"><input class="inv-person-debt" type="number" min="0" placeholder="بدهکار" value="${Number(p.debt)||""}"><input class="inv-person-credit" type="number" min="0" placeholder="بستانکار" value="${Number(p.credit)||""}"><button type="button" class="danger-icon" onclick="this.parentElement.remove();updateInvoicePeopleTotals()">🗑</button></div>`}
 function addInvoicePerson(pref={}){const box=$("invoicePeople");if(!box)return;const div=document.createElement("div");div.innerHTML=invoicePersonHTML(pref);box.appendChild(div.firstElementChild);updateInvoicePeopleTotals()}
 function updateInvoicePeopleTotals(){let debt=0,credit=0;document.querySelectorAll("#invoicePeople .invoice-person-row").forEach(r=>{debt+=Number(r.querySelector(".inv-person-debt")?.value)||0;credit+=Number(r.querySelector(".inv-person-credit")?.value)||0});if($("invPeopleDebtTotal"))$("invPeopleDebtTotal").textContent=money(debt);if($("invPeopleCreditTotal"))$("invPeopleCreditTotal").textContent=money(credit)}
 function invoiceProductPick(sel){const p=data.products.find(x=>x.id===sel.value);const row=sel.closest(".invoice-row");if(!p||!row)return;row.querySelector(".inv-desc").value=p.name;row.querySelector(".inv-price").value=p.price||0;updateInvoiceLiveTotal()}
 function openInvoice(id=null){
  const inv=id&&data.invoices.find(x=>x.id===id);
- const items=inv?.items?.length?inv.items:[{desc:"",qty:1,price:""}];
+ const items=inv?.items?.length?inv.items:[{desc:"",qty:"",price:""}];
  const people=Array.isArray(inv?.people)?inv.people:[];
  const cust=inv?.customerId?data.customers.find(c=>c.id===inv.customerId):null;
  const brand=inv?.brandingSnapshot||data.branding||{};
  openModal(`<div class="ios-invoice-modal"><div class="ios-invoice-top"><div class="ios-invoice-icon">🧾</div><div><h2> ${inv?"ویرایش فاکتور":"ثبت / صدور فاکتور"}</h2><small>فاکتور خود را مثل یک فرم مدرن آیفون مدیریت کن</small></div></div><div class="form ios-invoice-form">
  <input id="invName" placeholder="نام فاکتور" value="${esc(inv?.name||"")}">
- <div class="two-fields"><input id="invSeller" placeholder="نام فروشگاه / فروشنده" value="${esc(inv?.seller||brand.storeName||"")}"><select id="invCustomer"><option value="">بدون مشتری</option>${data.customers.map(c=>`<option value="${c.id}" ${c.id===inv?.customerId?"selected":""}>${esc(c.name)}${c.phone?" • "+esc(c.phone):""}</option>`).join("")}</select></div>
+ <div class="two-fields"><input id="invSeller" placeholder="نام فروشگاه / فروشنده" value="${esc(inv?.seller||brand.storeName||"")}"><select id="invCustomer"><option value="">اسم مشتری</option>${data.customers.map(c=>`<option value="${c.id}" ${c.id===inv?.customerId?"selected":""}>${esc(c.name)}${c.phone?" • "+esc(c.phone):""}</option>`).join("")}</select></div>
  <div class="two-fields"><input id="invDate" inputmode="numeric" placeholder="تاریخ شمسی ۱۴۰۵/۰۶/۰۸" value="${esc(jalaliInputValue(inv?.date)||todayJalali())}"><input id="invNo" placeholder="شماره فاکتور" value="${esc(inv?.number||"")}"></div>
- <div class="two-fields"><select id="invStatus"><option value="unpaid" ${inv?.status!=="paid"&&inv?.status!=="partial"?"selected":""}>🔴 پرداخت نشده</option><option value="partial" ${inv?.status==="partial"?"selected":""}>🟡 پرداخت بخشی</option><option value="paid" ${inv?.status==="paid"?"selected":""}>🟢 پرداخت کامل</option></select><input id="invPaid" oninput="updateInvoiceLiveTotal()" type="number" min="0" placeholder="مبلغ پرداخت‌شده" value="${Number(inv?.paid)||0}"></div>
- <div class="invoice-section-title">💸 تخفیف</div><div class="two-fields"><input id="invDiscount" oninput="updateInvoiceLiveTotal()" type="number" min="0" placeholder="تخفیف مبلغی (تومان)" value="${Number(inv?.discount)||0}"><input id="invDiscountPercent" oninput="updateInvoiceLiveTotal()" type="number" min="0" max="100" step="0.01" placeholder="تخفیف درصدی (%)" value="${Number(inv?.discountPercent)||0}"></div>
- <div class="two-fields"><input id="invTax" oninput="updateInvoiceLiveTotal()" type="number" min="0" placeholder="مالیات (درصد)" value="${Number(inv?.taxRate)||0}"><input id="invAddress" placeholder="آدرس مشتری" value="${esc(inv?.address||cust?.address||"")}"></div>
- <div class="invoice-section-title">👥 نفرات فاکتور</div>
- <div class="invoice-table-head invoice-people-head"><span>نام نفر</span><span>بدهکار</span><span>بستانکار</span><span></span></div>
+ <div class="two-fields"><select id="invStatus"><option value="unpaid" ${inv?.status!=="paid"&&inv?.status!=="partial"?"selected":""}>🔴 پرداخت نشده</option><option value="partial" ${inv?.status==="partial"?"selected":""}>🟡 پرداخت بخشی</option><option value="paid" ${inv?.status==="paid"?"selected":""}>🟢 پرداخت کامل</option></select><input id="invPaid" oninput="updateInvoiceLiveTotal()" type="number" min="0" placeholder="مبلغ پرداخت‌شده" value="${inv?.paid ? Number(inv.paid) : ""}"></div>
+ <div class="invoice-section-title">💸 تخفیف</div><div class="two-fields"><input id="invDiscount" oninput="updateInvoiceLiveTotal()" type="number" min="0" placeholder="تخفیف مبلغی (تومان)" value="${inv?.discount ? Number(inv.discount) : ""}"><input id="invDiscountPercent" oninput="updateInvoiceLiveTotal()" type="number" min="0" max="100" step="0.01" placeholder="تخفیف درصدی (%)" value="${inv?.discountPercent ? Number(inv.discountPercent) : ""}"></div>
+ <div class="two-fields"><input id="invTax" oninput="updateInvoiceLiveTotal()" type="number" min="0" placeholder="مالیات (درصد)" value="${inv?.taxRate ? Number(inv.taxRate) : ""}"><input id="invAddress" placeholder="آدرس مشتری" value="${esc(inv?.address||cust?.address||"")}"></div>
+ <div class="invoice-section-title">👤 اسم مشتری</div>
+ <div class="invoice-table-head invoice-people-head"><span>اسم مشتری</span><span>بدهکار</span><span>بستانکار</span><span></span></div>
  <div id="invoicePeople">${people.map(invoicePersonHTML).join("")}</div>
  <button type="button" onclick="addInvoicePerson()">＋ افزودن نفر</button>
  <div class="invoice-people-totals">جمع بدهکار: <strong id="invPeopleDebtTotal">۰ تومان</strong> • جمع بستانکار: <strong id="invPeopleCreditTotal">۰ تومان</strong></div>

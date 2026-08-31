@@ -92,7 +92,7 @@ body{font-size:15px;line-height:1.55}
 .note-actions .actions button{width:34px;height:34px;padding:0}
 @media(max-width:520px){.note-card .accordion-head{padding:11px 12px}.note-card .accordion-body{padding:0 10px 10px}.note-check-row{min-height:38px;padding:5px 7px}.note-check-row label{font-size:13.5px}.note-text{font-size:13.5px;line-height:1.7}}
 
-/* حساب‌یار 3.8 — invoice persistence / people / discount UI */
+/* حساب‌یار 3.8.2 — invoice persistence / people / discount UI */
 .invoice-section-title{font-weight:900;margin-top:10px;padding:11px 13px;border-radius:14px;background:rgba(33,132,91,.08);border:1px solid rgba(33,132,91,.12)}
 .invoice-person-row{display:grid;grid-template-columns:1.5fr 1fr 1fr 42px;gap:8px;margin:8px 0;align-items:center}
 .invoice-person-row input{width:100%;min-width:0;padding:12px;border:1px solid #dce7e2;border-radius:13px;background:rgba(255,255,255,.72);font:inherit}
@@ -138,7 +138,7 @@ body{font-size:15px;line-height:1.55}
 .note-card.has-alarm{border-inline-start:3px solid rgba(0,122,255,.65)}
 
 
-/* v3.8 — iPhone Reminders-inspired invoice editor theme (theme only; invoice logic incl. discount preserved) */
+/* v3.8.2 — iPhone Reminders-inspired invoice editor theme (theme only; invoice logic incl. discount preserved) */
 .ios-invoice-modal{max-width:640px;margin:auto}
 .ios-invoice-top{display:flex;gap:12px;align-items:center;margin-bottom:16px}
 .ios-invoice-top h2{margin:0;font-size:21px;font-weight:800;letter-spacing:-.2px}

@@ -1,6 +1,6 @@
 {
-  "name": "حساب‌یار 3.8",
-  "short_name": "حساب‌یار 3.8",
+  "name": "حساب‌یار 3.8.2",
+  "short_name": "حساب‌یار 3.8.2",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#f4f7fb",
@@ -15,5 +15,5 @@
       "purpose": "any maskable"
     }
   ],
-  "version": "3.8"
+  "version": "3.8.2"
 }
