@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="5.0";
+const APP_VERSION="5.1";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
@@ -590,7 +590,18 @@ function openCategory(){openModal(`<h2>🏷 دسته‌بندی‌ها</h2><div 
 function addCatPrompt(type){const n=prompt(type==="expense"?"نام دسته هزینه:":"نام نوع دریافت:");if(!n?.trim())return;const arr=type==="expense"?data.expenseCats:data.incomeCats;const nc=touch({id:uid(),name:n.trim()});arr.push(nc);markDirty(type==="expense"?"expenseCats":"incomeCats",nc.id,false,nc,nc.updatedAt);save();logEvent("ایجاد دسته",n.trim(),"create");openCategory()}
 function editCategory(type,id){const arr=type==="expense"?data.expenseCats:data.incomeCats,c=arr.find(x=>x.id===id);if(!c)return;const n=prompt("نام جدید:",c.name);if(n?.trim()){const old=c.name;c.name=n.trim();touch(c);markDirty(type==="expense"?"expenseCats":"incomeCats",c.id,false,c,c.updatedAt);data.transactions.forEach(t=>{if(t.category===old){t.category=c.name;touch(t);markDirty("transactions",t.id,false,t,t.updatedAt)}});save();openCategory()}}
 function removeCategory(type,id){if(!confirm("این دسته حذف شود؟"))return;removeRecord(type==="expense"?"expenseCats":"incomeCats",id);openCategory()}
-function openProduct(id=null){const p=id&&data.products.find(x=>x.id===id);openModal(`<h2>${p?"ویرایش کالا":"کالای جدید"}</h2><div class="form"><input id="prdName" placeholder="نام کالا / خدمت" value="${esc(p?.name||"")}"><input id="prdCode" placeholder="کد کالا (اختیاری)" value="${esc(p?.code||"")}"><div class="two-fields"><input id="prdBuy" type="number" min="0" placeholder="قیمت خرید" value="${Number(p?.buyPrice)||0}"><input id="prdPrice" type="number" min="0" placeholder="قیمت فروش" value="${Number(p?.price)||0}"><input id="prdStock" type="number" min="0" placeholder="موجودی" value="${Number(p?.stock)||0}"></div><input id="prdMin" type="number" min="0" placeholder="حداقل موجودی برای هشدار" value="${Number(p?.minStock)||0}"><button class="primary" onclick="saveProduct('${p?.id||""}')">💾 ذخیره</button></div>`)}
+function openProduct(id=null){const p=id&&data.products.find(x=>x.id===id);openModal(`<h2>${p?"ویرایش کالا":"کالای جدید"}</h2><div class="form">
+ ${invField("نام کالا یا خدمت","",`<input id="prdName" placeholder="مثلاً: کیف چرمی مدل ۱" value="${esc(p?.name||"")}">`)}
+ ${invField("کد کالا","اختیاری؛ برای پیدا کردن سریع‌تر",`<input id="prdCode" placeholder="مثلاً: A-102" value="${esc(p?.code||"")}">`)}
+ <div class="two-fields">
+ ${invField("قیمت خرید","تومان",`<input id="prdBuy" type="number" min="0" inputmode="numeric" placeholder="۰" value="${Number(p?.buyPrice)||""}">`)}
+ ${invField("قیمت فروش","تومان",`<input id="prdPrice" type="number" min="0" inputmode="numeric" placeholder="۰" value="${Number(p?.price)||""}">`)}
+ </div>
+ <div class="two-fields">
+ ${invField("موجودی فعلی","تعداد در انبار",`<input id="prdStock" type="number" min="0" inputmode="numeric" placeholder="۰" value="${Number(p?.stock)||""}">`)}
+ ${invField("حداقل موجودی","برای هشدار موجودی کم",`<input id="prdMin" type="number" min="0" inputmode="numeric" placeholder="۰" value="${Number(p?.minStock)||""}">`)}
+ </div>
+ <button class="primary" onclick="saveProduct('${p?.id||""}')">💾 ذخیره</button></div>`)}
 function saveProduct(id){const name=$("prdName").value.trim();if(!name)return alert("نام کالا را وارد کن");const o={name,code:$("prdCode").value.trim(),buyPrice:Number($("prdBuy").value)||0,price:Number($("prdPrice").value)||0,stock:Number($("prdStock").value)||0,minStock:Number($("prdMin").value)||0};if(id){const p=data.products.find(x=>x.id===id);Object.assign(p,o);touch(p);markDirty("products",p.id,false,p,p.updatedAt)}else{const p=touch({id:uid(),...o});data.products.unshift(p);markDirty("products",p.id,false,p,p.updatedAt)}save();logEvent(id?"ویرایش کالا":"افزودن کالا",name,id?"edit":"create");closeModal()}
 function deleteProduct(id){if(!confirm("این کالا حذف شود؟"))return;const p=data.products.find(x=>x.id===id);removeRecord("products",id);logEvent("حذف کالا",p?.name||id,"delete")}
 function renderProducts(){const box=$("productList");if(!box)return;box.innerHTML=data.products.map(p=>`<div class="item"><div><b>📦 ${esc(p.name)}</b><div class="meta">${p.code?"کد: "+esc(p.code)+" • ":""}خرید: ${money(p.buyPrice||0)} • فروش: ${money(p.price)}</div><div class="meta">موجودی: ${fa(p.stock)} ${Number(p.stock)<=Number(p.minStock)&&Number(p.minStock)>0?" • ⚠️ موجودی کم":""}</div></div><div class="actions"><button onclick="openProduct('${p.id}')">✏️</button><button onclick="deleteProduct('${p.id}')" class="danger-icon">🗑</button></div></div>`).join("")||empty("هنوز کالایی ثبت نشده است")}
@@ -702,13 +713,23 @@ function noteRepeatLabel(r){return r==="daily"?"روزانه":r==="weekly"?"هف
 function noteItemHTML(n,it){
  return '<div class="note-check-row" data-note-row="'+esc(it.id)+'" onclick="event.stopPropagation()"><label onclick="event.stopPropagation()"><input type="checkbox" '+(it.done?'checked':'')+' onclick="event.stopPropagation()" onchange="toggleNoteItem(\''+n.id+'\',\''+it.id+'\')"><span class="'+(it.done?'done':'')+'">'+esc(it.text)+'</span></label><button type="button" class="mini-danger note-item-delete" title="حذف آیتم" onclick="event.stopPropagation();deleteNoteItem(\''+n.id+'\',\''+it.id+'\')">×</button></div>';
 }
+const openAccordions=new Set();
 function noteHTML(n){
  const items=n.items||[];
  const list=items.length?items.map(it=>noteItemHTML(n,it)).join(''):'<div class="meta">هنوز آیتمی اضافه نشده</div>';
  const alarm=n.date?`<div class="meta">⏰ آلارم جداگانه: ${jalaliDateTimeInput(n.date)} • ${noteRepeatLabel(n.repeat)}</div>`:'<div class="meta">بدون آلارم</div>';
- return `<div class="note-card item accordion-card" data-note-card="${esc(n.id)}"><button class="accordion-head" type="button" aria-expanded="false" onclick="toggleAccordion(this,event)"><span><span class="note-badge">📝</span> <b>${esc(n.title)}</b></span><span class="note-count">${items.length?fa(items.filter(x=>x.done).length)+' / '+fa(items.length):''}⌄</span></button><div class="accordion-body"><div class="note-main">${n.text?'<div class="meta note-text">'+esc(n.text)+'</div>':''}${alarm}<div class="note-checklist">${list}</div></div><div class="note-actions">${actionButtons('openNote','deleteNote',n.id)}</div></div></div>`;
+ const accId="note-"+n.id;const isOpen=openAccordions.has(accId);
+ return `<div class="note-card item accordion-card${isOpen?' open':''}" data-note-card="${esc(n.id)}" data-acc-id="${accId}"><button class="accordion-head" type="button" aria-expanded="${isOpen}" onclick="toggleAccordion(this,event)"><span><span class="note-badge">📝</span> <b>${esc(n.title)}</b></span><span class="note-count">${items.length?fa(items.filter(x=>x.done).length)+' / '+fa(items.length):''}⌄</span></button><div class="accordion-body"><div class="note-main">${n.text?'<div class="meta note-text">'+esc(n.text)+'</div>':''}${alarm}<div class="note-checklist">${list}</div></div><div class="note-actions">${actionButtons('openNote','deleteNote',n.id)}</div></div></div>`;
 }
-function toggleAccordion(btn,event){if(event)event.stopPropagation();const card=btn?.closest(".accordion-card");if(!card)return;const open=!card.classList.contains("open");card.classList.toggle("open",open);btn.setAttribute("aria-expanded",String(open));}
+function toggleAccordion(btn,event){
+ if(event)event.stopPropagation();
+ const card=btn?.closest(".accordion-card");if(!card)return;
+ const open=!card.classList.contains("open");
+ card.classList.toggle("open",open);
+ btn.setAttribute("aria-expanded",String(open));
+ const accId=card.dataset.accId;
+ if(accId){if(open)openAccordions.add(accId);else openAccordions.delete(accId)}
+}
 
 
 function openReminder(id=null){const r=id&&data.reminders.find(x=>x.id===id);openModal(`<h2>${r?"ویرایش یادآوری":"یادآوری"}</h2><div class="form"><input id="rt" placeholder="عنوان" value="${esc(r?.title||"")}"><input id="ra" type="number" placeholder="مبلغ" value="${Number(r?.amount)||""}">${pickerBox("rdPicker","rtPicker",r?.date||new Date().toISOString())}<select id="rr"><option value="once" ${r?.repeat==="once"?"selected":""}>یک‌بار</option><option value="monthly" ${r?.repeat==="monthly"?"selected":""}>ماهانه</option><option value="weekly" ${r?.repeat==="weekly"?"selected":""}>هفتگی</option></select><select id="rb"><option value="expense" ${r?.type==="expense"?"selected":""}>پرداخت</option><option value="income" ${r?.type==="income"?"selected":""}>دریافت</option></select><button class="primary" onclick="saveReminder('${r?.id||""}')">${r?"ذخیره تغییرات":"ذخیره"}</button></div>`)}
@@ -886,7 +907,109 @@ async function shareInvoice(id){
  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=file.name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);alert("عکس فاکتور آماده شد؛ از گزینه اشتراک گوشی می‌توانی ارسالش کنی.")
 }
 function printInvoice(id){const inv=data.invoices.find(x=>x.id===id);if(!inv)return;previewInvoice(id);setTimeout(()=>window.print(),250)}
-function previewBrandFile(input,type){const f=input?.files?.[0];if(!f)return;const r=new FileReader();r.onload=()=>{const box=$(type==="logo"?"brandLogoPreview":type==="stamp"?"brandStampPreview":"brandSignaturePreview");if(box)box.innerHTML=`<img class="brand-preview-img" src="${r.result}" alt="${type}">`;input.dataset.value=r.result};r.readAsDataURL(f)}
+function previewBrandFile(input,type){const f=input?.files?.[0];if(!f)return;openFramer(f,type,input)}
+
+/* ===== Image framer: Telegram/Instagram-style fixed frame for logo/stamp/signature ===== */
+const framerState={img:null,type:null,input:null,scale:1,offX:0,offY:0,baseScale:1,stageW:260,stageH:260,dragging:false,startX:0,startY:0};
+const FRAMER_SIZES={logo:{stageW:220,stageH:220,outW:500,outH:500,round:true},stamp:{stageW:220,stageH:220,outW:500,outH:500,round:true},signature:{stageW:260,stageH:150,outW:640,outH:370,round:false}};
+function openFramer(file,type,input){
+ const cfg=FRAMER_SIZES[type]||FRAMER_SIZES.logo;
+ const r=new FileReader();
+ r.onload=()=>{
+  const img=new Image();
+  img.onload=()=>{
+   framerState.img=img;framerState.type=type;framerState.input=input;framerState.scale=1;framerState.offX=0;framerState.offY=0;
+   framerState.stageW=cfg.stageW;framerState.stageH=cfg.stageH;
+   framerState.baseScale=Math.max(cfg.stageW/img.naturalWidth,cfg.stageH/img.naturalHeight);
+   const modal=$("framerModal");const stage=$("framerStage");const imgEl=$("framerImg");
+   stage.style.width=cfg.stageW+"px";stage.style.height=cfg.stageH+"px";
+   stage.classList.toggle("framer-round",!!cfg.round);
+   imgEl.src=img.src;
+   $("framerZoom").value=1;
+   updateFramerTransform();
+   modal.classList.remove("hidden");
+  };
+  img.src=r.result;
+ };
+ r.readAsDataURL(file);
+}
+function updateFramerTransform(){
+ const s=framerState;const imgEl=$("framerImg");if(!imgEl||!s.img)return;
+ const total=s.baseScale*s.scale;
+ const dispW=s.img.naturalWidth*total,dispH=s.img.naturalHeight*total;
+ const maxX=Math.max(0,(dispW-s.stageW)/2),maxY=Math.max(0,(dispH-s.stageH)/2);
+ s.offX=Math.max(-maxX,Math.min(maxX,s.offX));s.offY=Math.max(-maxY,Math.min(maxY,s.offY));
+ imgEl.style.width=dispW+"px";imgEl.style.height=dispH+"px";
+ imgEl.style.transform=`translate(${-dispW/2+s.stageW/2+s.offX}px,${-dispH/2+s.stageH/2+s.offY}px)`;
+}
+function framerZoomChange(v){framerState.scale=Number(v)||1;updateFramerTransform()}
+function framerPointerDown(e){framerState.dragging=true;const p=e.touches?e.touches[0]:e;framerState.startX=p.clientX-framerState.offX;framerState.startY=p.clientY-framerState.offY}
+function framerPointerMove(e){if(!framerState.dragging)return;const p=e.touches?e.touches[0]:e;framerState.offX=p.clientX-framerState.startX;framerState.offY=p.clientY-framerState.startY;updateFramerTransform();if(e.cancelable)e.preventDefault()}
+function framerPointerUp(){framerState.dragging=false}
+function closeFramer(){$("framerModal").classList.add("hidden");framerState.img=null;if(framerState.input)framerState.input.value=""}
+function confirmFramer(){
+ const s=framerState;if(!s.img)return closeFramer();
+ const cfg=FRAMER_SIZES[s.type]||FRAMER_SIZES.logo;
+ const total=s.baseScale*s.scale;
+ const dispW=s.img.naturalWidth*total,dispH=s.img.naturalHeight*total;
+ const imgLeft=-dispW/2+s.stageW/2+s.offX, imgTop=-dispH/2+s.stageH/2+s.offY;
+ const sx=(0-imgLeft)/total, sy=(0-imgTop)/total, sw=s.stageW/total, sh=s.stageH/total;
+ const canvas=document.createElement("canvas");canvas.width=cfg.outW;canvas.height=cfg.outH;
+ const ctx=canvas.getContext("2d");
+ ctx.drawImage(s.img,sx,sy,sw,sh,0,0,cfg.outW,cfg.outH);
+ const dataUrl=canvas.toDataURL("image/png",0.92);
+ const box=$(s.type==="logo"?"brandLogoPreview":s.type==="stamp"?"brandStampPreview":"brandSignaturePreview");
+ if(box)box.innerHTML=`<img class="brand-preview-img" src="${dataUrl}" alt="${s.type}">`;
+ if(s.input)s.input.dataset.value=dataUrl;
+ closeFramer();
+}
+
+/* ===== Dashboard customization ===== */
+const DASH_WIDGETS=[{id:"hero",label:"موجودی کل"},{id:"stats",label:"درآمد و هزینه این ماه"},{id:"quick",label:"دکمه تراکنش و یادآوری"},{id:"invoiceBtn",label:"دکمه صدور فاکتور"},{id:"tools",label:"ابزارهای سریع (ماشین‌حساب و ثبت گروهی)"},{id:"recent",label:"آخرین تراکنش‌ها"}];
+function dashboardConfig(){
+ data.dashboardConfig??={};
+ if(!Array.isArray(data.dashboardConfig.order)||!data.dashboardConfig.order.length)data.dashboardConfig.order=DASH_WIDGETS.map(w=>w.id);
+ for(const w of DASH_WIDGETS)if(!data.dashboardConfig.order.includes(w.id))data.dashboardConfig.order.push(w.id);
+ if(!Array.isArray(data.dashboardConfig.hidden))data.dashboardConfig.hidden=[];
+ return data.dashboardConfig;
+}
+function applyDashboardConfig(){
+ const cfg=dashboardConfig();const home=$("home");if(!home)return;
+ const afterHead=home.querySelector(".home-head");
+ for(const id of cfg.order){
+  const el=home.querySelector(`.dash-widget[data-widget="${id}"]`);if(!el)continue;
+  home.appendChild(el);
+  el.classList.toggle("dash-hidden",cfg.hidden.includes(id));
+ }
+ if(afterHead)home.insertBefore(afterHead,home.firstChild);
+}
+function openDashboardCustomize(){
+ const cfg=dashboardConfig();
+ const rows=cfg.order.map((id,i)=>{
+  const w=DASH_WIDGETS.find(x=>x.id===id);if(!w)return"";
+  const hidden=cfg.hidden.includes(id);
+  return `<div class="dash-cfg-row" data-id="${id}">
+   <label class="dash-cfg-check"><input type="checkbox" ${hidden?"":"checked"} onchange="toggleDashWidget('${id}',!this.checked)"><span>${esc(w.label)}</span></label>
+   <div class="dash-cfg-move">
+    <button type="button" ${i===0?"disabled":""} onclick="moveDashWidget('${id}',-1)">▲</button>
+    <button type="button" ${i===cfg.order.length-1?"disabled":""} onclick="moveDashWidget('${id}',1)">▼</button>
+   </div>
+  </div>`;
+ }).join("");
+ openModal(`<h2>🎛 سفارشی‌سازی داشبورد</h2><div class="form"><p class="hint">هر بخش که نیاز نداری خاموش کن، و با فلش‌ها ترتیب نمایش را بر اساس اولویت خودت جابه‌جا کن.</p><div id="dashCfgList" class="dash-cfg-list">${rows}</div><button class="primary" onclick="closeModal()">تمام شد</button></div>`);
+}
+function toggleDashWidget(id,hide){
+ const cfg=dashboardConfig();
+ cfg.hidden=cfg.hidden.filter(x=>x!==id);
+ if(hide)cfg.hidden.push(id);
+ save();applyDashboardConfig();
+}
+function moveDashWidget(id,dir){
+ const cfg=dashboardConfig();
+ const i=cfg.order.indexOf(id);const j=i+dir;if(i<0||j<0||j>=cfg.order.length)return;
+ [cfg.order[i],cfg.order[j]]=[cfg.order[j],cfg.order[i]];
+ save();applyDashboardConfig();openDashboardCustomize();
+}
 function loadBrandingSettings(){const b=data.branding||{};if($("brandStore"))$("brandStore").value=b.storeName||"";[["brandLogoPreview",b.logo,"لوگو"],["brandStampPreview",b.stamp,"مهر"],["brandSignaturePreview",b.signature,"امضا"]].forEach(([id,src,label])=>{const box=$(id);if(box)box.innerHTML=src?`<img class="brand-preview-img" src="${src}" alt="${label}">`:""})}
 function saveBranding(){data.branding??={};data.branding.storeName=$("brandStore")?.value.trim()||"";["logo","stamp","signature"].forEach(type=>{const el=$(type==="logo"?"brandLogo":type==="stamp"?"brandStamp":"brandSignature");if(el?.dataset.value)data.branding[type]=el.dataset.value});save();logEvent("ذخیره مشخصات فاکتور",data.branding.storeName||"لوگو، مهر و امضا","settings");alert("مشخصات فاکتور ذخیره شد")}
 function clearBranding(){if(!confirm("لوگو، مهر و امضا حذف شوند؟"))return;data.branding={storeName:"",logo:"",stamp:"",signature:""};save();loadBrandingSettings();logEvent("حذف مشخصات فاکتور","لوگو، مهر و امضا حذف شدند","settings")}
@@ -905,7 +1028,7 @@ function render(){
  if($("txList"))$("txList").innerHTML=data.transactions.filter(t=>(!q||String(t.title).includes(q)||String(t.category||"").includes(q))&&(!ft||t.type===ft)&&(!fc||t.category===fc)).map(txHTML).join("")||empty("تراکنشی پیدا نشد");
  if($("customerList"))renderCustomers();
  if($("peopleList"))$("peopleList").innerHTML=data.people.filter(p=>(p.type||"debt")===peopleMode).map(p=>{const total=Number(p.amount)||0,paid=Math.min(Number(p.paid)||0,total),remaining=Math.max(0,total-paid);return `<div class="item"><div><b>${esc(p.name)}</b><div class="meta">${p.due?"سررسید: "+p.due:""}${p.note?" • "+esc(p.note):""}</div><div class="meta">کل: ${money(total)} • تسویه: ${money(paid)}</div></div><div><strong>${money(remaining)}</strong><div class="actions"><button type="button" onclick="payPerson('${p.id}')">تسویه</button>${actionButtons("openPerson","deletePerson",p.id)}</div></div></div>`}).join("")||empty(peopleMode==="debt"?"هنوز بدهکاری ثبت نشده":"هنوز طلبی ثبت نشده");
- if($("reminderList")){const normalReminders=data.reminders.filter(r=>!r.sourceNoteId); const noteAlarms=data.reminders.filter(r=>r.sourceNoteId); const normal=normalReminders.map(r=>`<div class="item accordion-card"><button class="accordion-head" type="button" aria-expanded="false" onclick="toggleAccordion(this,event)"><span>🔔 <b>${esc(r.title)}</b></span><span>⌄</span></button><div class="accordion-body"><div class="meta">${jalaliLabel(r.date)} • ${r.repeat==="once"?"یک‌بار":r.repeat==="weekly"?"هفتگی":"ماهانه"}</div><div class="accordion-actions"><strong>${r.amount?money(r.amount):""}</strong>${actionButtons("openReminder","deleteReminder",r.id)}</div></div></div>`).join(""); $("reminderList").innerHTML=`<div class="section-label">🔔 یادآوری‌های مستقل</div>${normal||empty("یادآوری مستقلی ندارید")}${noteAlarms.length?`<div class="section-label">📝⏰ آلارم یادداشت‌ها</div>`+noteAlarms.map(r=>`<div class="item accordion-card"><button class="accordion-head" type="button" aria-expanded="false" onclick="toggleAccordion(this,event)"><span>📝 <b>${esc(r.title)}</b></span><span>⌄</span></button><div class="accordion-body"><div class="meta">${jalaliLabel(r.date)} • ${r.repeat==="once"?"یک‌بار":r.repeat==="weekly"?"هفتگی":"ماهانه"}</div></div></div>`).join(""):``}`;}
+ if($("reminderList")){const normalReminders=data.reminders.filter(r=>!r.sourceNoteId); const noteAlarms=data.reminders.filter(r=>r.sourceNoteId); const normal=normalReminders.map(r=>{const accId="rem-"+r.id;const isOpen=openAccordions.has(accId);return `<div class="item accordion-card${isOpen?' open':''}" data-acc-id="${accId}"><button class="accordion-head" type="button" aria-expanded="${isOpen}" onclick="toggleAccordion(this,event)"><span>🔔 <b>${esc(r.title)}</b></span><span>⌄</span></button><div class="accordion-body"><div class="meta">${jalaliLabel(r.date)} • ${r.repeat==="once"?"یک‌بار":r.repeat==="weekly"?"هفتگی":"ماهانه"}</div><div class="accordion-actions"><strong>${r.amount?money(r.amount):""}</strong>${actionButtons("openReminder","deleteReminder",r.id)}</div></div></div>`}).join(""); $("reminderList").innerHTML=`<div class="section-label">🔔 یادآوری‌های مستقل</div>${normal||empty("یادآوری مستقلی ندارید")}${noteAlarms.length?`<div class="section-label">📝⏰ آلارم یادداشت‌ها</div>`+noteAlarms.map(r=>{const accId="remnote-"+r.id;const isOpen=openAccordions.has(accId);return `<div class="item accordion-card${isOpen?' open':''}" data-acc-id="${accId}"><button class="accordion-head" type="button" aria-expanded="${isOpen}" onclick="toggleAccordion(this,event)"><span>📝 <b>${esc(r.title)}</b></span><span>⌄</span></button><div class="accordion-body"><div class="meta">${jalaliLabel(r.date)} • ${r.repeat==="once"?"یک‌بار":r.repeat==="weekly"?"هفتگی":"ماهانه"}</div></div></div>`}).join(""):``}`;}
  if($("noteList"))$("noteList").innerHTML=data.notes.map(noteHTML).join("")||empty("یادداشتی ندارید");
  if($("invoiceList"))$("invoiceList").innerHTML=data.invoices.map(invoiceHTML).join("")||empty("هنوز فاکتوری ساخته نشده است");
  if($("checkList"))$("checkList").innerHTML=data.checks.map(c=>`<div class="item"><div><b>${c.type==="receive"?"دریافتی":"پرداختی"} • ${esc(c.name)}</b><div class="meta">${jalaliLabel(c.date)}${c.bank?" • "+esc(c.bank):""}</div></div><div><strong>${money(c.amount)}</strong>${actionButtons("openCheck","deleteCheck",c.id)}</div></div>`).join("")||empty("چکی ثبت نشده");
@@ -929,4 +1052,4 @@ function drawChart(inc,exp){const c=$("chart");if(!c)return;const x=c.getContext
 function exportData(){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));a.download="hesabdar-backup.json";a.click();logEvent("پشتیبان‌گیری","فایل JSON صادر شد","settings")}
 function importData(e){const file=e.target.files?.[0];if(!file)return;const r=new FileReader();r.onload=async()=>{try{data=JSON.parse(r.result);normalizeData();await migratePinSecurity();data.audit??=[];data.notes??=[];save();logEvent("بازیابی اطلاعات","پشتیبان وارد شد","settings");showLock();alert("بازیابی شد")}catch{alert("فایل نامعتبر است")}};r.readAsText(file)}
 function clearData(){if(confirm("همه اطلاعات حذف شود؟")){const pin=data.pin,pinHash=data.pinHash,pinSalt=data.pinSalt;data=blankData();data.pin=pin;data.pinHash=pinHash;data.pinSalt=pinSalt;save();logEvent("پاک کردن اطلاعات","اطلاعات برنامه پاک شد","delete");}}
-(async function initApp(){normalizeData();await migratePinSecurity();showLock();render();renderBrandingInSettings();renderSettingsFeatures();createAutoBackup("اجرای برنامه");logEvent("اجرای برنامه","برنامه حسابدار اجرا شد","system");await initSync();if(!sync.auth){[4000,12000,30000].forEach(ms=>setTimeout(()=>{if(!sync.auth)initSync()},ms))}syncAllNotesToReminders().catch(console.error);rescheduleAllNativeReminders().catch(console.error);startUpdateChecker();startReminderChecker();})();
+(async function initApp(){normalizeData();await migratePinSecurity();showLock();render();applyDashboardConfig();renderBrandingInSettings();renderSettingsFeatures();createAutoBackup("اجرای برنامه");logEvent("اجرای برنامه","برنامه حسابدار اجرا شد","system");await initSync();if(!sync.auth){[4000,12000,30000].forEach(ms=>setTimeout(()=>{if(!sync.auth)initSync()},ms))}syncAllNotesToReminders().catch(console.error);rescheduleAllNativeReminders().catch(console.error);startUpdateChecker();startReminderChecker();})();

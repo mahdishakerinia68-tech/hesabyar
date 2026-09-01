@@ -21,7 +21,7 @@
   <div class="top-bar-left">
     <img class="app-logo" src="logo.png" alt="حساب‌یار">
     <div class="top-bar-titles">
-      <h1>حساب‌یار <span class="version-pill">5.0</span></h1>
+      <h1>حساب‌یار <span class="version-pill">5.1</span></h1>
       <div id="syncBadge" class="sync-badge">☁️ آفلاین</div>
     </div>
   </div>
@@ -33,27 +33,46 @@
 <main>
 
 <section id="home" class="page active">
-  <div class="hero">
-    <span>موجودی کل</span>
-    <strong id="balance">۰ تومان</strong>
-    <div id="dueSoon"></div>
+  <div class="section-head home-head"><h2>خانه</h2><button class="dash-customize-btn" onclick="openDashboardCustomize()">🎛</button></div>
+
+  <div class="dash-widget" data-widget="hero">
+    <div class="hero">
+      <span>موجودی کل</span>
+      <strong id="balance">۰ تومان</strong>
+      <div id="dueSoon"></div>
+    </div>
   </div>
-  <div class="grid">
-    <div class="card"><span>درآمد این ماه</span><b id="income" class="income">۰</b></div>
-    <div class="card"><span>هزینه این ماه</span><b id="expense" class="expense">۰</b></div>
+
+  <div class="dash-widget" data-widget="stats">
+    <div class="grid">
+      <div class="card"><span>درآمد این ماه</span><b id="income" class="income">۰</b></div>
+      <div class="card"><span>هزینه این ماه</span><b id="expense" class="expense">۰</b></div>
+    </div>
   </div>
-  <div class="grid">
-    <button onclick="openTx()">➕<span>تراکنش</span></button>
-    <button onclick="openReminder()">🔔<span>یادآوری</span></button>
+
+  <div class="dash-widget" data-widget="quick">
+    <div class="grid">
+      <button onclick="openTx()">➕<span>تراکنش</span></button>
+      <button onclick="openReminder()">🔔<span>یادآوری</span></button>
+    </div>
   </div>
-  <button class="invoice-home-btn" onclick="openInvoice()">🧾 صدور فاکتور جدید</button>
-  <div class="home-tools">
-    <button class="tool-card" onclick="openCalculator()">🧮<b>ماشین حساب</b><small>محاسبه سریع مبلغ</small></button>
-    <button class="tool-card" onclick="openQuickTx('expense')">💸<b>چند هزینه</b><small>ثبت پشت‌سرهم</small></button>
-    <button class="tool-card" onclick="openQuickTx('income')">💰<b>چند دریافتی</b><small>ثبت پشت‌سرهم</small></button>
+
+  <div class="dash-widget" data-widget="invoiceBtn">
+    <button class="invoice-home-btn" onclick="openInvoice()">🧾 صدور فاکتور جدید</button>
   </div>
-  <div class="section-head"><h2>آخرین تراکنش‌ها</h2></div>
-  <div id="recent"></div>
+
+  <div class="dash-widget" data-widget="tools">
+    <div class="home-tools">
+      <button class="tool-card" onclick="openCalculator()">🧮<b>ماشین حساب</b><small>محاسبه سریع مبلغ</small></button>
+      <button class="tool-card" onclick="openQuickTx('expense')">💸<b>چند هزینه</b><small>ثبت پشت‌سرهم</small></button>
+      <button class="tool-card" onclick="openQuickTx('income')">💰<b>چند دریافتی</b><small>ثبت پشت‌سرهم</small></button>
+    </div>
+  </div>
+
+  <div class="dash-widget" data-widget="recent">
+    <div class="section-head"><h2>آخرین تراکنش‌ها</h2></div>
+    <div id="recent"></div>
+  </div>
 </section>
 
 <section id="accounts" class="page">
@@ -233,7 +252,7 @@
     </div>
 
   </div>
-  <p class="hint settings-footer">نسخه <span id="appVersionText">5.0</span> • بکاپ خودکار • بروزرسانی • اتصال دو گوشی • تقویم شمسی کامل</p>
+  <p class="hint settings-footer">نسخه <span id="appVersionText">5.1</span> • بکاپ خودکار • بروزرسانی • اتصال دو گوشی • تقویم شمسی کامل</p>
   <p class="hint">تغییرات روی این گوشی ذخیره می‌شود و در صورت اتصال به Firebase با گوشی دوم ادغام می‌گردد.</p>
 </section>
 
@@ -306,11 +325,29 @@
   </div>
 </div>
 
+<div id="framerModal" class="modal framer-modal hidden">
+  <div class="sheet framer-sheet">
+    <div class="sheet-grabber"></div>
+    <button class="close" onclick="closeFramer()">×</button>
+    <h2>تنظیم عکس</h2>
+    <p class="hint">عکس را با انگشت جابه‌جا کن و با اسلایدر بزرگ‌نمایی کن تا دقیق داخل کادر جا شود.</p>
+    <div class="framer-stage-wrap">
+      <div id="framerStage" class="framer-stage"
+           onmousedown="framerPointerDown(event)" onmousemove="framerPointerMove(event)" onmouseup="framerPointerUp()" onmouseleave="framerPointerUp()"
+           ontouchstart="framerPointerDown(event)" ontouchmove="framerPointerMove(event)" ontouchend="framerPointerUp()">
+        <img id="framerImg" draggable="false" alt="پیش‌نمایش">
+      </div>
+    </div>
+    <input id="framerZoom" type="range" min="1" max="3" step="0.01" value="1" oninput="framerZoomChange(this.value)">
+    <button class="primary" onclick="confirmFramer()">✅ تایید و برش عکس</button>
+  </div>
+</div>
+
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="capacitor-local-notifications-bridge.js"></script>
 <script src="app.js"></script>
-<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js?v=5.0").catch(console.error)}</script>
+<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js?v=5.1").catch(console.error)}</script>
 </body>
 </html>

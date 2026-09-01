@@ -164,8 +164,8 @@ body:not(.dark) .card-number-box{background:#F2F2F7}
 .accordion-head{width:100%;border:none;background:transparent;padding:13px 14px;display:flex;justify-content:space-between;align-items:center;font:inherit;color:var(--label)}
 .accordion-head span:last-child{transition:transform .2s ease;color:var(--label2)}
 .accordion-card.open .accordion-head span:last-child{transform:rotate(180deg)}
-.accordion-body{max-height:0;overflow:hidden;transition:max-height .22s ease;padding:0 14px}
-.accordion-card.open .accordion-body{max-height:200px;padding-bottom:13px}
+.accordion-body{max-height:0;overflow:hidden;transition:max-height .25s ease;padding:0 14px}
+.accordion-card.open .accordion-body{max-height:600px;overflow-y:auto;padding-bottom:13px}
 .accordion-actions{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
 
 /* notes */
@@ -408,6 +408,32 @@ body:not(.dark) .audit-icon{background:#F2F2F7}
 input::placeholder,textarea::placeholder{color:var(--label3)}
 ::-webkit-scrollbar{width:0;height:0}
 body.dark select,body.dark option{color-scheme:dark}
+
+/* ===== Dashboard customization ===== */
+.home-head{margin-top:2px}
+.dash-customize-btn{background:var(--card)!important;color:var(--label)!important;border:.5px solid var(--sep)}
+.dash-widget{margin-bottom:2px}
+.dash-widget.dash-hidden{display:none}
+.dash-cfg-list{display:flex;flex-direction:column;gap:8px}
+.dash-cfg-row{display:flex;justify-content:space-between;align-items:center;background:var(--card);border:.5px solid var(--sep);border-radius:var(--radius-sm);padding:11px 12px}
+.dash-cfg-check{display:flex;align-items:center;gap:10px;font-size:13.5px}
+.dash-cfg-check input{width:20px;height:20px;accent-color:var(--blue)}
+.dash-cfg-move{display:flex;gap:6px}
+.dash-cfg-move button{width:30px;height:30px;border:none;border-radius:8px;background:var(--bg3);color:var(--label)}
+.dash-cfg-move button:disabled{opacity:.3}
+body:not(.dark) .dash-cfg-move button{background:#F2F2F7}
+
+/* ===== Image framer (Instagram/Telegram style crop box) ===== */
+.framer-sheet{max-width:360px;text-align:center}
+.framer-sheet h2{text-align:center;font-size:18px}
+.framer-stage-wrap{display:flex;justify-content:center;margin:14px 0}
+.framer-stage{
+  position:relative;overflow:hidden;background:#111;border-radius:16px;touch-action:none;
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.15);cursor:grab;
+}
+.framer-stage.framer-round{border-radius:50%}
+.framer-stage img{position:absolute;top:0;left:0;max-width:none;user-select:none;-webkit-user-drag:none}
+#framerZoom{width:100%;accent-color:var(--blue);margin:6px 0 4px}
 
 @media (min-width:640px){
   .tab-bar{max-width:600px}
