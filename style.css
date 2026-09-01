@@ -8,7 +8,6 @@
   --radius:14px; --radius-lg:20px; --radius-sm:10px;
   --shadow:0 1px 2px rgba(0,0,0,.04),0 8px 24px rgba(0,0,0,.05);
   --safe-t:env(safe-area-inset-top); --safe-b:env(safe-area-inset-bottom);
-  --tabbar-h:64px;
   color-scheme: light;
 }
 body.dark{
@@ -29,7 +28,7 @@ body{
 button,input,select,textarea{font-family:inherit}
 h1,h2,h3{margin:0}
 
-.app{max-width:600px;margin:0 auto;min-height:100vh;padding-bottom:calc(var(--tabbar-h) + var(--safe-b) + 18px)}
+.app{max-width:600px;margin:0 auto;min-height:100vh;padding-bottom:calc(var(--safe-b) + 18px)}
 
 /* ===== Top bar ===== */
 .top-bar{
@@ -51,6 +50,12 @@ h1,h2,h3{margin:0}
   font-size:16px;box-shadow:var(--shadow);color:var(--label);
 }
 .header-actions button:active{transform:scale(.92)}
+.menu-trigger{
+  width:36px;height:36px;flex-shrink:0;border:none;border-radius:50%;background:var(--card);
+  font-size:18px;font-weight:800;box-shadow:var(--shadow);color:var(--label);
+  display:flex;align-items:center;justify-content:center;line-height:1;
+}
+.menu-trigger:active{transform:scale(.92)}
 
 /* ===== Pages ===== */
 main{padding:0}
@@ -164,6 +169,7 @@ body:not(.dark) .card-number-box{background:#F2F2F7}
 .accordion-head{width:100%;border:none;background:transparent;padding:13px 14px;display:flex;justify-content:space-between;align-items:center;font:inherit;color:var(--label)}
 .accordion-head span:last-child{transition:transform .2s ease;color:var(--label2)}
 .accordion-card.open .accordion-head span:last-child{transform:rotate(180deg)}
+.accordion-head .note-count{display:inline-block;transform:none !important}
 .accordion-body{max-height:0;overflow:hidden;transition:max-height .25s ease;padding:0 14px}
 .accordion-card.open .accordion-body{max-height:600px;overflow-y:auto;padding-bottom:13px}
 .accordion-actions{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
@@ -187,23 +193,6 @@ body:not(.dark) .card-number-box{background:#F2F2F7}
 .category-window{display:flex;flex-wrap:wrap;gap:8px;max-height:220px;overflow:auto;padding:4px 2px}
 .cat-btn{border:.5px solid var(--sep);background:var(--card);padding:9px 14px;border-radius:999px;font-size:13px;color:var(--label)}
 .cat-btn.selected-cat{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:700}
-
-/* ===== Bottom tab bar (iPhone style) ===== */
-.tab-bar{
-  position:fixed; inset-inline:0; bottom:0; z-index:40; display:flex;
-  height:calc(var(--tabbar-h) + var(--safe-b)); padding-bottom:var(--safe-b);
-  background:color-mix(in srgb, var(--bg) 85%, transparent);
-  -webkit-backdrop-filter:saturate(180%) blur(20px); backdrop-filter:saturate(180%) blur(20px);
-  border-top:.5px solid var(--sep); max-width:600px; margin:0 auto;
-}
-.tab-btn{
-  flex:1; border:none; background:transparent; display:flex; flex-direction:column; align-items:center;
-  justify-content:center; gap:2px; color:var(--label2); font-size:10.5px; font-weight:600; padding-top:6px;
-}
-.tab-icon{font-size:21px; line-height:1}
-.tab-btn.active{color:var(--blue)}
-.tab-btn:active{opacity:.6}
-.tab-more-btn.active{color:var(--blue)}
 
 /* ===== Modals / sheets ===== */
 .modal{
@@ -319,19 +308,31 @@ body:not(.dark) .sheet .close{background:#E5E5EA}
 .cal-cell.cal-selected{background:var(--blue);color:#fff;font-weight:700}
 .cal-today-btn{width:100%;margin-top:10px;padding:11px;border:none;border-radius:var(--radius-sm);background:var(--bg3);color:var(--blue);font-weight:700}
 
-/* menu sheet */
-.menu-sheet{max-height:80vh}
-.menu-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
-.menu-groups{display:flex;flex-direction:column;gap:18px;margin-top:6px}
-.menu-group-title{font-size:12px;font-weight:700;color:var(--label2);margin-bottom:8px;padding-inline-start:2px}
-.menu-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-.menu-grid .nav{
-  display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 4px;border:none;
-  border-radius:var(--radius-sm);background:var(--card);border:.5px solid var(--sep);font-size:22px;color:var(--label);
+/* side menu drawer */
+.menu-modal{align-items:stretch;justify-content:flex-start}
+.menu-sheet{
+  width:82%;max-width:300px;height:100%;max-height:none;margin:0;border-radius:0;
+  box-shadow:6px 0 30px rgba(0,0,0,.28);
+  padding:calc(16px + var(--safe-t)) 14px calc(20px + var(--safe-b));
+  animation:sheet-in-side .26s cubic-bezier(.32,.72,0,1);
+  overflow-y:auto;
 }
-.menu-grid .nav span{font-size:10.5px;font-weight:600}
-.menu-grid .nav.active{background:color-mix(in srgb, var(--blue) 12%, transparent);border-color:var(--blue);color:var(--blue)}
-.menu-grid .nav:active{transform:scale(.95)}
+@keyframes sheet-in-side{from{transform:translateX(100%);opacity:.7}to{transform:none;opacity:1}}
+.menu-sheet .sheet-grabber{display:none}
+.menu-sheet .close{position:static;width:30px;height:30px}
+.menu-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.menu-head h2{font-size:19px}
+.menu-groups{display:flex;flex-direction:column;gap:16px;margin-top:4px}
+.menu-group-title{font-size:11.5px;font-weight:700;color:var(--label2);margin-bottom:6px;padding-inline-start:4px}
+.menu-grid{display:flex;flex-direction:column;gap:2px}
+.menu-grid .nav{
+  display:flex;flex-direction:row;align-items:center;gap:12px;width:100%;text-align:start;
+  padding:11px 10px;border:none;border-radius:var(--radius-sm);background:transparent;
+  font-size:19px;color:var(--label);
+}
+.menu-grid .nav span{font-size:14px;font-weight:600}
+.menu-grid .nav.active{background:color-mix(in srgb, var(--blue) 12%, transparent);color:var(--blue)}
+.menu-grid .nav:active{background:var(--bg3)}
 
 /* PIN lock screen */
 .lock{position:fixed;inset:0;z-index:999;background:linear-gradient(160deg,#0A84FF,#111827);display:flex;align-items:center;justify-content:center;padding:20px}
@@ -450,7 +451,3 @@ body:not(.dark) .dash-cfg-move button{background:#F2F2F7}
 .framer-stage.framer-round{border-radius:50%}
 .framer-stage img{position:absolute;top:0;left:0;max-width:none;user-select:none;-webkit-user-drag:none}
 #framerZoom{width:100%;accent-color:var(--blue);margin:6px 0 4px}
-
-@media (min-width:640px){
-  .tab-bar{max-width:600px}
-}
