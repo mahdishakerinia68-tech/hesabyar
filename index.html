@@ -21,7 +21,7 @@
   <div class="top-bar-left">
     <img class="app-logo" src="logo.png" alt="حساب‌یار">
     <div class="top-bar-titles">
-      <h1>حساب‌یار <span class="version-pill">5.1</span></h1>
+      <h1>حساب‌یار <span class="version-pill">5.2</span></h1>
       <div id="syncBadge" class="sync-badge">☁️ آفلاین</div>
     </div>
   </div>
@@ -178,7 +178,7 @@
   <p class="hint settings-intro">تنظیمات را به بخش‌های جدا تقسیم کرده‌ایم تا پیدا کردن هر گزینه راحت‌تر باشد.</p>
   <div class="settings settings-page">
 
-    <div class="settings-group card">
+    <div class="settings-group card" id="stgGroup-branding">
       <div class="settings-group-head"><span>🏪</span><div><h3>ظاهر فروشگاه و فاکتور</h3><p class="hint">نام فروشگاه، لوگو، مهر و امضا برای فاکتور.</p></div></div>
       <input id="brandStore" placeholder="نام فروشگاه"/>
       <label class="file-label">🖼 لوگوی فروشگاه<input id="brandLogo" type="file" accept="image/*" onchange="previewBrandFile(this,'logo')"></label>
@@ -190,18 +190,18 @@
       <div class="settings-actions"><button class="primary" onclick="saveBranding()">💾 ذخیره مشخصات فاکتور</button><button onclick="clearBranding()">🧹 حذف لوگو، مهر و امضا</button></div>
     </div>
 
-    <div class="settings-group card">
+    <div class="settings-group card" id="stgGroup-year">
       <div class="settings-group-head"><span>📅</span><div><h3>سال مالی</h3><p class="hint">بستن سال فقط وضعیت سال را ثبت می‌کند؛ بدهی و طلب پاک نمی‌شود.</p></div></div>
       <div id="yearSettlementBox"></div>
       <button onclick="settleCurrentYear()">☑️ تسویه کامل سال</button>
     </div>
 
-    <div class="settings-group card">
+    <div class="settings-group card" id="stgGroup-notif">
       <div class="settings-group-head"><span>🔔</span><div><h3>اعلان‌ها</h3><p class="hint">اعلان‌های یادآوری را فعال یا آزمایش کن.</p></div></div>
       <div class="settings-actions"><button onclick="requestNotifications()">🔔 فعال‌سازی اعلان‌ها</button><button onclick="testNotifications()">🧪 تست اعلان</button></div>
     </div>
 
-    <div class="settings-group card upgrade-card">
+    <div class="settings-group card upgrade-card" id="stgGroup-backup">
       <div class="settings-group-head"><span>🚀</span><div><h3>پشتیبان و بروزرسانی</h3><p class="hint">پشتیبان خودکار و بررسی نسخه جدید.</p></div></div>
       <label class="feature-row"><input id="autoBackupToggle" type="checkbox" onchange="setAutoBackupEnabled(this.checked)"><span><b>حالت اتوماتیک بکاپ</b><small>پشتیبان داخلی هر ۶ ساعت، حداکثر ۵ نسخه</small></span></label>
       <div id="autoBackupLast" class="hint"></div>
@@ -219,7 +219,7 @@
       <div id="updateStatus" class="hint"></div>
     </div>
 
-    <div class="settings-group card">
+    <div class="settings-group card" id="stgGroup-manualBackup">
       <div class="settings-group-head"><span>💾</span><div><h3>پشتیبان‌گیری دستی</h3><p class="hint">فایل اطلاعات را صادر یا از یک فایل قبلی بازیابی کن.</p></div></div>
       <div class="settings-actions">
         <button onclick="exportData()">📤 پشتیبان‌گیری</button>
@@ -229,7 +229,7 @@
       <input hidden id="import" type="file" accept=".json" onchange="importData(event)">
     </div>
 
-    <div class="settings-group card sync-box">
+    <div class="settings-group card sync-box" id="stgGroup-sync">
       <div class="settings-group-head"><span>☁️</span><div><h3>همگام‌سازی دو گوشی</h3><p class="hint">همین حساب را روی دو گوشی وارد کن تا اطلاعات مشترک باشند.</p></div></div>
       <input id="settingsSyncEmail" type="email" placeholder="ایمیل حساب مشترک" autocomplete="username">
       <input id="settingsSyncPass" type="password" placeholder="رمز حساب مشترک" autocomplete="current-password">
@@ -246,13 +246,13 @@
       </div>
     </div>
 
-    <div class="settings-group card security-group">
+    <div class="settings-group card security-group" id="stgGroup-security">
       <div class="settings-group-head"><span>🔐</span><div><h3>امنیت ورود</h3><p class="hint">رمز ورود برنامه را تنظیم یا حذف کن.</p></div></div>
       <div class="settings-actions"><button onclick="setPin()">🔐 گذاشتن / تغییر رمز ورود</button><button onclick="removePin()">🔓 حذف رمز ورود</button></div>
     </div>
 
   </div>
-  <p class="hint settings-footer">نسخه <span id="appVersionText">5.1</span> • بکاپ خودکار • بروزرسانی • اتصال دو گوشی • تقویم شمسی کامل</p>
+  <p class="hint settings-footer">نسخه <span id="appVersionText">5.2</span> • بکاپ خودکار • بروزرسانی • اتصال دو گوشی • تقویم شمسی کامل</p>
   <p class="hint">تغییرات روی این گوشی ذخیره می‌شود و در صورت اتصال به Firebase با گوشی دوم ادغام می‌گردد.</p>
 </section>
 
@@ -348,6 +348,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="capacitor-local-notifications-bridge.js"></script>
 <script src="app.js"></script>
-<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js?v=5.1").catch(console.error)}</script>
+<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js?v=5.2").catch(console.error)}</script>
 </body>
 </html>

@@ -414,6 +414,22 @@ body.dark select,body.dark option{color-scheme:dark}
 .dash-customize-btn{background:var(--card)!important;color:var(--label)!important;border:.5px solid var(--sep)}
 .dash-widget{margin-bottom:2px}
 .dash-widget.dash-hidden{display:none}
+.settings-shortcut{
+  width:100%;display:flex;align-items:center;gap:12px;text-align:right;
+  padding:14px 16px;margin:0 0 10px;background:var(--card);border:.5px solid var(--sep);
+  border-radius:var(--radius);box-shadow:var(--shadow);font-family:inherit;color:var(--label);
+}
+.settings-shortcut:active{transform:scale(.98)}
+.settings-shortcut-icon{font-size:20px;flex-shrink:0}
+.settings-shortcut-body{flex:1;display:flex;flex-direction:column;gap:2px;text-align:right}
+.settings-shortcut-body b{font-size:14px;font-weight:700}
+.settings-shortcut-body small{font-size:11.5px;color:var(--label2);line-height:1.5}
+.settings-shortcut-arrow{font-size:18px;color:var(--label2);flex-shrink:0}
+.settings-group-highlight{animation:stgHighlight 1.6s ease}
+@keyframes stgHighlight{
+  0%{box-shadow:0 0 0 3px var(--blue)}
+  100%{box-shadow:var(--shadow)}
+}
 .dash-cfg-list{display:flex;flex-direction:column;gap:8px}
 .dash-cfg-row{display:flex;justify-content:space-between;align-items:center;background:var(--card);border:.5px solid var(--sep);border-radius:var(--radius-sm);padding:11px 12px}
 .dash-cfg-check{display:flex;align-items:center;gap:10px;font-size:13.5px}

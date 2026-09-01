@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="5.1";
+const APP_VERSION="5.2";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
@@ -613,7 +613,7 @@ function deleteCustomer(id){if(!confirm("این مشتری حذف شود؟"))ret
 function customerStats(c){const inv=data.invoices.filter(x=>x.customerId===c.id);return {count:inv.length,total:inv.reduce((s,x)=>s+invoiceTotal(x),0),paid:inv.reduce((s,x)=>s+Number(x.paid||0),0),due:inv.reduce((s,x)=>s+invoiceRemaining(x),0)}}
 function renderCustomers(){const box=$("customerList");if(!box)return;box.innerHTML=data.customers.map(c=>{const st=customerStats(c);return `<div class="item"><div><b>👤 ${esc(c.name)}</b><div class="meta">${esc(c.phone||"بدون شماره")} • ${fa(st.count)} فاکتور</div><div class="meta">خرید: ${money(st.total)} • پرداخت: ${money(st.paid)} • مانده: ${money(st.due)}</div></div><div class="actions"><button onclick="openCustomer('${c.id}')">✏️</button><button onclick="exportCustomerExcel('${c.id}')">📊</button><button onclick="deleteCustomer('${c.id}')" class="danger-icon">🗑</button></div></div>`}).join("")||empty("هنوز مشتری ثبت نشده است")}
 function exportXLS(filename,headers,rows){const escHtml=v=>String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");const html=`<html><head><meta charset="UTF-8"></head><body><table><thead><tr>${headers.map(h=>`<th>${escHtml(h)}</th>`).join("")}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(v=>`<td>${escHtml(v)}</td>`).join("")}</tr>`).join("")}</tbody></table></body></html>`;const blob=new Blob(["\ufeff",html],{type:"application/vnd.ms-excel;charset=utf-8"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=filename.endsWith(".xls")?filename:filename+".xls";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000)}
-function exportAccountExcel(id){const a=data.accounts.find(x=>x.id===id);if(!a)return;const tx=data.transactions.filter(t=>t.accountID===id||t.from===id||t.to===id).sort((x,y)=>String(x.date).localeCompare(String(y.date)));const rows=tx.map(t=>{const kind=t.type==="income"?"دریافتی":t.type==="expense"?"پرداختی":"انتقال";const other=t.type==="transfer"?(t.destinationType==="other"?(t.otherName||"دیگران"):data.accounts.find(x=>x.id===t.to)?.name||""):"";const sign=t.type==="income"?Number(t.amount||0):(t.type==="expense"||t.from===id)?-Number(t.amount||0):Number(t.amount||0);return [jalaliLabel(t.date),kind,t.title||"",data.accounts.find(x=>x.id===t.accountID)?.name||a.name,other,sign,accountBalance(a.id)]});exportXLS(`گزارش-${a.name}`,['تاریخ','نوع','شرح','حساب','مقصد','مبلغ خالص','مانده حساب'],rows)}
+function exportAccountExcel(id){const a=data.accounts.find(x=>x.id===id);if(!a)return;const tx=data.transactions.filter(t=>t.accountID===id||t.from===id||t.to===id).sort((x,y)=>String(x.date).localeCompare(String(y.date)));const rows=tx.map(t=>{const kind=t.type==="income"?"دریافتی":t.type==="expense"?"پرداختی":"انتقال";const other=t.type==="transfer"?(t.destinationType==="other"?(t.otherName||"دیگران"):data.accounts.find(x=>x.id===t.to)?.name||""):"";const sign=t.type==="income"?Number(t.amount||0):(t.type==="expense"||t.from===id)?-Number(t.amount||0):Number(t.amount||0);return [jalaliDateTimeInput(t.date),kind,t.title||"",data.accounts.find(x=>x.id===t.accountID)?.name||a.name,other,sign,accountBalance(a.id)]});exportXLS(`گزارش-${a.name}`,['تاریخ و ساعت ثبت','نوع','شرح','حساب','مقصد','مبلغ خالص','مانده حساب'],rows)}
 function exportCustomerExcel(id){const c=data.customers.find(x=>x.id===id);if(!c)return;const inv=data.invoices.filter(x=>x.customerId===id);const rows=inv.map(x=>[invoiceDateLabel(x.date),x.number||"",x.name||"",invoiceTotal(x),Number(x.paid||0),invoiceRemaining(x),x.status==="paid"?"پرداخت کامل":x.status==="partial"?"پرداخت بخشی":"پرداخت نشده"]);exportXLS(`مشتری-${c.name}`,['تاریخ','شماره فاکتور','عنوان','مبلغ','پرداخت','مانده','وضعیت'],rows)}
 function exportAllCustomersExcel(){const rows=data.customers.map(c=>{const st=customerStats(c);return [c.name,c.phone||"",st.count,st.total,st.paid,st.due]});exportXLS('همه-مشتریان',['نام مشتری','شماره تماس','تعداد فاکتور','مجموع خرید','مجموع پرداخت','مانده'],rows)}
 
@@ -792,7 +792,7 @@ function saveQuickRows(){
 }
 function accountBalance(id){let a=data.accounts.find(x=>x.id===id),v=Number(a?.balance)||0;data.transactions.forEach(t=>{if(t.type==="income"&&t.accountID===id)v+=t.amount;if(t.type==="expense"&&t.accountID===id)v-=t.amount;if(t.type==="transfer"){if(t.from===id)v-=t.amount;if(t.destinationType!=="other"&&t.to===id)v+=t.amount}});return v}
 function actionButtons(editFn,deleteFn,id){return `<div class="actions"><button type="button" title="ویرایش" onclick="${editFn}(\'${id}\')">✏️</button><button type="button" class="danger-icon" title="حذف" onclick="${deleteFn}(\'${id}\')">🗑</button></div>`}
-function txHTML(t){if(t.type==="transfer"){const dest=t.destinationType==="other"?`👤 ${esc(t.otherName||"حساب دیگران")} • ${esc(t.otherCard||"")}`:`🏦 ${esc(data.accounts.find(a=>a.id===t.to)?.name||"")}`;return `<div class="item"><div><b>↔ ${esc(t.title)}</b><div class="meta">از ${esc(data.accounts.find(a=>a.id===t.from)?.name||"")} ← ${dest}</div></div><div><strong>${money(t.amount)}</strong>${actionButtons("openTransfer","deleteTx",t.id)}</div></div>`;}let a=data.accounts.find(x=>x.id===t.accountID),sign=t.type==="income"?"+":"−";return `<div class="item"><div><b>${esc(t.title)}</b><div class="meta">${esc(t.category||"")} • ${a?esc(a.name):""} • ${t.source==="bank"?"بانکی":"دستی"}</div>${t.image?`<img class="tx-thumb" src="${t.image}" alt="پیوست" onclick="viewImage('${t.id}')">`:""}</div><div><strong class="${t.type}">${sign}${money(t.amount)}</strong>${actionButtons("openTx","deleteTx",t.id)}</div></div>`}
+function txHTML(t){if(t.type==="transfer"){const dest=t.destinationType==="other"?`👤 ${esc(t.otherName||"حساب دیگران")} • ${esc(t.otherCard||"")}`:`🏦 ${esc(data.accounts.find(a=>a.id===t.to)?.name||"")}`;return `<div class="item"><div><b>↔ ${esc(t.title)}</b><div class="meta">از ${esc(data.accounts.find(a=>a.id===t.from)?.name||"")} ← ${dest}</div><div class="meta">${jalaliDateTimeInput(t.date)}</div></div><div><strong>${money(t.amount)}</strong>${actionButtons("openTransfer","deleteTx",t.id)}</div></div>`;}let a=data.accounts.find(x=>x.id===t.accountID),sign=t.type==="income"?"+":"−";return `<div class="item"><div><b>${esc(t.title)}</b><div class="meta">${esc(t.category||"")} • ${a?esc(a.name):""} • ${t.source==="bank"?"بانکی":"دستی"}</div><div class="meta">${jalaliDateTimeInput(t.date)}</div>${t.image?`<img class="tx-thumb" src="${t.image}" alt="پیوست" onclick="viewImage('${t.id}')">`:""}</div><div><strong class="${t.type}">${sign}${money(t.amount)}</strong>${actionButtons("openTx","deleteTx",t.id)}</div></div>`}
 function viewImage(id){const t=data.transactions.find(x=>x.id===id);if(!t?.image)return;openModal(`<h2>📎 تصویر پیوست</h2><div class="attachment-large"><img src="${t.image}" alt="پیوست"></div>`)}
 function empty(s){return `<div class="card" style="text-align:center">${s}</div>`}
 
@@ -965,7 +965,21 @@ function confirmFramer(){
 }
 
 /* ===== Dashboard customization ===== */
-const DASH_WIDGETS=[{id:"hero",label:"موجودی کل"},{id:"stats",label:"درآمد و هزینه این ماه"},{id:"quick",label:"دکمه تراکنش و یادآوری"},{id:"invoiceBtn",label:"دکمه صدور فاکتور"},{id:"tools",label:"ابزارهای سریع (ماشین‌حساب و ثبت گروهی)"},{id:"recent",label:"آخرین تراکنش‌ها"}];
+const DASH_WIDGETS=[
+ {id:"hero",label:"موجودی کل"},
+ {id:"stats",label:"درآمد و هزینه این ماه"},
+ {id:"quick",label:"دکمه تراکنش و یادآوری"},
+ {id:"invoiceBtn",label:"دکمه صدور فاکتور"},
+ {id:"tools",label:"ابزارهای سریع (ماشین‌حساب و ثبت گروهی)"},
+ {id:"recent",label:"آخرین تراکنش‌ها"},
+ {id:"stgBranding",label:"🔧 ظاهر فروشگاه و فاکتور",settingsIcon:"🏪",settingsHint:"نام فروشگاه، لوگو، مهر و امضا برای فاکتور.",settingsTarget:"stgGroup-branding"},
+ {id:"stgYear",label:"🔧 سال مالی",settingsIcon:"📅",settingsHint:"وضعیت تسویه سال مالی جاری.",settingsTarget:"stgGroup-year"},
+ {id:"stgNotif",label:"🔧 اعلان‌ها",settingsIcon:"🔔",settingsHint:"فعال‌سازی و تست اعلان یادآوری‌ها.",settingsTarget:"stgGroup-notif"},
+ {id:"stgBackup",label:"🔧 پشتیبان و بروزرسانی",settingsIcon:"🚀",settingsHint:"بکاپ خودکار و بررسی نسخه جدید.",settingsTarget:"stgGroup-backup"},
+ {id:"stgManualBackup",label:"🔧 پشتیبان‌گیری دستی",settingsIcon:"💾",settingsHint:"خروجی یا بازیابی فایل اطلاعات.",settingsTarget:"stgGroup-manualBackup"},
+ {id:"stgSync",label:"🔧 همگام‌سازی دو گوشی",settingsIcon:"☁️",settingsHint:"وضعیت اتصال و ارسال/دریافت ابری.",settingsTarget:"stgGroup-sync"},
+ {id:"stgSecurity",label:"🔧 امنیت ورود",settingsIcon:"🔐",settingsHint:"رمز ورود برنامه را تنظیم یا حذف کن.",settingsTarget:"stgGroup-security"},
+];
 function dashboardConfig(){
  data.dashboardConfig??={};
  if(!Array.isArray(data.dashboardConfig.order)||!data.dashboardConfig.order.length)data.dashboardConfig.order=DASH_WIDGETS.map(w=>w.id);
@@ -973,7 +987,29 @@ function dashboardConfig(){
  if(!Array.isArray(data.dashboardConfig.hidden))data.dashboardConfig.hidden=[];
  return data.dashboardConfig;
 }
+function settingsShortcutHTML(w){
+ return `<div class="dash-widget" data-widget="${w.id}"><button type="button" class="card settings-shortcut" onclick="goToSettingsGroup('${w.settingsTarget}')"><span class="settings-shortcut-icon">${w.settingsIcon}</span><span class="settings-shortcut-body"><b>${esc(w.label.replace('🔧 ',''))}</b><small>${esc(w.settingsHint)}</small></span><span class="settings-shortcut-arrow">‹</span></button></div>`;
+}
+function ensureDashWidgetElements(){
+ const home=$("home");if(!home)return;
+ for(const w of DASH_WIDGETS){
+  if(!w.settingsTarget)continue;
+  if(home.querySelector(`.dash-widget[data-widget="${w.id}"]`))continue;
+  home.insertAdjacentHTML("beforeend",settingsShortcutHTML(w));
+ }
+}
+function goToSettingsGroup(targetId){
+ const navBtn=document.querySelector('.nav[data-page="settings"]');
+ if(navBtn)navBtn.click();
+ setTimeout(()=>{
+  const el=$(targetId);if(!el)return;
+  el.scrollIntoView({behavior:"smooth",block:"start"});
+  el.classList.add("settings-group-highlight");
+  setTimeout(()=>el.classList.remove("settings-group-highlight"),1600);
+ },260);
+}
 function applyDashboardConfig(){
+ ensureDashWidgetElements();
  const cfg=dashboardConfig();const home=$("home");if(!home)return;
  const afterHead=home.querySelector(".home-head");
  for(const id of cfg.order){
@@ -1046,7 +1082,7 @@ function renderAdvancedReport(){
  const fiISO=from?jalaliToISO(from):"", tiISO=to?jalaliToISO(to):"";
  if(fiISO)rows=rows.filter(t=>String(t.date||"")>=fiISO); if(tiISO)rows=rows.filter(t=>String(t.date||"")<=tiISO+"T23:59:59");
  const income=rows.filter(t=>t.type==="income").reduce((s,t)=>s+Number(t.amount||0),0), expense=rows.filter(t=>t.type==="expense").reduce((s,t)=>s+Number(t.amount||0),0);
- box.innerHTML=`<div class="report-summary"><div><span>دریافتی</span><b class="income">${money(income)}</b></div><div><span>هزینه</span><b class="expense">${money(expense)}</b></div><div><span>خالص</span><b>${money(income-expense)}</b></div></div><div class="report-table">${rows.slice(0,100).map(t=>`<div class="report-row"><span>${esc(t.title||"تراکنش")}<small>${jalaliLabel(t.date)} • ${esc(t.category||"")}</small></span><strong class="${t.type}">${t.type==="income"?"+":"−"}${money(t.amount)}</strong></div>`).join("")||`<p class="hint">موردی با این فیلتر پیدا نشد.</p>`}</div>`;
+ box.innerHTML=`<div class="report-summary"><div><span>دریافتی</span><b class="income">${money(income)}</b></div><div><span>هزینه</span><b class="expense">${money(expense)}</b></div><div><span>خالص</span><b>${money(income-expense)}</b></div></div><div class="report-table">${rows.slice(0,100).map(t=>`<div class="report-row"><span>${esc(t.title||"تراکنش")}<small>${jalaliDateTimeInput(t.date)} • ${esc(t.category||"")}</small></span><strong class="${t.type}">${t.type==="income"?"+":"−"}${money(t.amount)}</strong></div>`).join("")||`<p class="hint">موردی با این فیلتر پیدا نشد.</p>`}</div>`;
 }
 function drawChart(inc,exp){const c=$("chart");if(!c)return;const x=c.getContext("2d"),w=c.width,h=c.height;x.clearRect(0,0,w,h);const max=Math.max(inc,exp,1);[[inc,"درآمد"],[exp,"هزینه"]].forEach((v,i)=>{const bh=v[0]/max*170;x.fillStyle=i?"#ef4444":"#22c55e";x.fillRect(150+i*190,h-45-bh,90,bh);x.fillStyle="#374151";x.font="20px sans-serif";x.fillText(v[1],155+i*190,h-12)})}
 function exportData(){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));a.download="hesabdar-backup.json";a.click();logEvent("پشتیبان‌گیری","فایل JSON صادر شد","settings")}
