@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="5.3";
+const APP_VERSION="5.4";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
@@ -30,13 +30,14 @@ function createAutoBackup(reason="زمان‌بندی"){try{if(!autoBackupEnable
 function getAutoBackupInfo(){try{const last=localStorage.getItem(AUTO_BACKUP_KEY+"-last");return last?new Date(last):null}catch{return null}}
 function restoreLatestAutoBackup(){try{const list=JSON.parse(localStorage.getItem(AUTO_BACKUP_KEY)||"[]"); if(!list.length)return alert("هنوز پشتیبان خودکاری وجود ندارد."); if(!confirm("آخرین پشتیبان خودکار جایگزین اطلاعات فعلی شود؟"))return; data=list[0].data; normalizeData(); save(); logEvent("بازیابی پشتیبان خودکار",new Date(list[0].at).toLocaleString("fa-IR"),"settings"); alert("آخرین پشتیبان خودکار بازیابی شد.")}catch(e){alert("پشتیبان خودکار قابل بازیابی نیست.")}}
 function normalizeData(){data=data||blankData(); for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats","audit"]){data[k]??=[];} data.pin=typeof data.pin==="string"?data.pin:""; data.pinHash=typeof data.pinHash==="string"?data.pinHash:""; data.pinSalt=typeof data.pinSalt==="string"?data.pinSalt:""; data.branding??={storeName:"",logo:"",stamp:"",signature:""}; data.yearSettlements??={}; data._sync??={tombstones:{}}; data._sync.tombstones??={}; for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats"]){for(const r of data[k]){r.id??=uid();r.updatedAt??=new Date().toISOString();}}}
-function renderSettingsFeatures(){const e=$("autoBackupToggle");if(e)e.checked=autoBackupEnabled(); const last=$("autoBackupLast"); if(last){const d=getAutoBackupInfo();last.textContent=d?"آخرین پشتیبان: "+d.toLocaleString("fa-IR"):"هنوز پشتیبان خودکاری ساخته نشده";} const v=$("appVersionText");if(v)v.textContent=APP_VERSION;}
+function renderSettingsFeatures(){const e=$("autoBackupToggle");if(e)e.checked=autoBackupEnabled(); const last=$("autoBackupLast"); if(last){const d=getAutoBackupInfo();last.textContent=d?"آخرین پشتیبان: "+d.toLocaleString("fa-IR"):"هنوز پشتیبان خودکاری ساخته نشده";} const v=$("appVersionText");if(v)v.textContent=APP_VERSION; const vp=$("versionPill");if(vp)vp.textContent=APP_VERSION;}
 function setSyncStatus(t){const e=$("syncStatus");if(e)e.textContent=t||"";const b=$("syncBadge");if(!b)return;const s=String(t||"");let cls="offline",label="☁️ آفلاین";if(s.includes("آنلاین")||s.includes("انجام شد")||s.includes("متصل است")){cls="online";label="☁️ متصل"}else if(s.includes("⚠️")||s.includes("ناموفق")){cls="error";label="⚠️ خطای اتصال"}else if(s.includes("در حال")||s.includes("بررسی")){cls="pending";label="☁️ در حال اتصال..."}else if(s.includes("وارد شوید")||s.includes("ابتدا")){cls="offline";label="☁️ واردنشده"}b.textContent=label;b.className="sync-badge "+cls}
 
 const defaultsExpense=["بنزین","غذا و رستوران","خرید خانه","خرید روزانه","قبض","اینترنت و شارژ","حمل‌ونقل","پوشاک","درمان","تفریح","هدیه","سایر"];
 const defaultsIncome=["حقوق","پاداش","واریز","فروش","دریافت از شخص","سایر"];
 const $=id=>document.getElementById(id);
 const fa=n=>new Intl.NumberFormat("fa-IR").format(Number(n)||0);
+function debounce(fn,ms=150){let t;return(...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms)}}
 const money=n=>fa(n)+" تومان";
 const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
 // Jalali date helpers (UI uses Persian dates; storage remains ISO/Gregorian for compatibility).
@@ -455,16 +456,36 @@ async function removePin(){
 
 function tapFeedback(){try{if(navigator.vibrate)navigator.vibrate(8)}catch(e){}}
 document.addEventListener("click",e=>{if(e.target.closest("button,.nav"))tapFeedback()},{passive:true});
+
+/* ---- Page navigation with back-history (supports hardware/gesture back) ---- */
+let pageHistory=["home"];
+function activatePage(name){
+ document.querySelectorAll(".nav").forEach(x=>x.classList.remove("active"));
+ document.querySelectorAll(`.nav[data-page="${name}"]`).forEach(x=>x.classList.add("active"));
+ document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));
+ const page=$(name);
+ if(page)page.classList.add("active");
+ render();
+ return page;
+}
+function goToPage(name,fromNav){
+ if(!$(name))return;
+ const page=activatePage(name);
+ if(pageHistory[pageHistory.length-1]!==name)pageHistory.push(name);
+ if(fromNav)closeMenu();
+ logEvent("ورود به بخش",page?.querySelector("h2")?.textContent||name,"nav");
+}
+function goBackPage(){
+ if(pageHistory.length>1){
+  pageHistory.pop();
+  activatePage(pageHistory[pageHistory.length-1]);
+  return true;
+ }
+ return false;
+}
 document.querySelectorAll(".nav").forEach(b=>b.addEventListener("click",e=>{
  e.preventDefault();
- document.querySelectorAll(".nav").forEach(x=>x.classList.remove("active"));
- document.querySelectorAll(`.nav[data-page="${b.dataset.page}"]`).forEach(x=>x.classList.add("active"));
- document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));
- const page=$(b.dataset.page);
- if(page)page.classList.add("active");
- closeMenu();
- render();
- logEvent("ورود به بخش",page?.querySelector("h2")?.textContent||b.textContent.trim(),"nav");
+ goToPage(b.dataset.page,true);
 }));
 document.addEventListener("input",e=>{if(e.target.closest("#invoiceRows"))updateInvoiceLiveTotal()});
 $("theme").onclick=()=>{const dark=document.body.classList.toggle("dark");logEvent("تغییر تم",dark?"حالت شیشه‌ای تیره فعال شد":"حالت شیشه‌ای روشن فعال شد","settings")};
@@ -477,6 +498,44 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeMenu()});
 const modal=$("modal"),modalBody=$("modalBody");
 function openModal(html){modalBody.innerHTML=html;modal.classList.remove("hidden")}
 function closeModal(){modal.classList.add("hidden")}
+
+/* ---- Swipe-back / hardware-back gesture, like iOS & Android: swiping in
+ * from either screen edge (or pressing the system/browser back button)
+ * closes whatever sheet is open, or returns to the previous page — it
+ * never leaves or reloads the app. A single "trap" history entry is kept
+ * so this works reliably no matter how many sheets are stacked, without
+ * needing every close-button call site to manage history itself. ---- */
+function closeTopOverlay(){
+ if(!$("framerModal")?.classList.contains("hidden")){closeFramer();return true}
+ if(!$("calModal")?.classList.contains("hidden")){closeCalModal();return true}
+ if(!$("modal")?.classList.contains("hidden")){closeModal();return true}
+ if(!$("menuModal")?.classList.contains("hidden")){closeMenu();return true}
+ return false;
+}
+function performBack(){
+ if(closeTopOverlay())return true;
+ return goBackPage();
+}
+function armBackTrap(){try{history.pushState({hesabdarTrap:true},"",location.href)}catch(e){}}
+try{history.replaceState({hesabdarRoot:true},"",location.href)}catch(e){}
+armBackTrap();
+window.addEventListener("popstate",()=>{performBack();armBackTrap()});
+(function initSwipeBack(){
+ const EDGE=28,THRESH=65,MAXV_RATIO=.55;
+ let sx=0,sy=0,active=false;
+ document.addEventListener("touchstart",e=>{
+  if(e.touches.length!==1)return;
+  const t=e.touches[0];
+  sx=t.clientX;sy=t.clientY;
+  active=(sx<=EDGE||sx>=window.innerWidth-EDGE);
+ },{passive:true});
+ document.addEventListener("touchend",e=>{
+  if(!active)return;active=false;
+  const t=e.changedTouches[0];
+  const dx=t.clientX-sx,dy=Math.abs(t.clientY-sy);
+  if(Math.abs(dx)>THRESH&&dy<Math.abs(dx)*MAXV_RATIO)performBack();
+ },{passive:true});
+})();
 
 function touch(r){r.updatedAt=new Date().toISOString();r.updatedBy=sync.user?.uid||deviceId();return r}
 function markDeleted(type,id){data._sync??={tombstones:{}};data._sync.tombstones??={};data._sync.tombstones[type]??={};const dt=new Date().toISOString();data._sync.tombstones[type][id]=dt;markDirty(type,id,true,{id},dt)}
@@ -791,7 +850,7 @@ function saveQuickRows(){
   for(const row of rows){const amount=parseMoney(row.querySelector(".quick-amount")?.value);if(!amount)continue;const category=row.querySelector(".quick-cat")?.value||"سایر";const title=row.querySelector(".quick-title")?.value.trim()||category;const accountID=row.querySelector(".quick-account")?.value||data.accounts[0]?.id;if(!accountID)continue;const nt=touch({id:uid(),title,amount,type:quickTxType,category,accountID,date:new Date().toISOString(),source:"quick"});data.transactions.unshift(nt);markDirty("transactions",nt.id,false,nt,nt.updatedAt);logEvent(quickTxType==="expense"?"ثبت هزینه سریع":"ثبت دریافتی سریع",`${title} • ${money(amount)} • ${data.accounts.find(a=>a.id===accountID)?.name||""}`,"create");count++}
   if(!count)return alert("مبلغ حداقل یک مورد را وارد کن");save();closeModal();render();
 }
-function accountBalance(id){let a=data.accounts.find(x=>x.id===id),v=Number(a?.balance)||0;data.transactions.forEach(t=>{if(t.type==="income"&&t.accountID===id)v+=t.amount;if(t.type==="expense"&&t.accountID===id)v-=t.amount;if(t.type==="transfer"){if(t.from===id)v-=t.amount;if(t.destinationType!=="other"&&t.to===id)v+=t.amount}});return v}
+function accountBalance(id){let a=data.accounts.find(x=>x.id===id),v=Number(a?.balance)||0;data.transactions.forEach(t=>{const amt=Number(t.amount)||0;if(t.type==="income"&&t.accountID===id)v+=amt;if(t.type==="expense"&&t.accountID===id)v-=amt;if(t.type==="transfer"){if(t.from===id)v-=amt;if(t.destinationType!=="other"&&t.to===id)v+=amt}});return v}
 function actionButtons(editFn,deleteFn,id){return `<div class="actions"><button type="button" title="ویرایش" onclick="${editFn}(\'${id}\')">✏️</button><button type="button" class="danger-icon" title="حذف" onclick="${deleteFn}(\'${id}\')">🗑</button></div>`}
 function txHTML(t){if(t.type==="transfer"){const dest=t.destinationType==="other"?`👤 ${esc(t.otherName||"حساب دیگران")} • ${esc(t.otherCard||"")}`:`🏦 ${esc(data.accounts.find(a=>a.id===t.to)?.name||"")}`;return `<div class="item"><div><b>↔ ${esc(t.title)}</b><div class="meta">از ${esc(data.accounts.find(a=>a.id===t.from)?.name||"")} ← ${dest}</div><div class="meta">${jalaliDateTimeInput(t.date)}</div></div><div><strong>${money(t.amount)}</strong>${actionButtons("openTransfer","deleteTx",t.id)}</div></div>`;}let a=data.accounts.find(x=>x.id===t.accountID),sign=t.type==="income"?"+":"−";return `<div class="item"><div><b>${esc(t.title)}</b><div class="meta">${esc(t.category||"")} • ${a?esc(a.name):""} • ${t.source==="bank"?"بانکی":"دستی"}</div><div class="meta">${jalaliDateTimeInput(t.date)}</div>${t.image?`<img class="tx-thumb" src="${t.image}" alt="پیوست" onclick="viewImage('${t.id}')">`:""}</div><div><strong class="${t.type}">${sign}${money(t.amount)}</strong>${actionButtons("openTx","deleteTx",t.id)}</div></div>`}
 function viewImage(id){const t=data.transactions.find(x=>x.id===id);if(!t?.image)return;openModal(`<h2>📎 تصویر پیوست</h2><div class="attachment-large"><img src="${t.image}" alt="پیوست"></div>`)}
@@ -1055,7 +1114,7 @@ function settleCurrentYear(){const y=currentJalaliYear();const debt=data.people.
 function renderYearSettlement(){const box=$("yearSettlementBox");if(!box)return;const y=currentJalaliYear(),st=data.yearSettlements?.[y];const debt=data.people.filter(p=>p.type==="debt").reduce((s,p)=>s+Math.max(0,(Number(p.amount)||0)-(Number(p.paid)||0)),0),credit=data.people.filter(p=>p.type==="credit").reduce((s,p)=>s+Math.max(0,(Number(p.amount)||0)-(Number(p.paid)||0)),0);const rb=$("yearStatusReport");if(rb)rb.innerHTML=st?.settled?`<div class="card settlement-ok">🟢 سال ${fa(y)} تسویه شده است.</div>`:`<div class="card settlement-pending">🟡 سال ${fa(y)} هنوز تسویه نشده است.</div>`;box.innerHTML=st?.settled?`<div class="settlement-ok">🟢 سال ${fa(y)} تسویه شده است.</div>`:`<div class="settlement-pending">🟡 سال ${fa(y)} هنوز تسویه نشده است.<br>بدهی: ${money(debt)} • طلب: ${money(credit)}<br><small>بدهی‌ها و مطالبات تا تسویه کامل باقی می‌مانند.</small></div>`}
 function renderBrandingInSettings(){loadBrandingSettings();renderYearSettlement()}
 function render(){
- const inc=data.transactions.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0),exp=data.transactions.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0),base=data.accounts.reduce((s,a)=>s+(Number(a.balance)||0),0),net=inc-exp;
+ const inc=data.transactions.filter(t=>t.type==="income").reduce((s,t)=>s+(Number(t.amount)||0),0),exp=data.transactions.filter(t=>t.type==="expense").reduce((s,t)=>s+(Number(t.amount)||0),0),base=data.accounts.reduce((s,a)=>s+(Number(a.balance)||0),0),net=inc-exp;
  if($("balance"))$("balance").textContent=money(base+net);if($("income"))$("income").textContent=money(inc);if($("expense"))$("expense").textContent=money(exp);
  if($("recent"))$("recent").innerHTML=data.transactions.slice(0,6).map(txHTML).join("")||empty("هنوز تراکنشی ثبت نشده");
  if($("accountList"))$("accountList").innerHTML=data.accounts.map(a=>`<div class="item account-item"><div class="account-main"><b>${esc(a.name)}</b><div class="meta">${esc(a.bank||"حساب شخصی")}${a.sender?" • فرستنده: "+esc(a.sender):""}</div>${cardActions(a)}</div><div><strong>${money(accountBalance(a.id))}</strong>${actionButtons("openAccount","deleteAccount",a.id)}<button type="button" title="گزارش Excel" onclick="exportAccountExcel('${a.id}')">📊</button></div></div>`).join("")||empty("هنوز حسابی اضافه نشده");
@@ -1070,10 +1129,11 @@ function render(){
  if($("invoiceList"))$("invoiceList").innerHTML=data.invoices.map(invoiceHTML).join("")||empty("هنوز فاکتوری ساخته نشده است");
  if($("checkList"))$("checkList").innerHTML=data.checks.map(c=>`<div class="item"><div><b>${c.type==="receive"?"دریافتی":"پرداختی"} • ${esc(c.name)}</b><div class="meta">${jalaliLabel(c.date)}${c.bank?" • "+esc(c.bank):""}</div></div><div><strong>${money(c.amount)}</strong>${actionButtons("openCheck","deleteCheck",c.id)}</div></div>`).join("")||empty("چکی ثبت نشده");
  if($("categoryList"))$("categoryList").innerHTML='<div class="card"><b>هزینه‌ها</b><p>'+data.expenseCats.map(c=>esc(c.name)).join(" • ")+'</p><b>دریافت‌ها</b><p>'+data.incomeCats.map(c=>esc(c.name)).join(" • ")+'</p></div>';
- const debt=data.people.filter(p=>p.type==="debt").reduce((s,p)=>s+p.amount-p.paid,0),credit=data.people.filter(p=>p.type==="credit").reduce((s,p)=>s+p.amount-p.paid,0);
+ const debt=data.people.filter(p=>p.type==="debt").reduce((s,p)=>s+((Number(p.amount)||0)-(Number(p.paid)||0)),0),credit=data.people.filter(p=>p.type==="credit").reduce((s,p)=>s+((Number(p.amount)||0)-(Number(p.paid)||0)),0);
  if($("totalDebt"))$("totalDebt").textContent=money(debt);if($("totalCredit"))$("totalCredit").textContent=money(credit);
  if($("reportStats")){const now=new Date(),m=now.getMonth(),y=now.getFullYear();const mt=data.transactions.filter(t=>{const d=new Date(t.date);return !isNaN(d)&&d.getMonth()===m&&d.getFullYear()===y});const mi=mt.filter(t=>t.type==="income").reduce((s,t)=>s+Number(t.amount||0),0),me=mt.filter(t=>t.type==="expense").reduce((s,t)=>s+Number(t.amount||0),0);const cats={};mt.filter(t=>t.type==="expense").forEach(t=>cats[t.category||"سایر"]=(cats[t.category||"سایر"]||0)+Number(t.amount||0));const top=Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,5);$("reportStats").innerHTML=`<div class="grid"><div class="card"><span>تعداد تراکنش</span><b>${fa(data.transactions.length)}</b></div><div class="card"><span>تعداد چک</span><b>${fa(data.checks.length)}</b></div><div class="card"><span>درآمد این ماه</span><b class="income">${money(mi)}</b></div><div class="card"><span>هزینه این ماه</span><b class="expense">${money(me)}</b></div></div><div class="card report-card"><h3>📊 بیشترین دسته‌های هزینه این ماه</h3>${top.map((x,i)=>`<div class="report-row"><span>${fa(i+1)}. ${esc(x[0])}</span><strong>${money(x[1])}</strong></div>`).join("")||`<p class="hint">هنوز هزینه‌ای در این ماه ثبت نشده.</p>`}</div><div class="card report-card"><h3>🏦 مانده حساب‌ها</h3>${data.accounts.map(a=>`<div class="report-row"><span>${esc(a.name)}</span><strong>${money(accountBalance(a.id))}</strong></div>`).join("")||`<p class="hint">حسابی ثبت نشده.</p>`}</div>`;}
  drawChart(inc,exp);renderAudit();renderAdvancedReport();renderYearSettlement();renderDueSoon();if($("settings" )?.classList.contains("active"))renderBrandingInSettings()}
+const renderDebounced=debounce(render,120);
 function renderAdvancedReport(){
  const box=$("advancedReport"); if(!box)return;
  const type=$("reportType")?.value||"all", account=$("reportAccount")?.value||"", from=$("reportFrom")?.value||"", to=$("reportTo")?.value||"";
