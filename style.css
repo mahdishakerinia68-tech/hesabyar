@@ -17,18 +17,23 @@ body.dark{
   --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);
   color-scheme: dark;
 }
-*{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
-html{background:var(--bg)}
+*{box-sizing:border-box; -webkit-tap-highlight-color: transparent; min-width:0;}
+html{background:var(--bg); overflow-x:hidden}
 body{
   margin:0; min-height:100vh; background:var(--bg); color:var(--label);
   font-family:"Vazirmatn",-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Tahoma,sans-serif;
-  -webkit-font-smoothing:antialiased; overscroll-behavior-y:none;
+  -webkit-font-smoothing:antialiased; overscroll-behavior-y:none; overscroll-behavior-x:none;
   transition:background .25s ease,color .25s ease;
+  overflow-x:hidden; width:100%;
 }
-button,input,select,textarea{font-family:inherit}
+button,input,select,textarea{font-family:inherit;max-width:100%}
 h1,h2,h3{margin:0}
+img,svg,canvas{max-width:100%}
 
-.app{max-width:600px;margin:0 auto;min-height:100vh;padding-bottom:calc(var(--safe-b) + 18px)}
+/* Nothing in the app should ever be wide enough to need a horizontal drag —
+   every page and every sheet clips instead of scrolling sideways. */
+.app,main,.page,.sheet,.modal{overflow-x:hidden}
+.app{max-width:600px;margin:0 auto;min-height:100vh;padding-bottom:calc(var(--safe-b) + 18px);width:100%}
 
 /* ===== Top bar ===== */
 .top-bar{
@@ -71,7 +76,7 @@ main{padding:0}
   color:#fff;box-shadow:0 14px 30px rgba(10,132,255,.28);position:relative;overflow:hidden;
 }
 .hero span{font-size:13px;opacity:.85;font-weight:500}
-.hero strong{display:block;font-size:32px;margin-top:6px;font-weight:800;letter-spacing:-.5px}
+.hero strong{display:block;font-size:clamp(22px,7vw,32px);margin-top:6px;font-weight:800;letter-spacing:-.5px;overflow-wrap:break-word;word-break:break-word}
 .hero #dueSoon:not(:empty){margin-top:12px;font-size:12.5px;background:rgba(255,255,255,.16);padding:8px 12px;border-radius:12px;display:inline-block}
 
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
@@ -80,7 +85,7 @@ main{padding:0}
   box-shadow:var(--shadow);
 }
 .card span{font-size:12.5px;color:var(--label2);font-weight:500}
-.card b{display:block;margin-top:6px;font-size:19px;font-weight:700}
+.card b{display:block;margin-top:6px;font-size:19px;font-weight:700;overflow-wrap:break-word;word-break:break-word}
 .card.hint{font-size:13px;color:var(--label2);line-height:1.9}
 
 .grid>button{
@@ -121,8 +126,8 @@ body.dark .invoice-home-btn{background:#fff;color:#000}
   margin:8px 0;display:flex;justify-content:space-between;align-items:center;gap:10px;box-shadow:var(--shadow);
 }
 .item.compact{padding:10px 12px}
-.item b{font-weight:700;font-size:14.5px}
-.meta{color:var(--label2);font-size:12px;margin-top:3px;line-height:1.6}
+.item b{font-weight:700;font-size:14.5px;overflow-wrap:break-word;word-break:break-word}
+.meta{color:var(--label2);font-size:12px;margin-top:3px;line-height:1.6;overflow-wrap:break-word;word-break:break-word}
 .income{color:var(--green)!important} .expense{color:var(--red)!important}
 strong.income,strong.expense{font-size:15px}
 
@@ -251,8 +256,24 @@ body:not(.dark) .sheet .close{background:#E5E5EA}
 /* invoice builder */
 .invoice-table-head{display:grid;grid-template-columns:1.1fr 1.6fr .7fr .9fr .3fr;gap:6px;font-size:10.5px;color:var(--label2);padding:0 4px;font-weight:700}
 .invoice-row{display:grid;grid-template-columns:1.1fr 1.6fr .7fr .9fr .3fr;gap:6px;align-items:center}
-.invoice-row select,.invoice-row input{padding:9px 8px;font-size:12.5px;border-radius:9px;border:.5px solid var(--sep);background:var(--card);color:var(--label);width:100%}
+.invoice-row select,.invoice-row input{padding:9px 8px;font-size:12.5px;border-radius:9px;border:.5px solid var(--sep);background:var(--card);color:var(--label);width:100%;min-width:0}
 .invoice-row button{border:none;background:color-mix(in srgb, var(--red) 12%, transparent);color:var(--red);border-radius:8px;height:32px}
+/* On narrow phones, five squeezed columns get unreadable — stack each row
+   into a small card instead of shrinking columns to nothing. */
+@media (max-width:400px){
+  .invoice-table-head{display:none}
+  .invoice-row{
+    grid-template-columns:1fr 1fr;
+    grid-template-areas:"product product" "desc desc" "qty price" "del del";
+    background:var(--card);border:.5px solid var(--sep);border-radius:var(--radius-sm);
+    padding:8px;margin-bottom:8px;
+  }
+  .invoice-row .inv-product{grid-area:product}
+  .invoice-row .inv-desc{grid-area:desc}
+  .invoice-row .inv-qty{grid-area:qty}
+  .invoice-row .inv-price{grid-area:price}
+  .invoice-row button{grid-area:del;width:100%}
+}
 .invoice-total-box{background:var(--card);border:.5px solid var(--sep);border-radius:var(--radius);padding:14px}
 .inv-total-row{display:flex;justify-content:space-between;font-size:13px;color:var(--label2);padding:5px 0}
 .inv-total-row strong{color:var(--label);font-weight:700}
@@ -451,3 +472,19 @@ body:not(.dark) .dash-cfg-move button{background:#F2F2F7}
 .framer-stage.framer-round{border-radius:50%}
 .framer-stage img{position:absolute;top:0;left:0;max-width:none;user-select:none;-webkit-user-drag:none}
 #framerZoom{width:100%;accent-color:var(--blue);margin:6px 0 4px}
+
+/* n1 performance + hierarchy + drag UI */
+.drag-grip,.cat-drag-handle{cursor:grab;touch-action:none;user-select:none;opacity:.65;font-size:20px;padding:4px 8px}
+.drag-grip:active,.cat-drag-handle:active{cursor:grabbing}
+.note-card[draggable="true"],.reminderList .accordion-card[draggable="true"],.cat-manager[draggable="true"],.subcat-row[draggable="true"]{cursor:grab}
+.cat-group{margin:10px 0}
+.cat-parent-label{font-weight:800;margin:8px 4px}
+.cat-children{display:flex;flex-wrap:wrap;gap:7px}
+.cat-manager .accordion-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.cat-manager .accordion-head>span:first-child{flex:1}
+.cat-sub-body{padding:8px}
+.cat-manager-actions{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:8px}
+.subcat-row{margin:6px 0}
+/* n1 final: clickable total balance */
+.hero-balance{width:100%;border:0;text-align:right;font:inherit;color:inherit;display:block;cursor:pointer;touch-action:manipulation}
+.hero-balance:active{transform:scale(.99)}
