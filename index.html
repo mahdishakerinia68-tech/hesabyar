@@ -22,7 +22,7 @@
     <button id="menuBtn" class="menu-trigger" aria-label="باز کردن منو" aria-haspopup="true" aria-expanded="false" aria-controls="menuModal">⋯</button>
     <img class="app-logo" src="logo.png" alt="حساب‌یار">
     <div class="top-bar-titles">
-      <h1>حساب‌یار <span class="version-pill" id="versionPill">5.4</span></h1>
+      <h1>حساب‌یار <span class="version-pill">5.3</span></h1>
       <div id="syncBadge" class="sync-badge">☁️ آفلاین</div>
     </div>
   </div>
@@ -89,7 +89,7 @@
 
 <section id="transactions" class="page">
   <div class="section-head"><h2>تراکنش‌ها</h2><button onclick="openTx()">＋</button></div>
-  <input id="search" class="search" placeholder="جستجو در تراکنش‌ها..." oninput="renderDebounced()">
+  <input id="search" class="search" placeholder="جستجو در تراکنش‌ها..." oninput="render()">
   <div class="filters">
     <select id="filterType" onchange="render()">
       <option value="">همه</option><option value="income">درآمد</option><option value="expense">هزینه</option>
@@ -253,7 +253,7 @@
     </div>
 
   </div>
-  <p class="hint settings-footer">نسخه <span id="appVersionText">5.4</span> • بکاپ خودکار • بروزرسانی • اتصال دو گوشی • تقویم شمسی کامل</p>
+  <p class="hint settings-footer">نسخه <span id="appVersionText">5.3</span> • بکاپ خودکار • بروزرسانی • اتصال دو گوشی • تقویم شمسی کامل</p>
   <p class="hint">تغییرات روی این گوشی ذخیره می‌شود و در صورت اتصال به Firebase با گوشی دوم ادغام می‌گردد.</p>
 </section>
 
@@ -340,6 +340,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="capacitor-local-notifications-bridge.js"></script>
 <script src="app.js"></script>
-<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js?v=5.4").catch(console.error)}</script>
+<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js?v=5.3").catch(console.error)}</script>
 </body>
 </html>
