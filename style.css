@@ -25,6 +25,10 @@ body{
   -webkit-font-smoothing:antialiased; overscroll-behavior-y:none; overscroll-behavior-x:none;
   transition:background .25s ease,color .25s ease;
   overflow-x:hidden; width:100%;
+  /* Stop the browser's own edge-swipe-back gesture (which can trigger a real
+     page reload / flash of unstyled content) from fighting with our custom
+     swipe-back handler in app.js; vertical scrolling still works normally. */
+  touch-action: pan-y;
 }
 button,input,select,textarea{font-family:inherit;max-width:100%}
 h1,h2,h3{margin:0}
@@ -171,6 +175,9 @@ body:not(.dark) .card-number-box{background:#F2F2F7}
 
 /* accordion (reminders) */
 .accordion-card{flex-direction:column;align-items:stretch;padding:0;overflow:hidden}
+.accordion-head-row{display:flex;align-items:center;gap:2px}
+.accordion-head-row .accordion-head{flex:1;min-width:0}
+.note-head-move{flex-shrink:0;padding-inline-start:10px}
 .accordion-head{width:100%;border:none;background:transparent;padding:13px 14px;display:flex;justify-content:space-between;align-items:center;font:inherit;color:var(--label)}
 .accordion-head span:last-child{transition:transform .2s ease;color:var(--label2)}
 .accordion-card.open .accordion-head span:last-child{transform:rotate(180deg)}
