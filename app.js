@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="5.6";
+const APP_VERSION="5.8";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
@@ -25,12 +25,88 @@ const DEFAULT_SYNC_CONFIG={
 let sync={app:null,auth:null,db:null,user:null,unsubscribe:null,ready:false,saving:false,queued:false,hydrating:false,authListener:false,dirty:new Map()};
 function syncConfig(){try{return JSON.parse(localStorage.getItem(SYNC_KEY)||"null")||DEFAULT_SYNC_CONFIG}catch{return DEFAULT_SYNC_CONFIG}}
 function autoBackupEnabled(){return localStorage.getItem(AUTO_BACKUP_ENABLED_KEY)!=="false"}
-function setAutoBackupEnabled(v){localStorage.setItem(AUTO_BACKUP_ENABLED_KEY,v?"true":"false"); if(v) createAutoBackup("فعال‌سازی پشتیبان خودکار"); logEvent(v?"پشتیبان خودکار فعال شد":"پشتیبان خودکار غیرفعال شد",v?"پشتیبان‌گیری خودکار هر ۶ ساعت فعال است":"پشتیبان‌گیری خودکار خاموش شد","settings",false); renderSettingsFeatures()}
-function createAutoBackup(reason="زمان‌بندی"){try{if(!autoBackupEnabled())return false; const raw=JSON.stringify(data); const list=JSON.parse(localStorage.getItem(AUTO_BACKUP_KEY)||"[]"); list.unshift({at:new Date().toISOString(),reason,data:JSON.parse(raw)}); while(list.length>5)list.pop(); localStorage.setItem(AUTO_BACKUP_KEY,JSON.stringify(list)); localStorage.setItem(AUTO_BACKUP_KEY+"-last",new Date().toISOString()); return true}catch(e){console.warn("auto backup",e);return false}}
+function setAutoBackupEnabled(v){localStorage.setItem(AUTO_BACKUP_ENABLED_KEY,v?"true":"false"); if(v) createAutoBackup("فعال‌سازی پشتیبان خودکار"); logEvent(v?"پشتیبان خودکار فعال شد":"پشتیبان خودکار غیرفعال شد",v?"از این پس هر ۶ ساعت یک فایل پشتیبان واقعی داخل گوشی ساخته می‌شود":"پشتیبان‌گیری خودکار خاموش شد","settings",false); renderSettingsFeatures()}
+/* ---- Real file auto-backup -----------------------------------------
+ * On a Capacitor build (native app), this writes an actual .json file
+ * into Documents/HesabdarBackups on the device using the Filesystem
+ * plugin, and prunes old files so only the last 5 remain. In a plain
+ * browser/PWA where that native plugin isn't available, it falls back to
+ * triggering a normal file download of the same backup onto the phone.
+ * The localStorage snapshot list is kept too, as a fast, always-available
+ * safety net for the in-app "restore last backup" button. ---- */
+const AUTO_BACKUP_DIRECTORY="Documents";
+const AUTO_BACKUP_FOLDER="HesabdarBackups";
+const AUTO_BACKUP_LAST_FILE_KEY="hesabdar-auto-backup-last-file-v1";
+function backupFileName(){const d=new Date(),p=n=>String(n).padStart(2,"0");return `hesabdar-backup-${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}.json`}
+async function pruneOldBackupFiles(fs){
+ try{
+  const res=await fs.readdir({path:AUTO_BACKUP_FOLDER,directory:AUTO_BACKUP_DIRECTORY});
+  const files=(res?.files||[]).map(f=>typeof f==="string"?f:f?.name).filter(n=>n&&n.endsWith(".json")).sort();
+  while(files.length>5){const old=files.shift();try{await fs.deleteFile({path:`${AUTO_BACKUP_FOLDER}/${old}`,directory:AUTO_BACKUP_DIRECTORY})}catch(e){}}
+ }catch(e){/* folder may not exist yet on first run - nothing to prune */}
+}
+/* Only try the native Filesystem plugin when we're actually on a Capacitor
+ * native build AND that plugin is really registered on the native side.
+ * Without this check, calling it on a build that only has the JS bridge
+ * (no @capacitor/filesystem installed natively) throws on every attempt —
+ * which is exactly the error the user hit on every app launch. */
+function filesystemPlugin(){
+ try{
+  const C=window.Capacitor;
+  if(!C||typeof C.isNativePlatform!=="function"||!C.isNativePlatform())return null;
+  if(typeof C.isPluginAvailable==="function"&&!C.isPluginAvailable("Filesystem"))return null;
+  const fs=C.Plugins?.Filesystem;
+  if(!fs||typeof fs.writeFile!=="function")return null;
+  return fs;
+ }catch(e){return null}
+}
+async function writeAutoBackupFile(payload){
+ const json=JSON.stringify(payload,null,2),filename=backupFileName();
+ const fs=filesystemPlugin();
+ if(fs){
+  try{
+   await fs.writeFile({path:`${AUTO_BACKUP_FOLDER}/${filename}`,data:json,directory:AUTO_BACKUP_DIRECTORY,encoding:"utf8",recursive:true});
+   pruneOldBackupFiles(fs).catch(()=>{});
+   return {ok:true,method:"filesystem",filename,where:`${AUTO_BACKUP_DIRECTORY}/${AUTO_BACKUP_FOLDER}`};
+  }catch(e){console.warn("Filesystem auto backup failed, falling back to download",e)}
+ }
+ try{
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([json],{type:"application/json"}));
+  a.download=filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  return {ok:true,method:"download",filename,where:"Download"};
+ }catch(e){console.warn("auto backup file download failed",e);return {ok:false}}
+}
+function createAutoBackup(reason="زمان‌بندی"){
+ try{
+  if(!autoBackupEnabled())return false;
+  const raw=JSON.stringify(data);
+  const list=JSON.parse(localStorage.getItem(AUTO_BACKUP_KEY)||"[]");
+  list.unshift({at:new Date().toISOString(),reason,data:JSON.parse(raw)});
+  while(list.length>5)list.pop();
+  localStorage.setItem(AUTO_BACKUP_KEY,JSON.stringify(list));
+  localStorage.setItem(AUTO_BACKUP_KEY+"-last",new Date().toISOString());
+  writeAutoBackupFile(JSON.parse(raw)).then(res=>{
+   if(res?.ok){localStorage.setItem(AUTO_BACKUP_LAST_FILE_KEY,JSON.stringify({filename:res.filename,where:res.where,at:new Date().toISOString()}));renderSettingsFeatures()}
+  }).catch(e=>console.warn("auto backup file",e));
+  return true;
+ }catch(e){console.warn("auto backup",e);return false}
+}
 function getAutoBackupInfo(){try{const last=localStorage.getItem(AUTO_BACKUP_KEY+"-last");return last?new Date(last):null}catch{return null}}
+/* Runs a backup only if none has ever run, or the last one was 6+ hours
+ * ago — so opening the app doesn't force a backup (and a possible
+ * Filesystem error) every single time, only on the intended schedule. */
+function maybeAutoBackup(reason){
+ if(!autoBackupEnabled())return false;
+ const last=getAutoBackupInfo();
+ if(last&&Date.now()-last.getTime()<AUTO_BACKUP_MS)return false;
+ return createAutoBackup(reason);
+}
+function getAutoBackupFileInfo(){try{return JSON.parse(localStorage.getItem(AUTO_BACKUP_LAST_FILE_KEY)||"null")}catch{return null}}
 function restoreLatestAutoBackup(){try{const list=JSON.parse(localStorage.getItem(AUTO_BACKUP_KEY)||"[]"); if(!list.length)return alert("هنوز پشتیبان خودکاری وجود ندارد."); if(!confirm("آخرین پشتیبان خودکار جایگزین اطلاعات فعلی شود؟"))return; data=list[0].data; normalizeData(); save(); logEvent("بازیابی پشتیبان خودکار",new Date(list[0].at).toLocaleString("fa-IR"),"settings"); alert("آخرین پشتیبان خودکار بازیابی شد.")}catch(e){alert("پشتیبان خودکار قابل بازیابی نیست.")}}
 function normalizeData(){data=data||blankData(); for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats","audit"]){data[k]??=[];} data.pin=typeof data.pin==="string"?data.pin:""; data.pinHash=typeof data.pinHash==="string"?data.pinHash:""; data.pinSalt=typeof data.pinSalt==="string"?data.pinSalt:""; data.branding??={storeName:"",logo:"",stamp:"",signature:""}; data.yearSettlements??={}; data._sync??={tombstones:{}}; data._sync.tombstones??={}; for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats"]){for(const r of data[k]){r.id??=uid();r.updatedAt??=new Date().toISOString();}} for(const c of [...data.expenseCats,...data.incomeCats]){c.children??=[];for(const ch of c.children){ch.id??=uid();}} data.notes.forEach((n,i)=>{if(typeof n.order!=="number")n.order=i;}); data.reminders.forEach((r,i)=>{if(typeof r.order!=="number")r.order=i;});}
-function renderSettingsFeatures(){const e=$("autoBackupToggle");if(e)e.checked=autoBackupEnabled(); const last=$("autoBackupLast"); if(last){const d=getAutoBackupInfo();last.textContent=d?"آخرین پشتیبان: "+d.toLocaleString("fa-IR"):"هنوز پشتیبان خودکاری ساخته نشده";} const v=$("appVersionText");if(v)v.textContent=APP_VERSION; const vp=$("versionPill");if(vp)vp.textContent=APP_VERSION;}
+function renderSettingsFeatures(){const e=$("autoBackupToggle");if(e)e.checked=autoBackupEnabled(); const last=$("autoBackupLast"); if(last){const d=getAutoBackupInfo();const f=getAutoBackupFileInfo();last.textContent=d?"آخرین پشتیبان: "+d.toLocaleString("fa-IR")+(f?.filename?` • فایل: ${f.filename} (${f.where})`:""):"هنوز پشتیبان خودکاری ساخته نشده";} const v=$("appVersionText");if(v)v.textContent=APP_VERSION; const vp=$("versionPill");if(vp)vp.textContent=APP_VERSION;}
 function setSyncStatus(t){const e=$("syncStatus");if(e)e.textContent=t||"";const b=$("syncBadge");if(!b)return;const s=String(t||"");let cls="offline",label="☁️ آفلاین";if(s.includes("آنلاین")||s.includes("انجام شد")||s.includes("متصل است")){cls="online";label="☁️ متصل"}else if(s.includes("⚠️")||s.includes("ناموفق")){cls="error";label="⚠️ خطای اتصال"}else if(s.includes("در حال")||s.includes("بررسی")){cls="pending";label="☁️ در حال اتصال..."}else if(s.includes("وارد شوید")||s.includes("ابتدا")){cls="offline";label="☁️ واردنشده"}b.textContent=label;b.className="sync-badge "+cls}
 
 const defaultsExpense=["بنزین","غذا و رستوران","خرید خانه","خرید روزانه","قبض","اینترنت و شارژ","حمل‌ونقل","پوشاک","درمان","تفریح","هدیه","سایر"];
@@ -198,7 +274,7 @@ function renderAudit(){
   box.innerHTML=logs.map(e=>`<div class="audit-item"><div class="audit-icon">${auditIcon(e.kind)}</div><div class="audit-main"><b>${esc(e.action)}</b>${e.detail?`<div class="meta">${esc(e.detail)}</div>`:""}<small>${new Intl.DateTimeFormat("fa-IR-u-ca-persian",{dateStyle:"short",timeStyle:"short"}).format(new Date(e.at))}</small></div></div>`).join("")||empty("هنوز گزارشی ثبت نشده است");
 }
 function clearAudit(){if(!data.audit?.length)return alert("گزارشی برای پاک کردن وجود ندارد");if(confirm("همه گزارش‌های فعالیت پاک شوند؟")){const old=data.audit.slice();data.audit=[];for(const e of old)markDirty("audit",e.id,true,{id:e.id},new Date().toISOString());save();logEvent("گزارش‌ها پاک شدند","سابقه فعالیت قبلی حذف شد","system")}}
-function save(){localStorage.setItem(KEY,JSON.stringify(data)); if(autoBackupEnabled()){const last=getAutoBackupInfo();if(!last||Date.now()-last.getTime()>=AUTO_BACKUP_MS)createAutoBackup("ذخیره زمان‌بندی‌شده")};render();syncSave()}
+function save(){localStorage.setItem(KEY,JSON.stringify(data)); maybeAutoBackup("ذخیره زمان‌بندی‌شده"); render();syncSave()}
 function hasMeaningfulData(d){
   if(!d||typeof d!=="object")return false;
   return ["accounts","transactions","people","reminders","notes","checks","invoices"].some(k=>Array.isArray(d[k])&&d[k].length>0);
@@ -522,15 +598,27 @@ armBackTrap();
 window.addEventListener("popstate",()=>{performBack();armBackTrap()});
 (function initSwipeBack(){
  const EDGE=28,THRESH=65,MAXV_RATIO=.55;
- let sx=0,sy=0,active=false;
+ let sx=0,sy=0,active=false,claimed=false;
  document.addEventListener("touchstart",e=>{
   if(e.touches.length!==1)return;
   const t=e.touches[0];
   sx=t.clientX;sy=t.clientY;
   active=(sx<=EDGE||sx>=window.innerWidth-EDGE);
+  claimed=false;
  },{passive:true});
+ /* Once it's clearly a horizontal drag from the edge, take over the gesture
+  * ourselves (preventDefault) so the browser/WebView can't also treat it as
+  * a native back-navigation — that double handling is what caused the
+  * multi-second delay and raw/unstyled flash the user was seeing. */
+ document.addEventListener("touchmove",e=>{
+  if(!active||claimed)return;
+  const t=e.touches[0];
+  const dx=t.clientX-sx,dy=Math.abs(t.clientY-sy);
+  if(Math.abs(dx)>12&&dy<Math.abs(dx)*MAXV_RATIO){claimed=true;if(e.cancelable)e.preventDefault()}
+ },{passive:false});
  document.addEventListener("touchend",e=>{
-  if(!active)return;active=false;
+  if(!active){return}
+  active=false;
   const t=e.changedTouches[0];
   const dx=t.clientX-sx,dy=Math.abs(t.clientY-sy);
   if(Math.abs(dx)>THRESH&&dy<Math.abs(dx)*MAXV_RATIO)performBack();
@@ -816,8 +904,12 @@ function noteHTML(n,pos){
  const list=items.length?items.map((it,i)=>noteItemHTML(n,it,i,items.length)).join(''):'<div class="meta">هنوز آیتمی اضافه نشده</div>';
  const alarm=n.date?`<div class="meta">⏰ آلارم جداگانه: ${jalaliDateTimeInput(n.date)} • ${noteRepeatLabel(n.repeat)}</div>`:'<div class="meta">بدون آلارم</div>';
  const accId="note-"+n.id;const isOpen=openAccordions.has(accId);
- const moveBtns=pos?`<div class="reorder-btns"><button type="button" title="انتقال به بالا" ${pos.i===0?"disabled":""} onclick="event.stopPropagation();moveNote('${n.id}',-1)">▲</button><button type="button" title="انتقال به پایین" ${pos.i===pos.total-1?"disabled":""} onclick="event.stopPropagation();moveNote('${n.id}',1)">▼</button></div>`:"";
- return `<div class="note-card item accordion-card${isOpen?' open':''}" data-note-card="${esc(n.id)}" data-acc-id="${accId}"><button class="accordion-head" type="button" aria-expanded="${isOpen}" onclick="toggleAccordion(this,event)"><span><span class="note-badge">📝</span> <b>${esc(n.title)}</b></span><span class="note-count">${items.length?fa(items.filter(x=>x.done).length)+' / '+fa(items.length):''}</span><span class="acc-arrow">⌄</span></button><div class="accordion-body"><div class="note-main">${n.text?'<div class="meta note-text">'+esc(n.text)+'</div>':''}${alarm}<div class="note-checklist">${list}</div></div><div class="note-actions">${moveBtns}${actionButtons('openNote','deleteNote',n.id)}</div></div></div>`;
+ /* The header (this note card's own position among other notes) needs its
+  * own up/down buttons visible right away — not buried inside the
+  * collapsed accordion body, where only the checklist sub-items live.
+  * So these sit in a row alongside the collapse button itself. */
+ const moveBtns=pos?`<div class="reorder-btns note-head-move" onclick="event.stopPropagation()"><button type="button" title="انتقال یادداشت به بالا" ${pos.i===0?"disabled":""} onclick="event.stopPropagation();moveNote('${n.id}',-1)">▲</button><button type="button" title="انتقال یادداشت به پایین" ${pos.i===pos.total-1?"disabled":""} onclick="event.stopPropagation();moveNote('${n.id}',1)">▼</button></div>`:"";
+ return `<div class="note-card item accordion-card${isOpen?' open':''}" data-note-card="${esc(n.id)}" data-acc-id="${accId}"><div class="accordion-head-row">${moveBtns}<button class="accordion-head" type="button" aria-expanded="${isOpen}" onclick="toggleAccordion(this,event)"><span><span class="note-badge">📝</span> <b>${esc(n.title)}</b></span><span class="note-count">${items.length?fa(items.filter(x=>x.done).length)+' / '+fa(items.length):''}</span><span class="acc-arrow">⌄</span></button></div><div class="accordion-body"><div class="note-main">${n.text?'<div class="meta note-text">'+esc(n.text)+'</div>':''}${alarm}<div class="note-checklist">${list}</div></div><div class="note-actions">${actionButtons('openNote','deleteNote',n.id)}</div></div></div>`;
 }
 function moveNote(id,dir){
  const sorted=[...data.notes].sort((a,b)=>(a.order??0)-(b.order??0));
@@ -861,7 +953,7 @@ function isNewerVersion(remote,local){const a=versionParts(remote),b=versionPart
 async function notifyUpdate(remote,url){const msg="نسخه جدید حسابدار "+remote+" منتشر شده است";try{if("Notification" in window && Notification.permission==="granted")new Notification("بروزرسانی حسابدار",{body:msg});else if("Notification" in window && Notification.permission!=="denied")await Notification.requestPermission().then(p=>{if(p==="granted")new Notification("بروزرسانی حسابدار",{body:msg})})}catch(e){} if(url && confirm(msg+"\n\nبرای مشاهده صفحه انتشار باز شود؟"))window.open(url,"_blank","noopener,noreferrer")}
 async function checkForUpdates(manual=false){const repo=githubRepo();if($("githubRepo"))$("githubRepo").value=repo;if(!repo){setUpdateStatus("ابتدا مخزن GitHub را در تنظیمات وارد کن.");return false}if(manual)setUpdateStatus("در حال بررسی نسخه جدید...");try{const r=await fetch("https://api.github.com/repos/"+repo+"/releases/latest",{headers:{Accept:"application/vnd.github+json"},cache:"no-store"});if(!r.ok)throw new Error("GitHub "+r.status);const rel=await r.json(),remote=rel.tag_name||rel.name||"";if(isNewerVersion(remote,APP_VERSION)){setUpdateStatus("⚠️ نسخه جدید "+remote+" موجود است");localStorage.setItem("hesabdar-last-update",remote);await notifyUpdate(remote,rel.html_url)}else{setUpdateStatus("✅ برنامه به‌روز است؛ نسخه فعلی "+APP_VERSION);localStorage.setItem("hesabdar-last-update",remote)}return true}catch(e){setUpdateStatus("❌ بررسی GitHub انجام نشد؛ اینترنت و نام مخزن را بررسی کن.");return false}}
 async function updateServiceWorkerNow(){try{if(!('serviceWorker' in navigator))return; const reg=await navigator.serviceWorker.getRegistration(); if(reg){await reg.update();}}catch(e){console.warn("service worker update",e)}}
-function startUpdateChecker(){setTimeout(()=>{checkForUpdates(false);updateServiceWorkerNow()},2500);setInterval(()=>{checkForUpdates(false);updateServiceWorkerNow()},UPDATE_CHECK_MS);setInterval(()=>{if(autoBackupEnabled())createAutoBackup("هر ۶ ساعت")},AUTO_BACKUP_MS)}
+function startUpdateChecker(){setTimeout(()=>{checkForUpdates(false);updateServiceWorkerNow()},2500);setInterval(()=>{checkForUpdates(false);updateServiceWorkerNow()},UPDATE_CHECK_MS);setInterval(()=>{maybeAutoBackup("هر ۶ ساعت")},AUTO_BACKUP_MS)}
 async function testNotifications(){
   const ok=await requestNativeNotifications();
   if(!ok)return alert("اجازه اعلان داده نشد. از تنظیمات گوشی/مرورگر اجازه اعلان را برای حساب‌یار فعال کن.");
@@ -1295,4 +1387,4 @@ function drawChart(inc,exp){const c=$("chart");if(!c)return;const x=c.getContext
 function exportData(){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));a.download="hesabdar-backup.json";a.click();logEvent("پشتیبان‌گیری","فایل JSON صادر شد","settings")}
 function importData(e){const file=e.target.files?.[0];if(!file)return;const r=new FileReader();r.onload=async()=>{try{data=JSON.parse(r.result);normalizeData();await migratePinSecurity();data.audit??=[];data.notes??=[];save();logEvent("بازیابی اطلاعات","پشتیبان وارد شد","settings");showLock();alert("بازیابی شد")}catch{alert("فایل نامعتبر است")}};r.readAsText(file)}
 function clearData(){if(confirm("همه اطلاعات حذف شود؟")){const pin=data.pin,pinHash=data.pinHash,pinSalt=data.pinSalt;data=blankData();data.pin=pin;data.pinHash=pinHash;data.pinSalt=pinSalt;save();logEvent("پاک کردن اطلاعات","اطلاعات برنامه پاک شد","delete");}}
-(async function initApp(){normalizeData();await migratePinSecurity();showLock();render();applyDashboardConfig();renderBrandingInSettings();renderSettingsFeatures();createAutoBackup("اجرای برنامه");logEvent("اجرای برنامه","برنامه حسابدار اجرا شد","system");await initSync();if(!sync.auth){[4000,12000,30000].forEach(ms=>setTimeout(()=>{if(!sync.auth)initSync()},ms))}syncAllNotesToReminders().catch(console.error);rescheduleAllNativeReminders().catch(console.error);startUpdateChecker();startReminderChecker();})();
+(async function initApp(){normalizeData();await migratePinSecurity();showLock();render();applyDashboardConfig();renderBrandingInSettings();renderSettingsFeatures();maybeAutoBackup("اجرای برنامه");logEvent("اجرای برنامه","برنامه حسابدار اجرا شد","system");await initSync();if(!sync.auth){[4000,12000,30000].forEach(ms=>setTimeout(()=>{if(!sync.auth)initSync()},ms))}syncAllNotesToReminders().catch(console.error);rescheduleAllNativeReminders().catch(console.error);startUpdateChecker();startReminderChecker();})();
