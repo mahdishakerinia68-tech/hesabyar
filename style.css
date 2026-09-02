@@ -179,9 +179,13 @@ body:not(.dark) .card-number-box{background:#F2F2F7}
 .accordion-head-row .accordion-head{flex:1;min-width:0}
 .note-head-move{flex-shrink:0;padding-inline-start:10px}
 .accordion-head{width:100%;border:none;background:transparent;padding:13px 14px;display:flex;justify-content:space-between;align-items:center;font:inherit;color:var(--label)}
-.accordion-head span:last-child{transition:transform .2s ease;color:var(--label2)}
+/* v5.9: the title span grows to fill the row, so the item-count badge and
+   the collapse arrow are pushed together to the left edge of the card
+   instead of sitting squeezed right up against the note's title text. */
+.accordion-head>span:first-child{flex:1;min-width:0}
+.accordion-head span:last-child{transition:transform .2s ease;color:var(--label2);flex-shrink:0}
 .accordion-card.open .accordion-head span:last-child{transform:rotate(180deg)}
-.accordion-head .note-count{display:inline-block;transform:none !important}
+.accordion-head .note-count{display:inline-block;transform:none !important;flex-shrink:0;margin-inline-start:8px}
 .accordion-body{max-height:0;overflow:hidden;transition:max-height .25s ease;padding:0 14px}
 .accordion-card.open .accordion-body{max-height:600px;overflow-y:auto;padding-bottom:13px}
 .accordion-actions{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
@@ -369,6 +373,12 @@ body:not(.dark) .sheet .close{background:#E5E5EA}
 .lockbox p{color:#666;font-size:13px;margin-bottom:16px}
 .lockbox input{width:100%;padding:14px;text-align:center;font-size:20px;letter-spacing:6px;border:.5px solid #ddd;border-radius:12px;margin-bottom:12px;background:#f5f5f7}
 .lockbox button.primary{width:100%;padding:14px;border:none;border-radius:12px;background:var(--blue);color:#fff;font-weight:700;font-size:15px}
+.lock-bio-btn{width:100%;padding:12px;border:none;border-radius:12px;background:transparent;color:var(--blue);font-weight:700;font-size:13.5px;margin-top:8px}
+.pattern-wrap{display:flex;justify-content:center;margin:6px 0}
+.pattern-svg{width:230px;height:230px;touch-action:none;-webkit-user-select:none;user-select:none}
+.pattern-dot{fill:#e3e3ea;stroke:#c7c7cc;stroke-width:1.5;transition:fill .15s ease}
+.pattern-dot.on{fill:var(--blue);stroke:var(--blue)}
+.pattern-line{fill:none;stroke:var(--blue);stroke-width:5;stroke-linecap:round;stroke-linejoin:round}
 
 /* settings */
 .settings-page{display:flex;flex-direction:column;gap:14px;margin-top:10px}

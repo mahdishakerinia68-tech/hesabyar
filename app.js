@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="5.8";
+const APP_VERSION="5.9";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
@@ -28,14 +28,17 @@ function autoBackupEnabled(){return localStorage.getItem(AUTO_BACKUP_ENABLED_KEY
 function setAutoBackupEnabled(v){localStorage.setItem(AUTO_BACKUP_ENABLED_KEY,v?"true":"false"); if(v) createAutoBackup("فعال‌سازی پشتیبان خودکار"); logEvent(v?"پشتیبان خودکار فعال شد":"پشتیبان خودکار غیرفعال شد",v?"از این پس هر ۶ ساعت یک فایل پشتیبان واقعی داخل گوشی ساخته می‌شود":"پشتیبان‌گیری خودکار خاموش شد","settings",false); renderSettingsFeatures()}
 /* ---- Real file auto-backup -----------------------------------------
  * On a Capacitor build (native app), this writes an actual .json file
- * into Documents/HesabdarBackups on the device using the Filesystem
- * plugin, and prunes old files so only the last 5 remain. In a plain
- * browser/PWA where that native plugin isn't available, it falls back to
- * triggering a normal file download of the same backup onto the phone.
+ * into a "حسابداری" folder inside the device's shared Downloads folder
+ * (visible from any file manager, not just inside the app), using the
+ * Filesystem plugin, and prunes old files so only the last 5 remain. In
+ * a plain browser/PWA where that native plugin isn't available, it falls
+ * back to triggering a normal file download of the same backup onto the
+ * phone (browsers always place downloads in the device's Downloads
+ * folder by default, though a sub-folder can't be forced from the web).
  * The localStorage snapshot list is kept too, as a fast, always-available
  * safety net for the in-app "restore last backup" button. ---- */
-const AUTO_BACKUP_DIRECTORY="Documents";
-const AUTO_BACKUP_FOLDER="HesabdarBackups";
+const AUTO_BACKUP_DIRECTORY="ExternalStorage";
+const AUTO_BACKUP_FOLDER="Download/حسابداری";
 const AUTO_BACKUP_LAST_FILE_KEY="hesabdar-auto-backup-last-file-v1";
 function backupFileName(){const d=new Date(),p=n=>String(n).padStart(2,"0");return `hesabdar-backup-${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}.json`}
 async function pruneOldBackupFiles(fs){
@@ -67,7 +70,7 @@ async function writeAutoBackupFile(payload){
   try{
    await fs.writeFile({path:`${AUTO_BACKUP_FOLDER}/${filename}`,data:json,directory:AUTO_BACKUP_DIRECTORY,encoding:"utf8",recursive:true});
    pruneOldBackupFiles(fs).catch(()=>{});
-   return {ok:true,method:"filesystem",filename,where:`${AUTO_BACKUP_DIRECTORY}/${AUTO_BACKUP_FOLDER}`};
+   return {ok:true,method:"filesystem",filename,where:"Download/حسابداری"};
   }catch(e){console.warn("Filesystem auto backup failed, falling back to download",e)}
  }
  try{
@@ -105,16 +108,52 @@ function maybeAutoBackup(reason){
 }
 function getAutoBackupFileInfo(){try{return JSON.parse(localStorage.getItem(AUTO_BACKUP_LAST_FILE_KEY)||"null")}catch{return null}}
 function restoreLatestAutoBackup(){try{const list=JSON.parse(localStorage.getItem(AUTO_BACKUP_KEY)||"[]"); if(!list.length)return alert("هنوز پشتیبان خودکاری وجود ندارد."); if(!confirm("آخرین پشتیبان خودکار جایگزین اطلاعات فعلی شود؟"))return; data=list[0].data; normalizeData(); save(); logEvent("بازیابی پشتیبان خودکار",new Date(list[0].at).toLocaleString("fa-IR"),"settings"); alert("آخرین پشتیبان خودکار بازیابی شد.")}catch(e){alert("پشتیبان خودکار قابل بازیابی نیست.")}}
-function normalizeData(){data=data||blankData(); for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats","audit"]){data[k]??=[];} data.pin=typeof data.pin==="string"?data.pin:""; data.pinHash=typeof data.pinHash==="string"?data.pinHash:""; data.pinSalt=typeof data.pinSalt==="string"?data.pinSalt:""; data.branding??={storeName:"",logo:"",stamp:"",signature:""}; data.yearSettlements??={}; data._sync??={tombstones:{}}; data._sync.tombstones??={}; for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats"]){for(const r of data[k]){r.id??=uid();r.updatedAt??=new Date().toISOString();}} for(const c of [...data.expenseCats,...data.incomeCats]){c.children??=[];for(const ch of c.children){ch.id??=uid();}} data.notes.forEach((n,i)=>{if(typeof n.order!=="number")n.order=i;}); data.reminders.forEach((r,i)=>{if(typeof r.order!=="number")r.order=i;});}
-function renderSettingsFeatures(){const e=$("autoBackupToggle");if(e)e.checked=autoBackupEnabled(); const last=$("autoBackupLast"); if(last){const d=getAutoBackupInfo();const f=getAutoBackupFileInfo();last.textContent=d?"آخرین پشتیبان: "+d.toLocaleString("fa-IR")+(f?.filename?` • فایل: ${f.filename} (${f.where})`:""):"هنوز پشتیبان خودکاری ساخته نشده";} const v=$("appVersionText");if(v)v.textContent=APP_VERSION; const vp=$("versionPill");if(vp)vp.textContent=APP_VERSION;}
+function normalizeData(){data=data||blankData(); for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats","audit"]){data[k]??=[];} data.pin=typeof data.pin==="string"?data.pin:""; data.pinHash=typeof data.pinHash==="string"?data.pinHash:""; data.pinSalt=typeof data.pinSalt==="string"?data.pinSalt:""; data.patternHash=typeof data.patternHash==="string"?data.patternHash:""; data.patternSalt=typeof data.patternSalt==="string"?data.patternSalt:""; data.lockMethod=(data.lockMethod==="pattern")?"pattern":"pin"; data.biometricEnabled=!!data.biometricEnabled; data.webauthnCredId=typeof data.webauthnCredId==="string"?data.webauthnCredId:""; data.lang=(data.lang==="en")?"en":"fa"; data.branding??={storeName:"",logo:"",stamp:"",signature:""}; data.yearSettlements??={}; data._sync??={tombstones:{}}; data._sync.tombstones??={}; for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats"]){for(const r of data[k]){r.id??=uid();r.updatedAt??=new Date().toISOString();}} for(const c of [...data.expenseCats,...data.incomeCats]){c.children??=[];for(const ch of c.children){ch.id??=uid();}} data.notes.forEach((n,i)=>{if(typeof n.order!=="number")n.order=i;}); data.reminders.forEach((r,i)=>{if(typeof r.order!=="number")r.order=i;});}
+/* ---- Language switch (v5.9) -------------------------------------------
+ * Translates the app's static "chrome" — menu, page section headers, and
+ * settings group titles — between Persian and English, and switches
+ * number digits (fa()) and the money unit accordingly. Screens, forms and
+ * alerts you type your own data into (transaction titles, notes, etc.)
+ * stay exactly as you typed them, in whichever language that was. ---- */
+const I18N_EN={
+ "page.home":"Home","page.recent":"Recent Transactions","page.accounts":"Accounts & Banks","page.transfer":"Transfer Between Accounts","page.bankMsg":"Bank SMS","page.transactions":"Transactions","page.products":"📦 Products & Inventory","page.customers":"👥 Customers","page.people":"Debts / Credits","page.reminders":"Reminders","page.notes":"📝 Notes","page.checks":"Checks","page.categories":"Expense Categories","page.reports":"Dashboard & Reports","page.audit":"📋 Activity Log","page.invoices":"📦 Invoice Box","page.settings":"Settings",
+ "menu.title":"Menu","menu.main":"Main","menu.finance":"Finance","menu.notesGroup":"Notes & Reminders","menu.other":"Other",
+ "nav.home":"Home","nav.transactions":"Transactions","nav.invoices":"Invoices","nav.reports":"Reports","nav.accounts":"Accounts","nav.people":"Debts/Credits","nav.customers":"Customers","nav.products":"Products","nav.checks":"Checks","nav.reminders":"Reminders","nav.notes":"Notes","nav.categories":"Categories","nav.settings":"Settings",
+ "stg.branding.title":"Store & Invoice Branding","stg.year.title":"Fiscal Year","stg.notif.title":"Notifications","stg.backup.title":"Backup & Updates","stg.github.title":"Update from GitHub","stg.manualBackup.title":"Manual Backup","stg.sync.title":"Two-Device Sync","stg.security.title":"Login Security","stg.lang.title":"App Language","stg.lang.hint":"The menu, page titles and settings section will be shown in this language."
+};
+function applyLanguage(){
+ const lang=data.lang==="en"?"en":"fa";
+ document.documentElement.lang=lang==="en"?"en":"fa";
+ document.documentElement.dir=lang==="en"?"ltr":"rtl";
+ document.querySelectorAll("[data-i18n]").forEach(el=>{
+  if(!el.dataset.i18nOrig)el.dataset.i18nOrig=el.textContent;
+  const key=el.getAttribute("data-i18n");
+  el.textContent=lang==="en"?(I18N_EN[key]||el.dataset.i18nOrig):el.dataset.i18nOrig;
+ });
+ const bf=$("langBtnFa"),be=$("langBtnEn");
+ if(bf)bf.classList.toggle("primary",lang==="fa");
+ if(be)be.classList.toggle("primary",lang==="en");
+ render();
+}
+function setAppLanguage(lang){
+ data.lang=lang==="en"?"en":"fa"; save();
+ logEvent(lang==="en"?"Language switched to English":"زبان برنامه به فارسی تغییر کرد","","settings");
+ applyLanguage();
+}
+
+function renderSettingsFeatures(){const e=$("autoBackupToggle");if(e)e.checked=autoBackupEnabled(); const last=$("autoBackupLast"); if(last){const d=getAutoBackupInfo();const f=getAutoBackupFileInfo();last.textContent=d?"آخرین پشتیبان: "+d.toLocaleString("fa-IR")+(f?.filename?` • فایل: ${f.filename} (${f.where})`:""):"هنوز پشتیبان خودکاری ساخته نشده";} const v=$("appVersionText");if(v)v.textContent=APP_VERSION; const vp=$("versionPill");if(vp)vp.textContent=APP_VERSION;
+ const bio=$("biometricToggle");if(bio)bio.checked=!!data.biometricEnabled;
+ const mh=$("securityMethodHint");if(mh)mh.textContent=hasLockCode()?("روش فعلی: "+(data.lockMethod==="pattern"?"رمز الگو":"رمز عددی")+(data.biometricEnabled?" + بیومتریک":"")):"هنوز رمزی برای ورود تنظیم نشده.";
+ const bf=$("langBtnFa"),be=$("langBtnEn");if(bf)bf.classList.toggle("primary",data.lang!=="en");if(be)be.classList.toggle("primary",data.lang==="en");
+}
 function setSyncStatus(t){const e=$("syncStatus");if(e)e.textContent=t||"";const b=$("syncBadge");if(!b)return;const s=String(t||"");let cls="offline",label="☁️ آفلاین";if(s.includes("آنلاین")||s.includes("انجام شد")||s.includes("متصل است")){cls="online";label="☁️ متصل"}else if(s.includes("⚠️")||s.includes("ناموفق")){cls="error";label="⚠️ خطای اتصال"}else if(s.includes("در حال")||s.includes("بررسی")){cls="pending";label="☁️ در حال اتصال..."}else if(s.includes("وارد شوید")||s.includes("ابتدا")){cls="offline";label="☁️ واردنشده"}b.textContent=label;b.className="sync-badge "+cls}
 
 const defaultsExpense=["بنزین","غذا و رستوران","خرید خانه","خرید روزانه","قبض","اینترنت و شارژ","حمل‌ونقل","پوشاک","درمان","تفریح","هدیه","سایر"];
 const defaultsIncome=["حقوق","پاداش","واریز","فروش","دریافت از شخص","سایر"];
 const $=id=>document.getElementById(id);
-const fa=n=>new Intl.NumberFormat("fa-IR").format(Number(n)||0);
+const fa=n=>{const num=Number(n)||0;return (typeof data!=="undefined"&&data?.lang==="en")?new Intl.NumberFormat("en-US").format(num):new Intl.NumberFormat("fa-IR").format(num)};
 function debounce(fn,ms=150){let t;return(...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms)}}
-const money=n=>fa(n)+" تومان";
+const money=n=>fa(n)+((typeof data!=="undefined"&&data?.lang==="en")?" Toman":" تومان");
 const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
 // Jalali date helpers (UI uses Persian dates; storage remains ISO/Gregorian for compatibility).
 function div(a,b){return Math.floor(a/b)}
@@ -229,7 +268,7 @@ function renderDueSoon(){
   box.innerHTML=`🔔 ${overdue?`<b>${fa(overdue)} یادآوری دیرشده</b> • `:""}${fa(todayCount)} یادآوری در ۲۴ ساعت آینده`;
 }
 
-const blankData=()=>({accounts:[],transactions:[],people:[],reminders:[],notes:[],checks:[],invoices:[],customers:[],products:[],audit:[],expenseCats:defaultsExpense.map((name,i)=>({id:"e"+i,name,children:[]})),incomeCats:defaultsIncome.map((name,i)=>({id:"i"+i,name,children:[]})),pin:"",branding:{storeName:"",logo:"",stamp:"",signature:""},yearSettlements:{}});
+const blankData=()=>({accounts:[],transactions:[],people:[],reminders:[],notes:[],checks:[],invoices:[],customers:[],products:[],audit:[],expenseCats:defaultsExpense.map((name,i)=>({id:"e"+i,name,children:[]})),incomeCats:defaultsIncome.map((name,i)=>({id:"i"+i,name,children:[]})),pin:"",patternHash:"",patternSalt:"",lockMethod:"pin",biometricEnabled:false,webauthnCredId:"",lang:"fa",branding:{storeName:"",logo:"",stamp:"",signature:""},yearSettlements:{}});
 window.addEventListener("error",e=>{console.error(e.error||e.message)});
 window.addEventListener("unhandledrejection",e=>{console.error(e.reason)});
 window.addEventListener("online",async()=>{if(sync.db)sync.db.enableNetwork().catch(console.error);setSyncStatus("🌐 اینترنت برقرار شد؛ در حال بررسی اتصال دو گوشی..."); if(!sync.auth)await initSync(); if(sync.dirty&&sync.dirty.size)syncSave(); await verifyTwoPhoneConnection(true); checkForUpdates(false);});
@@ -254,17 +293,39 @@ data=data||blankData();
 normalizeData();
 data.accounts??=[];
 if(!data.accounts.some(a=>String(a.name||"").trim()==="کیف پول نقدی")){const cash=touch({id:uid(),name:"کیف پول نقدی",bank:"",sender:"",card:"",balance:0,default:true});data.accounts.unshift(cash);localStorage.setItem(KEY,JSON.stringify(data));}
-data.transactions??=[];data.people??=[];data.customers??=[];data.products??=[];data.reminders??=[];data.notes??=[];data.checks??=[];data.invoices??=[];data.audit??=[];data.expenseCats??=defaultsExpense.map((name,i)=>({id:"e"+i,name,children:[]}));data.incomeCats??=defaultsIncome.map((name,i)=>({id:"i"+i,name,children:[]}));data.pin=typeof data.pin==="string"?data.pin:"";data.pinHash=typeof data.pinHash==="string"?data.pinHash:"";data.pinSalt=typeof data.pinSalt==="string"?data.pinSalt:"";data.branding??={storeName:"",logo:"",stamp:"",signature:""};data.branding.storeName??="";data.branding.logo??="";data.branding.stamp??="";data.branding.signature??="";data.yearSettlements??={};data._sync??={tombstones:{}};data._sync.tombstones??={};for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats"]){for(const r of data[k]){r.id??=uid();r.updatedAt??=new Date().toISOString()}}for(const c of [...data.expenseCats,...data.incomeCats]){c.children??=[];for(const ch of c.children){ch.id??=uid()}}
+data.transactions??=[];data.people??=[];data.customers??=[];data.products??=[];data.reminders??=[];data.notes??=[];data.checks??=[];data.invoices??=[];data.audit??=[];data.expenseCats??=defaultsExpense.map((name,i)=>({id:"e"+i,name,children:[]}));data.incomeCats??=defaultsIncome.map((name,i)=>({id:"i"+i,name,children:[]}));data.pin=typeof data.pin==="string"?data.pin:"";data.pinHash=typeof data.pinHash==="string"?data.pinHash:"";data.pinSalt=typeof data.pinSalt==="string"?data.pinSalt:"";data.patternHash=typeof data.patternHash==="string"?data.patternHash:"";data.patternSalt=typeof data.patternSalt==="string"?data.patternSalt:"";data.lockMethod=(data.lockMethod==="pattern")?"pattern":"pin";data.biometricEnabled=!!data.biometricEnabled;data.webauthnCredId=typeof data.webauthnCredId==="string"?data.webauthnCredId:"";data.lang=(data.lang==="en")?"en":"fa";data.branding??={storeName:"",logo:"",stamp:"",signature:""};data.branding.storeName??="";data.branding.logo??="";data.branding.stamp??="";data.branding.signature??="";data.yearSettlements??={};data._sync??={tombstones:{}};data._sync.tombstones??={};for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats"]){for(const r of data[k]){r.id??=uid();r.updatedAt??=new Date().toISOString()}}for(const c of [...data.expenseCats,...data.incomeCats]){c.children??=[];for(const ch of c.children){ch.id??=uid()}}
 // Normalize older people records so saved debtors/creditors always render correctly.
 for(const p of data.people){if(p.type==="debtor"||p.type==="debtors"||p.type==="بدهکار")p.type="debt";if(p.type==="creditor"||p.type==="creditors"||p.type==="طلبکار"||p.type==="بستانکار")p.type="credit";if(p.type!=="debt"&&p.type!=="credit")p.type="debt";p.amount=Number(p.amount)||0;p.paid=Number(p.paid)||0;p.name=String(p.name||"").trim()} 
 let peopleMode="debt";
 const AUDIT_LIMIT=1000;
+/* v5.9 perf fix: logEvent() used to write the ENTIRE app data blob to
+ * localStorage and trigger a full render()+syncSave() synchronously,
+ * every single time it ran — and it ran on every page navigation
+ * (goToPage), every save, every button tap that logs an action. As the
+ * data grew (more transactions/audit entries) this JSON.stringify+render
+ * pair got heavier and heavier, which is exactly what showed up as
+ * "لag when switching pages". The audit entry itself still needs to be
+ * persisted, but that persistence + the cloud sync it triggers are now
+ * batched into one debounced flush shortly after the tap, instead of
+ * blocking it — so the screen switches instantly and the bookkeeping
+ * happens a moment later in the background. */
+let _auditFlushTimer=null,_auditFlushSync=false;
+function scheduleAuditFlush(doSync){
+  _auditFlushSync=_auditFlushSync||!!doSync;
+  if(_auditFlushTimer)return;
+  _auditFlushTimer=setTimeout(()=>{
+    _auditFlushTimer=null;
+    try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){console.warn("audit flush",e)}
+    const s=_auditFlushSync;_auditFlushSync=false;
+    if(s)syncSave();
+  },300);
+}
 function logEvent(action,detail="",kind="info",doSync=true){
   const entry={id:uid(),at:new Date().toISOString(),action:String(action||"رویداد"),detail:String(detail||""),kind:String(kind||"info")};
   data.audit??=[]; data.audit.unshift(entry); if(data.audit.length>AUDIT_LIMIT)data.audit.length=AUDIT_LIMIT;
-  localStorage.setItem(KEY,JSON.stringify(data));
   markDirty("audit",entry.id,false,entry,entry.at);
-  render(); if(doSync)syncSave();
+  scheduleAuditFlush(doSync);
+  if(pageActive("reports")&&$("auditList"))renderAudit();
 }
 function auditLabel(k){return ({create:"ایجاد",edit:"ویرایش",delete:"حذف",payment:"تسویه",sync:"همگام‌سازی",auth:"ورود/خروج",system:"سیستم",nav:"ناوبری",settings:"تنظیمات",info:"اطلاعات"})[k]||"رویداد"}
 function auditIcon(k){return ({create:"➕",edit:"✏️",delete:"🗑️",payment:"💳",sync:"☁️",auth:"🔐",system:"⚙️",nav:"🧭",settings:"🎛️",info:"ℹ️"})[k]||"•"}
@@ -503,17 +564,103 @@ function b64ToBytes(s){const bin=atob(s);const out=new Uint8Array(bin.length);fo
 async function hashPin(pin,saltB64){const salt=saltB64?b64ToBytes(saltB64):crypto.getRandomValues(new Uint8Array(16));const key=await crypto.subtle.importKey("raw",new TextEncoder().encode(pin),"PBKDF2",false,["deriveBits"]);const bits=await crypto.subtle.deriveBits({name:"PBKDF2",salt,iterations:120000,hash:"SHA-256"},key,256);return {hash:bytesToB64(bits),salt:bytesToB64(salt)}}
 async function verifyPin(pin){if(data.pinHash&&data.pinSalt){const x=await hashPin(pin,data.pinSalt);return x.hash===data.pinHash}return String(pin)===String(data.pin||"")}
 async function migratePinSecurity(){if(!data.pin||data.pinHash)return;try{const x=await hashPin(data.pin);data.pinHash=x.hash;data.pinSalt=x.salt;data.pin="";localStorage.setItem(KEY,JSON.stringify(data));}catch(e){console.warn("PIN security migration",e)}}
+function hasLockCode(){return !!(data.pinHash||data.pin||data.patternHash)}
+
+/* ---- Pattern lock (v5.9) --------------------------------------------
+ * A 3x3 connect-the-dots pattern, drawn like an Android unlock pattern.
+ * The sequence of dot indices (e.g. "0-1-4-7") is hashed with the same
+ * PBKDF2 routine used for the numeric PIN, so it's never stored in the
+ * clear. Reused both for setting the pattern (settings) and for
+ * unlocking the app (lock screen). ---- */
+function patternDotXY(i){const col=i%3,row=Math.floor(i/3);return {x:40+col*90,y:40+row*90}}
+function patternSVG(){let dots="";for(let i=0;i<9;i++){const c=patternDotXY(i);dots+=`<circle class="pattern-dot" data-i="${i}" cx="${c.x}" cy="${c.y}" r="17"></circle>`}return `<svg id="patternSvg" viewBox="0 0 260 260" class="pattern-svg" touch-action="none"><polyline id="patternLine" class="pattern-line" points=""></polyline>${dots}</svg>`}
+let patternPath=[];
+function patternPointFromEvent(svg,ev){const rect=svg.getBoundingClientRect();const t=ev.touches&&ev.touches[0]?ev.touches[0]:ev;const x=(t.clientX-rect.left)/rect.width*260,y=(t.clientY-rect.top)/rect.height*260;return {x,y}}
+function patternRedraw(svg){svg.querySelectorAll(".pattern-dot").forEach(d=>d.classList.toggle("on",patternPath.includes(+d.dataset.i)));const line=svg.querySelector("#patternLine");if(line)line.setAttribute("points",patternPath.map(i=>{const c=patternDotXY(i);return `${c.x},${c.y}`}).join(" "))}
+function patternDown(ev,onDone){ev.preventDefault();const svg=ev.currentTarget;patternPath=[];const move=e=>patternMove(e,svg);const up=()=>{patternUp(svg,onDone);svg.removeEventListener("pointermove",move);svg.removeEventListener("pointerup",up);svg.removeEventListener("pointerleave",up)};svg.addEventListener("pointermove",move);svg.addEventListener("pointerup",up);svg.addEventListener("pointerleave",up);patternMove(ev,svg)}
+function patternMove(ev,svg){const p=patternPointFromEvent(svg,ev);for(let i=0;i<9;i++){const c=patternDotXY(i);if(!patternPath.includes(i)&&Math.hypot(p.x-c.x,p.y-c.y)<26)patternPath.push(i)}patternRedraw(svg)}
+function patternUp(svg,onDone){onDone([...patternPath])}
+function patternKeyOf(path){return path.join("-")}
+async function openPatternSetup(){
+ const old=data.pinHash||data.pin;
+ if(old){const p=prompt("برای تغییر روش قفل، رمز عددی فعلی را وارد کن:")||"";if(!(await verifyPin(p)))return alert("رمز فعلی اشتباه است")}
+ const step={first:null};
+ const body=`<h2>🔗 تعیین رمز الگو</h2><p class="hint">حداقل ۴ نقطه را به هم وصل کن.</p><div id="patSetupWrap" class="pattern-wrap">${patternSVG()}</div><p id="patSetupMsg" class="hint"></p>`;
+ openModal(body);
+ const svg=$("patternSvg");
+ svg.onpointerdown=e=>patternDown(e,async path=>{
+  if(path.length<4){$("patSetupMsg").textContent="حداقل ۴ نقطه لازم است، دوباره بکش.";patternPath=[];patternRedraw(svg);return}
+  if(!step.first){step.first=path;patternPath=[];patternRedraw(svg);$("patSetupMsg").textContent="همین الگو را دوباره بکش تا تایید شود.";return}
+  if(patternKeyOf(step.first)!==patternKeyOf(path)){$("patSetupMsg").textContent="الگو با بار قبل یکسان نبود؛ از اول بکش.";step.first=null;patternPath=[];patternRedraw(svg);return}
+  try{const x=await hashPin(patternKeyOf(path));data.pin="";data.pinHash="";data.pinSalt="";data.patternHash=x.hash;data.patternSalt=x.salt;data.lockMethod="pattern";save();logEvent("تعیین رمز الگو",old?"الگوی ورود تغییر کرد":"قفل الگویی فعال شد","settings");alert("رمز الگو با موفقیت ذخیره شد");closeModal();renderSettingsFeatures()}catch(e){alert("ذخیره الگو انجام نشد")}
+ });
+}
+async function verifyPattern(path){if(!data.patternHash||!data.patternSalt)return false;const x=await hashPin(patternKeyOf(path),data.patternSalt);return x.hash===data.patternHash}
+
+/* ---- Biometric unlock (Face ID / fingerprint) (v5.9) -----------------
+ * On a native Capacitor build with a biometric plugin available (e.g.
+ * capacitor-native-biometric, registered as "NativeBiometric"), the
+ * device's own Face ID / fingerprint prompt is used directly. In a
+ * plain browser/PWA, the standard WebAuthn platform authenticator is
+ * used instead (this covers Face ID/Touch ID in Safari and fingerprint/
+ * face unlock in Chrome on supported devices). A PIN or pattern must
+ * already be set — biometrics is always an additional, faster way in,
+ * never a replacement for having a code configured. ---- */
+function getNativeBiometric(){try{const p=globalThis.Capacitor?.Plugins?.NativeBiometric;if(p&&typeof p.verifyIdentity==="function")return p}catch(e){}return null}
+async function webauthnSupported(){try{return !!(window.PublicKeyCredential&&await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable())}catch(e){return false}}
+async function webauthnRegister(){
+ if(!(await webauthnSupported()))return false;
+ try{
+  const cred=await navigator.credentials.create({publicKey:{challenge:crypto.getRandomValues(new Uint8Array(32)),rp:{name:"حساب‌یار"},user:{id:crypto.getRandomValues(new Uint8Array(16)),name:"hesabdar-user",displayName:"کاربر حسابدار"},pubKeyCredParams:[{type:"public-key",alg:-7},{type:"public-key",alg:-257}],authenticatorSelection:{authenticatorAttachment:"platform",userVerification:"required"},timeout:60000}});
+  if(!cred)return false;
+  data.webauthnCredId=bytesToB64(cred.rawId);
+  return true;
+ }catch(e){console.warn("webauthn register",e);return false}
+}
+async function webauthnUnlock(){
+ if(!data.webauthnCredId)return false;
+ try{const cred=await navigator.credentials.get({publicKey:{challenge:crypto.getRandomValues(new Uint8Array(32)),allowCredentials:[{id:b64ToBytes(data.webauthnCredId),type:"public-key"}],userVerification:"required",timeout:60000}});return !!cred}catch(e){console.warn("webauthn unlock",e);return false}
+}
+async function biometricAvailable(){const p=getNativeBiometric();if(p){try{const r=await p.isAvailable();return !!(r&&(r.isAvailable||r.has))}catch(e){return false}}return webauthnSupported()}
+async function biometricVerify(){const p=getNativeBiometric();if(p){try{await p.verifyIdentity({reason:"ورود به حساب‌یار",title:"ورود با اثرانگشت / چهره",subtitle:"",description:"برای باز کردن برنامه تایید هویت کن"});return true}catch(e){return false}}return webauthnUnlock()}
+async function setBiometricEnabled(v){
+ if(v){
+  if(!hasLockCode()){alert("اول یک رمز ورود (عددی یا الگو) تعیین کن، بعد بیومتریک را فعال کن.");renderSettingsFeatures();return}
+  let ok=await biometricAvailable();
+  if(ok&&!getNativeBiometric())ok=await webauthnRegister();
+  if(!ok){alert("قفل بیومتریک (اثرانگشت/چهره) روی این گوشی در دسترس نیست یا تنظیم نشده.");renderSettingsFeatures();return}
+  data.biometricEnabled=true;
+ }else{data.biometricEnabled=false;data.webauthnCredId=""}
+ save();logEvent(v?"فعال‌سازی قفل بیومتریک":"غیرفعال‌سازی قفل بیومتریک","","settings");renderSettingsFeatures();
+}
+
 function showLock(){
  let old=$("lock"); if(old) old.remove();
- if(!data.pinHash&&!data.pin)return;
+ if(!hasLockCode())return;
  const d=document.createElement("div");d.id="lock";d.className="lock";
- d.innerHTML='<div class="lockbox"><h1>🔐 حسابدار</h1><p>رمز ورود را وارد کن</p><input id="pinInput" inputmode="numeric" maxlength="8" type="password" autocomplete="off" placeholder="رمز ورود"><button class="primary" id="unlockBtn">ورود</button></div>';
+ const bioBtn=data.biometricEnabled?'<button type="button" class="lock-bio-btn" id="bioUnlockBtn">👁 ورود با اثرانگشت / چهره</button>':"";
+ if(data.lockMethod==="pattern"&&data.patternHash){
+  d.innerHTML=`<div class="lockbox"><h1>🔐 حساب‌یار</h1><p>الگوی ورود را بکش</p><div class="pattern-wrap">${patternSVG()}</div><p id="lockMsg" class="hint"></p>${bioBtn}</div>`;
+ }else{
+  d.innerHTML='<div class="lockbox"><h1>🔐 حساب‌یار</h1><p>رمز ورود را وارد کن</p><input id="pinInput" inputmode="numeric" maxlength="8" type="password" autocomplete="off" placeholder="رمز ورود"><button class="primary" id="unlockBtn">ورود</button>'+bioBtn+'</div>';
+ }
  document.body.appendChild(d);
- $("unlockBtn").onclick=unlock;
- $("pinInput").onkeydown=e=>{if(e.key==="Enter")unlock()};
+ if(data.lockMethod==="pattern"&&data.patternHash){
+  const svg=$("patternSvg");
+  svg.onpointerdown=e=>patternDown(e,async path=>{
+   const ok=await verifyPattern(path).catch(()=>false);
+   if(ok){$("lock")?.remove();return}
+   $("lockMsg").textContent="الگو اشتباه است";patternPath=[];patternRedraw(svg);
+  });
+ }else{
+  $("unlockBtn").onclick=unlock;
+  $("pinInput").onkeydown=e=>{if(e.key==="Enter")unlock()};
+ }
+ if(bioBtn)$("bioUnlockBtn").onclick=async()=>{const ok=await biometricVerify().catch(()=>false);if(ok)$("lock")?.remove();else alert("تایید بیومتریک انجام نشد")};
 }
 async function unlock(){const input=$("pinInput");if(!input)return;const ok=await verifyPin(input.value).catch(()=>false);if(!ok)return alert("رمز اشتباه است");$("lock")?.remove()}
 async function setPin(){
+ if(data.lockMethod==="pattern"&&data.patternHash){alert("در حال حاضر قفل الگو فعال است. برای تغییر به رمز عددی، اول با «حذف رمز ورود» آن را غیرفعال کن.");return}
  const old=data.pinHash||data.pin?(prompt("رمز فعلی را وارد کن:")||""):"";
  if((data.pinHash||data.pin)&&!(await verifyPin(old)))return alert("رمز فعلی اشتباه است");
  const p=prompt(data.pinHash||data.pin?"رمز جدید ۴ تا ۸ رقمی:":"یک رمز ۴ تا ۸ رقمی برای ورود تعیین کن:");
@@ -521,13 +668,13 @@ async function setPin(){
  if(!/^\d{4,8}$/.test(p))return alert("رمز باید ۴ تا ۸ رقم باشد");
  const p2=prompt("رمز جدید را دوباره وارد کن:");
  if(p!==p2)return alert("دو رمز یکسان نیستند");
- try{const x=await hashPin(p);data.pin="";data.pinHash=x.hash;data.pinSalt=x.salt;save();logEvent("تغییر رمز ورود","رمز ورود تغییر کرد","settings");alert("رمز با موفقیت ذخیره شد")}catch(e){alert("ذخیره رمز انجام نشد")}
+ try{const x=await hashPin(p);data.pin="";data.pinHash=x.hash;data.pinSalt=x.salt;data.lockMethod="pin";save();logEvent("تغییر رمز ورود","رمز ورود تغییر کرد","settings");alert("رمز با موفقیت ذخیره شد");renderSettingsFeatures()}catch(e){alert("ذخیره رمز انجام نشد")}
 }
 async function removePin(){
- if(!data.pinHash&&!data.pin)return alert("هنوز رمزی فعال نیست");
- const p=prompt("رمز فعلی را وارد کن:");
- if(!(await verifyPin(p||"")))return alert("رمز فعلی اشتباه است");
- data.pin="";data.pinHash="";data.pinSalt="";save();logEvent("حذف رمز ورود","قفل برنامه غیرفعال شد","settings");alert("رمز حذف شد");
+ if(!hasLockCode())return alert("هنوز رمزی فعال نیست");
+ if(data.lockMethod==="pattern"){if(!confirm("رمز الگو حذف شود؟"))return}
+ else{const p=prompt("رمز فعلی را وارد کن:");if(!(await verifyPin(p||"")))return alert("رمز فعلی اشتباه است")}
+ data.pin="";data.pinHash="";data.pinSalt="";data.patternHash="";data.patternSalt="";data.biometricEnabled=false;data.webauthnCredId="";data.lockMethod="pin";save();logEvent("حذف رمز ورود","قفل برنامه غیرفعال شد","settings");alert("رمز حذف شد");renderSettingsFeatures();
 }
 
 function tapFeedback(){try{if(navigator.vibrate)navigator.vibrate(8)}catch(e){}}
@@ -1386,5 +1533,5 @@ function renderAdvancedReport(){
 function drawChart(inc,exp){const c=$("chart");if(!c)return;const x=c.getContext("2d"),w=c.width,h=c.height;x.clearRect(0,0,w,h);const max=Math.max(inc,exp,1);[[inc,"درآمد"],[exp,"هزینه"]].forEach((v,i)=>{const bh=v[0]/max*170;x.fillStyle=i?"#ef4444":"#22c55e";x.fillRect(150+i*190,h-45-bh,90,bh);x.fillStyle="#374151";x.font="20px sans-serif";x.fillText(v[1],155+i*190,h-12)})}
 function exportData(){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));a.download="hesabdar-backup.json";a.click();logEvent("پشتیبان‌گیری","فایل JSON صادر شد","settings")}
 function importData(e){const file=e.target.files?.[0];if(!file)return;const r=new FileReader();r.onload=async()=>{try{data=JSON.parse(r.result);normalizeData();await migratePinSecurity();data.audit??=[];data.notes??=[];save();logEvent("بازیابی اطلاعات","پشتیبان وارد شد","settings");showLock();alert("بازیابی شد")}catch{alert("فایل نامعتبر است")}};r.readAsText(file)}
-function clearData(){if(confirm("همه اطلاعات حذف شود؟")){const pin=data.pin,pinHash=data.pinHash,pinSalt=data.pinSalt;data=blankData();data.pin=pin;data.pinHash=pinHash;data.pinSalt=pinSalt;save();logEvent("پاک کردن اطلاعات","اطلاعات برنامه پاک شد","delete");}}
-(async function initApp(){normalizeData();await migratePinSecurity();showLock();render();applyDashboardConfig();renderBrandingInSettings();renderSettingsFeatures();maybeAutoBackup("اجرای برنامه");logEvent("اجرای برنامه","برنامه حسابدار اجرا شد","system");await initSync();if(!sync.auth){[4000,12000,30000].forEach(ms=>setTimeout(()=>{if(!sync.auth)initSync()},ms))}syncAllNotesToReminders().catch(console.error);rescheduleAllNativeReminders().catch(console.error);startUpdateChecker();startReminderChecker();})();
+function clearData(){if(confirm("همه اطلاعات حذف شود؟")){const pin=data.pin,pinHash=data.pinHash,pinSalt=data.pinSalt,patternHash=data.patternHash,patternSalt=data.patternSalt,lockMethod=data.lockMethod,biometricEnabled=data.biometricEnabled,webauthnCredId=data.webauthnCredId,lang=data.lang;data=blankData();data.pin=pin;data.pinHash=pinHash;data.pinSalt=pinSalt;data.patternHash=patternHash;data.patternSalt=patternSalt;data.lockMethod=lockMethod;data.biometricEnabled=biometricEnabled;data.webauthnCredId=webauthnCredId;data.lang=lang;save();logEvent("پاک کردن اطلاعات","اطلاعات برنامه پاک شد","delete");}}
+(async function initApp(){normalizeData();await migratePinSecurity();showLock();render();applyDashboardConfig();renderBrandingInSettings();renderSettingsFeatures();applyLanguage();maybeAutoBackup("اجرای برنامه");logEvent("اجرای برنامه","برنامه حسابدار اجرا شد","system");await initSync();if(!sync.auth){[4000,12000,30000].forEach(ms=>setTimeout(()=>{if(!sync.auth)initSync()},ms))}syncAllNotesToReminders().catch(console.error);rescheduleAllNativeReminders().catch(console.error);startUpdateChecker();startReminderChecker();})();
