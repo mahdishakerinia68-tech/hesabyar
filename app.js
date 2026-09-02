@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="5.4";
+const APP_VERSION="5.5";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
@@ -29,7 +29,7 @@ function setAutoBackupEnabled(v){localStorage.setItem(AUTO_BACKUP_ENABLED_KEY,v?
 function createAutoBackup(reason="زمان‌بندی"){try{if(!autoBackupEnabled())return false; const raw=JSON.stringify(data); const list=JSON.parse(localStorage.getItem(AUTO_BACKUP_KEY)||"[]"); list.unshift({at:new Date().toISOString(),reason,data:JSON.parse(raw)}); while(list.length>5)list.pop(); localStorage.setItem(AUTO_BACKUP_KEY,JSON.stringify(list)); localStorage.setItem(AUTO_BACKUP_KEY+"-last",new Date().toISOString()); return true}catch(e){console.warn("auto backup",e);return false}}
 function getAutoBackupInfo(){try{const last=localStorage.getItem(AUTO_BACKUP_KEY+"-last");return last?new Date(last):null}catch{return null}}
 function restoreLatestAutoBackup(){try{const list=JSON.parse(localStorage.getItem(AUTO_BACKUP_KEY)||"[]"); if(!list.length)return alert("هنوز پشتیبان خودکاری وجود ندارد."); if(!confirm("آخرین پشتیبان خودکار جایگزین اطلاعات فعلی شود؟"))return; data=list[0].data; normalizeData(); save(); logEvent("بازیابی پشتیبان خودکار",new Date(list[0].at).toLocaleString("fa-IR"),"settings"); alert("آخرین پشتیبان خودکار بازیابی شد.")}catch(e){alert("پشتیبان خودکار قابل بازیابی نیست.")}}
-function normalizeData(){data=data||blankData(); for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats","audit"]){data[k]??=[];} data.pin=typeof data.pin==="string"?data.pin:""; data.pinHash=typeof data.pinHash==="string"?data.pinHash:""; data.pinSalt=typeof data.pinSalt==="string"?data.pinSalt:""; data.branding??={storeName:"",logo:"",stamp:"",signature:""}; data.yearSettlements??={}; data._sync??={tombstones:{}}; data._sync.tombstones??={}; for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats"]){for(const r of data[k]){r.id??=uid();r.updatedAt??=new Date().toISOString();}}}
+function normalizeData(){data=data||blankData(); for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats","audit"]){data[k]??=[];} data.pin=typeof data.pin==="string"?data.pin:""; data.pinHash=typeof data.pinHash==="string"?data.pinHash:""; data.pinSalt=typeof data.pinSalt==="string"?data.pinSalt:""; data.branding??={storeName:"",logo:"",stamp:"",signature:""}; data.yearSettlements??={}; data._sync??={tombstones:{}}; data._sync.tombstones??={}; for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats"]){for(const r of data[k]){r.id??=uid();r.updatedAt??=new Date().toISOString();}} for(const c of [...data.expenseCats,...data.incomeCats]){c.children??=[];for(const ch of c.children){ch.id??=uid();}} data.notes.forEach((n,i)=>{if(typeof n.order!=="number")n.order=i;}); data.reminders.forEach((r,i)=>{if(typeof r.order!=="number")r.order=i;});}
 function renderSettingsFeatures(){const e=$("autoBackupToggle");if(e)e.checked=autoBackupEnabled(); const last=$("autoBackupLast"); if(last){const d=getAutoBackupInfo();last.textContent=d?"آخرین پشتیبان: "+d.toLocaleString("fa-IR"):"هنوز پشتیبان خودکاری ساخته نشده";} const v=$("appVersionText");if(v)v.textContent=APP_VERSION; const vp=$("versionPill");if(vp)vp.textContent=APP_VERSION;}
 function setSyncStatus(t){const e=$("syncStatus");if(e)e.textContent=t||"";const b=$("syncBadge");if(!b)return;const s=String(t||"");let cls="offline",label="☁️ آفلاین";if(s.includes("آنلاین")||s.includes("انجام شد")||s.includes("متصل است")){cls="online";label="☁️ متصل"}else if(s.includes("⚠️")||s.includes("ناموفق")){cls="error";label="⚠️ خطای اتصال"}else if(s.includes("در حال")||s.includes("بررسی")){cls="pending";label="☁️ در حال اتصال..."}else if(s.includes("وارد شوید")||s.includes("ابتدا")){cls="offline";label="☁️ واردنشده"}b.textContent=label;b.className="sync-badge "+cls}
 
@@ -153,7 +153,7 @@ function renderDueSoon(){
   box.innerHTML=`🔔 ${overdue?`<b>${fa(overdue)} یادآوری دیرشده</b> • `:""}${fa(todayCount)} یادآوری در ۲۴ ساعت آینده`;
 }
 
-const blankData=()=>({accounts:[],transactions:[],people:[],reminders:[],notes:[],checks:[],invoices:[],customers:[],products:[],audit:[],expenseCats:defaultsExpense.map((name,i)=>({id:"e"+i,name})),incomeCats:defaultsIncome.map((name,i)=>({id:"i"+i,name})),pin:"",branding:{storeName:"",logo:"",stamp:"",signature:""},yearSettlements:{}});
+const blankData=()=>({accounts:[],transactions:[],people:[],reminders:[],notes:[],checks:[],invoices:[],customers:[],products:[],audit:[],expenseCats:defaultsExpense.map((name,i)=>({id:"e"+i,name,children:[]})),incomeCats:defaultsIncome.map((name,i)=>({id:"i"+i,name,children:[]})),pin:"",branding:{storeName:"",logo:"",stamp:"",signature:""},yearSettlements:{}});
 window.addEventListener("error",e=>{console.error(e.error||e.message)});
 window.addEventListener("unhandledrejection",e=>{console.error(e.reason)});
 window.addEventListener("online",async()=>{if(sync.db)sync.db.enableNetwork().catch(console.error);setSyncStatus("🌐 اینترنت برقرار شد؛ در حال بررسی اتصال دو گوشی..."); if(!sync.auth)await initSync(); if(sync.dirty&&sync.dirty.size)syncSave(); await verifyTwoPhoneConnection(true); checkForUpdates(false);});
@@ -178,7 +178,7 @@ data=data||blankData();
 normalizeData();
 data.accounts??=[];
 if(!data.accounts.some(a=>String(a.name||"").trim()==="کیف پول نقدی")){const cash=touch({id:uid(),name:"کیف پول نقدی",bank:"",sender:"",card:"",balance:0,default:true});data.accounts.unshift(cash);localStorage.setItem(KEY,JSON.stringify(data));}
-data.transactions??=[];data.people??=[];data.customers??=[];data.products??=[];data.reminders??=[];data.notes??=[];data.checks??=[];data.invoices??=[];data.audit??=[];data.expenseCats??=defaultsExpense.map((name,i)=>({id:"e"+i,name}));data.incomeCats??=defaultsIncome.map((name,i)=>({id:"i"+i,name}));data.pin=typeof data.pin==="string"?data.pin:"";data.pinHash=typeof data.pinHash==="string"?data.pinHash:"";data.pinSalt=typeof data.pinSalt==="string"?data.pinSalt:"";data.branding??={storeName:"",logo:"",stamp:"",signature:""};data.branding.storeName??="";data.branding.logo??="";data.branding.stamp??="";data.branding.signature??="";data.yearSettlements??={};data._sync??={tombstones:{}};data._sync.tombstones??={};for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats"]){for(const r of data[k]){r.id??=uid();r.updatedAt??=new Date().toISOString()}}
+data.transactions??=[];data.people??=[];data.customers??=[];data.products??=[];data.reminders??=[];data.notes??=[];data.checks??=[];data.invoices??=[];data.audit??=[];data.expenseCats??=defaultsExpense.map((name,i)=>({id:"e"+i,name,children:[]}));data.incomeCats??=defaultsIncome.map((name,i)=>({id:"i"+i,name,children:[]}));data.pin=typeof data.pin==="string"?data.pin:"";data.pinHash=typeof data.pinHash==="string"?data.pinHash:"";data.pinSalt=typeof data.pinSalt==="string"?data.pinSalt:"";data.branding??={storeName:"",logo:"",stamp:"",signature:""};data.branding.storeName??="";data.branding.logo??="";data.branding.stamp??="";data.branding.signature??="";data.yearSettlements??={};data._sync??={tombstones:{}};data._sync.tombstones??={};for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats"]){for(const r of data[k]){r.id??=uid();r.updatedAt??=new Date().toISOString()}}for(const c of [...data.expenseCats,...data.incomeCats]){c.children??=[];for(const ch of c.children){ch.id??=uid()}}
 // Normalize older people records so saved debtors/creditors always render correctly.
 for(const p of data.people){if(p.type==="debtor"||p.type==="debtors"||p.type==="بدهکار")p.type="debt";if(p.type==="creditor"||p.type==="creditors"||p.type==="طلبکار"||p.type==="بستانکار")p.type="credit";if(p.type!=="debt"&&p.type!=="credit")p.type="debt";p.amount=Number(p.amount)||0;p.paid=Number(p.paid)||0;p.name=String(p.name||"").trim()} 
 let peopleMode="debt";
@@ -568,10 +568,28 @@ function cardActions(a){
  return `<div class="card-number-box"><span>💳 ${esc(a.card)}</span><div class="actions card-actions"><button type="button" title="کپی شماره کارت" onclick="copyCardNumber('${a.id}\')">📋 کپی</button><button type="button" title="ارسال شماره کارت" onclick="shareCardNumber('${a.id}\')">📤 ارسال</button></div></div>`;
 }
 function deleteAccount(id){const a=data.accounts.find(x=>x.id===id);if(!a)return;if(confirm("این حساب و تراکنش‌های مرتبط با آن حذف شوند؟")){const related=data.transactions.filter(t=>t.accountID===id||t.from===id||t.to===id);related.forEach(t=>removeRecord("transactions",t.id));removeRecord("accounts",id);logEvent("حذف حساب",`${a.name} • ${related.length} تراکنش مرتبط حذف شد`,"delete")}}
-function categoryButtons(type,selected=""){const arr=type==="expense"?data.expenseCats:data.incomeCats;return `<div class="category-window">${arr.map(c=>`<button type="button" class="cat-btn ${c.name===selected?"selected-cat":""}" onclick="pickCategory('${type}','${c.id}')">${esc(c.name)}</button>`).join("")}</div>`}
-function openTx(id=null){if(!data.accounts.length)return alert("اول از بخش حساب‌ها یک حساب اضافه کنید");const t=id&&data.transactions.find(x=>x.id===id);if(t?.type==="transfer")return openTransfer(id);const typ=t?.type||"expense";openModal(`<h2>${t?"ویرایش تراکنش":"ثبت تراکنش"}</h2><div class="form"><div class="type-switch"><button type="button" id="expBtn" class="${typ==="expense"?"chosen":""}" onclick="txType('expense')">💸 هزینه</button><button type="button" id="incBtn" class="${typ==="income"?"chosen":""}" onclick="txType('income')">💰 دریافت</button></div><input id="txKind" type="hidden" value="${typ}"><input id="title" placeholder="عنوان" value="${esc(t?.title||"")}"><input id="amount" type="number" placeholder="مبلغ" value="${Number(t?.amount)||""}"><div id="expensePanel" style="display:${typ==="expense"?"block":"none"}"><b id="catLabel">${t?.category?"دسته هزینه: "+esc(t.category):"دسته هزینه را انتخاب کنید"}</b>${categoryButtons("expense",typ==="expense"?t?.category:"")}<input id="cat" type="hidden" value="${esc(typ==="expense"?t?.category||"":"")}"></div><div id="incomePanel" style="display:${typ==="income"?"block":"none"}"><b id="incatLabel">${t?.category?"نوع دریافت: "+esc(t.category):"نوع دریافت را انتخاب کنید"}</b>${categoryButtons("income",typ==="income"?t?.category:"")}<input id="incat" type="hidden" value="${esc(typ==="income"?t?.category||"":"")}"></div>${accountSelect("acc",t?.accountID||"")}<label class="file-label">📎 تصویر پیوست (اختیاری)<input id="txImage" type="file" accept="image/*" onchange="previewTxImage(this)"></label>${t?.image?`<div class="attachment-preview"><img src="${t.image}" alt="پیوست"></div>`:""}<div id="txImagePreview"></div><button class="primary" onclick="saveTx('${t?.id||""}')">${t?"ذخیره تغییرات":"ثبت تراکنش"}</button></div>`)}
+function categoryButtons(type,selected=""){
+  const arr=type==="expense"?data.expenseCats:data.incomeCats;
+  return `<div class="category-window">${arr.map(c=>{
+    const kids=c.children||[];
+    const isParentSel=c.name===selected;
+    return `<div class="cat-group">
+      <button type="button" class="cat-btn ${isParentSel?"selected-cat":""}" onclick="pickCategory('${type}','${c.id}')">${esc(c.name)}${kids.length?'<span class="cat-caret">›</span>':""}</button>
+      ${kids.length?`<div class="cat-children">${kids.map(ch=>{const full=c.name+" - "+ch.name;return `<button type="button" class="cat-chip ${selected===full?"selected-cat":""}" onclick="pickSubCategory('${type}','${c.id}','${ch.id}')">${esc(ch.name)}</button>`}).join("")}</div>`:""}
+    </div>`;
+  }).join("")}</div>`;
+}
+function openTx(id=null){if(!data.accounts.length)return alert("اول از بخش حساب‌ها یک حساب اضافه کنید");const t=id&&data.transactions.find(x=>x.id===id);if(t?.type==="transfer")return openTransfer(id);const typ=t?.type||"expense";openModal(`<h2>${t?"ویرایش تراکنش":"ثبت تراکنش"}</h2><div class="form"><div class="type-switch"><button type="button" id="expBtn" class="${typ==="expense"?"chosen":""}" onclick="txType('expense')">💸 هزینه</button><button type="button" id="incBtn" class="${typ==="income"?"chosen":""}" onclick="txType('income')">💰 دریافت</button></div><input id="txKind" type="hidden" value="${typ}"><input id="title" placeholder="عنوان" value="${esc(t?.title||"")}"><input id="amount" type="number" placeholder="مبلغ" value="${Number(t?.amount)||""}"><div id="expensePanel" style="display:${typ==="expense"?"block":"none"}"><b id="catLabel">${t?.category?"دسته: "+esc(t.category):"دسته را انتخاب کنید"}</b>${categoryButtons("expense",typ==="expense"?t?.category:"")}<input id="cat" type="hidden" value="${esc(typ==="expense"?t?.category||"":"")}"></div><div id="incomePanel" style="display:${typ==="income"?"block":"none"}"><b id="incatLabel">${t?.category?"دسته: "+esc(t.category):"دسته را انتخاب کنید"}</b>${categoryButtons("income",typ==="income"?t?.category:"")}<input id="incat" type="hidden" value="${esc(typ==="income"?t?.category||"":"")}"></div>${accountSelect("acc",t?.accountID||"")}<label class="file-label">📎 تصویر پیوست (اختیاری)<input id="txImage" type="file" accept="image/*" onchange="previewTxImage(this)"></label>${t?.image?`<div class="attachment-preview"><img src="${t.image}" alt="پیوست"></div>`:""}<div id="txImagePreview"></div><button class="primary" onclick="saveTx('${t?.id||""}')">${t?"ذخیره تغییرات":"ثبت تراکنش"}</button></div>`)}
 function txType(t){$("txKind").value=t;$("expBtn").classList.toggle("chosen",t==="expense");$("incBtn").classList.toggle("chosen",t==="income");$("expensePanel").style.display=t==="expense"?"block":"none";$("incomePanel").style.display=t==="income"?"block":"none"}
-function pickCategory(type,id){const c=(type==="expense"?data.expenseCats:data.incomeCats).find(x=>x.id===id);if(!c)return;if(type==="expense"){$("cat").value=c.name;$("catLabel").textContent="دسته هزینه: "+c.name}else{$("incat").value=c.name;$(("incatLabel")).textContent="نوع دریافت: "+c.name}}
+function pickCategory(type,id){const c=(type==="expense"?data.expenseCats:data.incomeCats).find(x=>x.id===id);if(!c)return;setCategoryValue(type,c.name)}
+function pickSubCategory(type,catId,childId){const c=(type==="expense"?data.expenseCats:data.incomeCats).find(x=>x.id===catId);const ch=c?.children?.find(x=>x.id===childId);if(!c||!ch)return;setCategoryValue(type,c.name+" - "+ch.name)}
+function setCategoryValue(type,name){
+  const valEl=$(type==="expense"?"cat":"incat"), labelEl=$(type==="expense"?"catLabel":"incatLabel");
+  if(valEl)valEl.value=name; if(labelEl)labelEl.textContent="دسته: "+name;
+  const panel=$(type==="expense"?"expensePanel":"incomePanel");
+  const win=panel?.querySelector(".category-window");
+  if(win)win.outerHTML=categoryButtons(type,name);
+}
 async function saveTx(id){
  const amount=parseMoney($("amount").value),type=$("txKind").value,category=type==="expense"?$("cat").value:$("incat").value;
  if(!amount)return alert("مبلغ را وارد کنید");if(!category)return alert("دسته را انتخاب کنید");
@@ -646,10 +664,20 @@ function saveTransfer(id){
  if(id){const t=data.transactions.find(x=>x.id===id);if(!t)return;Object.assign(t,o);touch(t);markDirty("transactions",t.id,false,t,t.updatedAt)}else{const nt=touch({id:uid(),date:new Date().toISOString(),...o});data.transactions.unshift(nt);markDirty("transactions",nt.id,false,nt,nt.updatedAt)}save();logEvent(id?"ویرایش انتقال":"ایجاد انتقال",`${money(amount)} • ${mode==="other"?o.otherName:"حساب خودم"}`,id?"edit":"create");closeModal()
 }
 function deleteTx(id){if(confirm("این تراکنش حذف شود؟")){const t=data.transactions.find(x=>x.id===id);removeRecord("transactions",id);logEvent("حذف تراکنش",t?.title||id,"delete")}}
-function openCategory(){openModal(`<h2>🏷 دسته‌بندی‌ها</h2><div class="section-head"><b>دسته‌های هزینه</b><button onclick="addCatPrompt('expense')">＋</button></div>${data.expenseCats.map(c=>`<div class="item compact"><b>${esc(c.name)}</b><div class="actions"><button onclick="editCategory('expense','${c.id}')">✏️</button><button class="danger-icon" onclick="removeCategory('expense','${c.id}')">🗑</button></div></div>`).join("")}<div class="section-head"><b>نوع‌های دریافت</b><button onclick="addCatPrompt('income')">＋</button></div>${data.incomeCats.map(c=>`<div class="item compact"><b>${esc(c.name)}</b><div class="actions"><button onclick="editCategory('income','${c.id}')">✏️</button><button class="danger-icon" onclick="removeCategory('income','${c.id}')">🗑</button></div></div>`).join("")}`)}
-function addCatPrompt(type){const n=prompt(type==="expense"?"نام دسته هزینه:":"نام نوع دریافت:");if(!n?.trim())return;const arr=type==="expense"?data.expenseCats:data.incomeCats;const nc=touch({id:uid(),name:n.trim()});arr.push(nc);markDirty(type==="expense"?"expenseCats":"incomeCats",nc.id,false,nc,nc.updatedAt);save();logEvent("ایجاد دسته",n.trim(),"create");openCategory()}
-function editCategory(type,id){const arr=type==="expense"?data.expenseCats:data.incomeCats,c=arr.find(x=>x.id===id);if(!c)return;const n=prompt("نام جدید:",c.name);if(n?.trim()){const old=c.name;c.name=n.trim();touch(c);markDirty(type==="expense"?"expenseCats":"incomeCats",c.id,false,c,c.updatedAt);data.transactions.forEach(t=>{if(t.category===old){t.category=c.name;touch(t);markDirty("transactions",t.id,false,t,t.updatedAt)}});save();openCategory()}}
-function removeCategory(type,id){if(!confirm("این دسته حذف شود؟"))return;removeRecord(type==="expense"?"expenseCats":"incomeCats",id);openCategory()}
+function categoryManageRow(type,c){
+  const kids=c.children||[];
+  return `<div class="cat-manage-row">
+    <div class="cat-manage-head"><b>${esc(c.name)}</b><div class="actions"><button title="افزودن زیرمجموعه" onclick="addSubCatPrompt('${type}','${c.id}')">🏷➕</button><button onclick="editCategory('${type}','${c.id}')">✏️</button><button class="danger-icon" onclick="removeCategory('${type}','${c.id}')">🗑</button></div></div>
+    ${kids.length?`<div class="cat-sub-list">${kids.map(ch=>`<span class="cat-sub-chip">${esc(ch.name)}<button title="ویرایش" onclick="editSubCategory('${type}','${c.id}','${ch.id}')">✏️</button><button title="حذف" onclick="removeSubCategory('${type}','${c.id}','${ch.id}')">×</button></span>`).join("")}</div>`:`<div class="cat-sub-list"><button type="button" class="cat-sub-add" onclick="addSubCatPrompt('${type}','${c.id}')">＋ افزودن زیرمجموعه</button></div>`}
+  </div>`;
+}
+function openCategory(){openModal(`<h2>🏷 دسته‌ها</h2><p class="hint">هر دسته می‌تواند چند زیرمجموعه داشته باشد؛ هنگام ثبت تراکنش می‌توانی دسته یا زیرمجموعه دقیق‌تر آن را انتخاب کنی.</p><div class="section-head"><b>دسته‌های هزینه</b><button onclick="addCatPrompt('expense')">＋</button></div>${data.expenseCats.map(c=>categoryManageRow('expense',c)).join("")||empty("هنوز دسته‌ای اضافه نشده")}<div class="section-head"><b>دسته‌های دریافت</b><button onclick="addCatPrompt('income')">＋</button></div>${data.incomeCats.map(c=>categoryManageRow('income',c)).join("")||empty("هنوز دسته‌ای اضافه نشده")}`)}
+function addCatPrompt(type){const n=prompt("نام دسته:");if(!n?.trim())return;const arr=type==="expense"?data.expenseCats:data.incomeCats;const nc=touch({id:uid(),name:n.trim(),children:[]});arr.push(nc);markDirty(type==="expense"?"expenseCats":"incomeCats",nc.id,false,nc,nc.updatedAt);save();logEvent("ایجاد دسته",n.trim(),"create");openCategory()}
+function editCategory(type,id){const arr=type==="expense"?data.expenseCats:data.incomeCats,c=arr.find(x=>x.id===id);if(!c)return;const n=prompt("نام جدید:",c.name);if(n?.trim()){const old=c.name;c.name=n.trim();touch(c);markDirty(type==="expense"?"expenseCats":"incomeCats",c.id,false,c,c.updatedAt);data.transactions.forEach(t=>{if(t.category===old)/* exact match on the parent name only */ {t.category=c.name;touch(t);markDirty("transactions",t.id,false,t,t.updatedAt)}else if(String(t.category||"").startsWith(old+" - ")){t.category=c.name+t.category.slice(old.length);touch(t);markDirty("transactions",t.id,false,t,t.updatedAt)}});save();openCategory()}}
+function removeCategory(type,id){if(!confirm("این دسته و همه زیرمجموعه‌های آن حذف شود؟"))return;removeRecord(type==="expense"?"expenseCats":"incomeCats",id);openCategory()}
+function addSubCatPrompt(type,catId){const arr=type==="expense"?data.expenseCats:data.incomeCats;const c=arr.find(x=>x.id===catId);if(!c)return;const n=prompt("نام زیرمجموعه:");if(!n?.trim())return;c.children=c.children||[];c.children.push({id:uid(),name:n.trim()});touch(c);markDirty(type==="expense"?"expenseCats":"incomeCats",c.id,false,c,c.updatedAt);save();logEvent("ایجاد زیرمجموعه دسته",c.name+" › "+n.trim(),"create");openCategory()}
+function editSubCategory(type,catId,childId){const arr=type==="expense"?data.expenseCats:data.incomeCats;const c=arr.find(x=>x.id===catId);const ch=c?.children?.find(x=>x.id===childId);if(!c||!ch)return;const n=prompt("نام جدید:",ch.name);if(!n?.trim())return;const oldFull=c.name+" - "+ch.name;ch.name=n.trim();const newFull=c.name+" - "+ch.name;touch(c);markDirty(type==="expense"?"expenseCats":"incomeCats",c.id,false,c,c.updatedAt);data.transactions.forEach(t=>{if(t.category===oldFull){t.category=newFull;touch(t);markDirty("transactions",t.id,false,t,t.updatedAt)}});save();openCategory()}
+function removeSubCategory(type,catId,childId){if(!confirm("این زیرمجموعه حذف شود؟"))return;const arr=type==="expense"?data.expenseCats:data.incomeCats;const c=arr.find(x=>x.id===catId);if(!c)return;c.children=(c.children||[]).filter(x=>x.id!==childId);touch(c);markDirty(type==="expense"?"expenseCats":"incomeCats",c.id,false,c,c.updatedAt);save();openCategory()}
 function openProduct(id=null){const p=id&&data.products.find(x=>x.id===id);openModal(`<h2>${p?"ویرایش کالا":"کالای جدید"}</h2><div class="form">
  ${invField("نام کالا یا خدمت","",`<input id="prdName" placeholder="مثلاً: کیف چرمی مدل ۱" value="${esc(p?.name||"")}">`)}
  ${invField("کد کالا","اختیاری؛ برای پیدا کردن سریع‌تر",`<input id="prdCode" placeholder="مثلاً: A-102" value="${esc(p?.code||"")}">`)}
@@ -754,7 +782,8 @@ function openNote(id=null){
  const items=(n?.items||[]);
  openModal(`<h2>${n?"ویرایش یادداشت":"یادداشت جدید"}</h2><div class="form"><input id="ntitle" placeholder="عنوان یادداشت، مثلاً خرید" value="${esc(n?.title||"")}">${pickerBox("ndatePicker","ntimePicker",n?.date||new Date().toISOString())}<select id="nrepeat"><option value="none" ${!n?.repeat||n?.repeat==="none"?"selected":""}>بدون تکرار</option><option value="daily" ${n?.repeat==="daily"?"selected":""}>روزانه</option><option value="weekly" ${n?.repeat==="weekly"?"selected":""}>هفتگی</option><option value="monthly" ${n?.repeat==="monthly"?"selected":""}>ماهانه</option></select><textarea id="ntext" placeholder="توضیحات اصلی (اختیاری)">${esc(n?.text||"")}</textarea><div><b>آیتم‌های زیرمجموعه</b><div id="noteItemsEditor" class="note-items-editor">${items.map((it,i)=>noteItemEditor(it,i)).join("")}</div><button type="button" class="add-item-btn" onclick="addNoteItemEditor()">＋ افزودن آیتم</button></div><button class="primary" onclick="saveNote('${n?.id||""}')">${n?"ذخیره تغییرات":"ساخت یادداشت"}</button></div>`);
 }
-function noteItemEditor(it={},i){return `<div class="note-edit-row"><input class="note-item-input" data-note-item="${i}" data-note-item-id="${esc(it.id||"")}" placeholder="مثلاً خرید نان" value="${esc(it.text||"")}"><button type="button" class="mini-danger" onclick="this.parentElement.remove()">🗑</button></div>`}
+function noteItemEditor(it={},i){return `<div class="note-edit-row"><div class="reorder-btns"><button type="button" title="انتقال به بالا" onclick="moveNoteItemEditorRow(this,-1)">▲</button><button type="button" title="انتقال به پایین" onclick="moveNoteItemEditorRow(this,1)">▼</button></div><input class="note-item-input" data-note-item="${i}" data-note-item-id="${esc(it.id||"")}" placeholder="مثلاً خرید نان" value="${esc(it.text||"")}"><button type="button" class="mini-danger" onclick="this.parentElement.remove()">🗑</button></div>`}
+function moveNoteItemEditorRow(btn,dir){const row=btn.closest(".note-edit-row");if(!row)return;const sib=dir<0?row.previousElementSibling:row.nextElementSibling;if(!sib)return;if(dir<0)row.parentElement.insertBefore(row,sib);else row.parentElement.insertBefore(sib,row)}
 function addNoteItemEditor(){const box=$("noteItemsEditor");if(!box)return;const i=box.querySelectorAll(".note-item-input").length;box.insertAdjacentHTML("beforeend",noteItemEditor({},i))}
 async function saveNote(id){
  const title=$("ntitle").value.trim(); if(!title)return alert("عنوان یادداشت را وارد کنید");
@@ -763,23 +792,40 @@ async function saveNote(id){
  const items=inputs.map((el,i)=>{const oldItem=el.dataset.noteItemId?oldItems.find(x=>x.id===el.dataset.noteItemId):oldItems[i];return {id:oldItem?.id||uid(),text:el.value.trim(),done:!!oldItem?.done}}).filter(x=>x.text);
  const o={title,date:pickerToISO("ndatePicker","ntimePicker"),repeat:$("nrepeat").value,text:$("ntext").value.trim(),items};
  if(id){if(!old)return alert("یادداشت پیدا نشد");Object.assign(old,o);touch(old);markDirty("notes",old.id,false,old,old.updatedAt);save();await upsertReminderForNote(old)}
- else{const nn=touch({id:uid(),...o});data.notes.unshift(nn);markDirty("notes",nn.id,false,nn,nn.updatedAt);save();await upsertReminderForNote(nn)}
+ else{const minOrder=data.notes.length?Math.min(...data.notes.map(n=>n.order??0)):0;const nn=touch({id:uid(),order:minOrder-1,...o});data.notes.unshift(nn);markDirty("notes",nn.id,false,nn,nn.updatedAt);save();await upsertReminderForNote(nn)}
  logEvent(id?"ویرایش یادداشت":"ایجاد یادداشت",title,id?"edit":"create");closeModal();
 }
 async function toggleNoteItem(noteId,itemId){const n=data.notes.find(x=>x.id===noteId);const it=n?.items?.find(x=>x.id===itemId);if(!it)return;it.done=!it.done;touch(n);markDirty("notes",n.id,false,n,n.updatedAt);localStorage.setItem(KEY,JSON.stringify(data));syncSave();await upsertReminderForNote(n,false);logEvent(it.done?"تکمیل آیتم یادداشت":"بازگردانی آیتم یادداشت",`${n.title} • ${it.text}`,"edit");const row=document.querySelector(`[data-note-row="${CSS.escape(itemId)}"]`);if(row){const span=row.querySelector("span");if(span)span.classList.toggle("done",it.done);const cb=row.querySelector("input[type=checkbox]");if(cb)cb.checked=it.done}const card=document.querySelector(`[data-note-card="${CSS.escape(noteId)}"]`);if(card){const total=(n.items||[]).length,done=(n.items||[]).filter(x=>x.done).length;const count=card.querySelector(".note-count");if(count)count.textContent=total?`${fa(done)} / ${fa(total)}`:""}}
 async function deleteNote(id){if(confirm("این یادداشت و همه آیتم‌های آن حذف شود؟")){const n=data.notes.find(x=>x.id===id);await removeReminderForNote(id);removeRecord("notes",id);logEvent("حذف یادداشت",n?.title||id,"delete")}}
 async function deleteNoteItem(noteId,itemId){const n=data.notes.find(x=>x.id===noteId);if(!n)return;if(confirm("این آیتم حذف شود؟")){n.items=(n.items||[]).filter(x=>x.id!==itemId);touch(n);markDirty("notes",n.id,false,n,n.updatedAt);localStorage.setItem(KEY,JSON.stringify(data));syncSave();await upsertReminderForNote(n,false);logEvent("حذف آیتم یادداشت",n.title,"delete");const row=document.querySelector(`[data-note-row="${CSS.escape(itemId)}"]`);if(row)row.remove();const card=document.querySelector(`[data-note-card="${CSS.escape(noteId)}"]`);if(card){const total=(n.items||[]).length,done=(n.items||[]).filter(x=>x.done).length;const count=card.querySelector(".note-count");if(count)count.textContent=total?`${fa(done)} / ${fa(total)}⌄`:"⌄";const list=card.querySelector(".note-checklist");if(list&&!total)list.innerHTML='<div class="meta">هنوز آیتمی اضافه نشده</div>';}}}
 function noteRepeatLabel(r){return r==="daily"?"روزانه":r==="weekly"?"هفتگی":r==="monthly"?"ماهانه":"بدون تکرار"}
-function noteItemHTML(n,it){
- return '<div class="note-check-row" data-note-row="'+esc(it.id)+'" onclick="event.stopPropagation()"><label onclick="event.stopPropagation()"><input type="checkbox" '+(it.done?'checked':'')+' onclick="event.stopPropagation()" onchange="toggleNoteItem(\''+n.id+'\',\''+it.id+'\')"><span class="'+(it.done?'done':'')+'">'+esc(it.text)+'</span></label><button type="button" class="mini-danger note-item-delete" title="حذف آیتم" onclick="event.stopPropagation();deleteNoteItem(\''+n.id+'\',\''+it.id+'\')">×</button></div>';
+function noteItemHTML(n,it,i,total){
+ const moveBtns=total>1?'<div class="reorder-btns" onclick="event.stopPropagation()"><button type="button" title="انتقال به بالا" '+(i===0?'disabled':'')+' onclick="event.stopPropagation();moveNoteItem(\''+n.id+'\',\''+it.id+'\',-1)">▲</button><button type="button" title="انتقال به پایین" '+(i===total-1?'disabled':'')+' onclick="event.stopPropagation();moveNoteItem(\''+n.id+'\',\''+it.id+'\',1)">▼</button></div>':'';
+ return '<div class="note-check-row" data-note-row="'+esc(it.id)+'" onclick="event.stopPropagation()">'+moveBtns+'<label onclick="event.stopPropagation()"><input type="checkbox" '+(it.done?'checked':'')+' onclick="event.stopPropagation()" onchange="toggleNoteItem(\''+n.id+'\',\''+it.id+'\')"><span class="'+(it.done?'done':'')+'">'+esc(it.text)+'</span></label><button type="button" class="mini-danger note-item-delete" title="حذف آیتم" onclick="event.stopPropagation();deleteNoteItem(\''+n.id+'\',\''+it.id+'\')">×</button></div>';
+}
+async function moveNoteItem(noteId,itemId,dir){
+ const n=data.notes.find(x=>x.id===noteId); if(!n||!n.items)return;
+ const idx=n.items.findIndex(x=>x.id===itemId); if(idx<0)return;
+ const swapIdx=idx+dir; if(swapIdx<0||swapIdx>=n.items.length)return;
+ [n.items[idx],n.items[swapIdx]]=[n.items[swapIdx],n.items[idx]];
+ touch(n); markDirty("notes",n.id,false,n,n.updatedAt); save();
 }
 const openAccordions=new Set();
-function noteHTML(n){
+function noteHTML(n,pos){
  const items=n.items||[];
- const list=items.length?items.map(it=>noteItemHTML(n,it)).join(''):'<div class="meta">هنوز آیتمی اضافه نشده</div>';
+ const list=items.length?items.map((it,i)=>noteItemHTML(n,it,i,items.length)).join(''):'<div class="meta">هنوز آیتمی اضافه نشده</div>';
  const alarm=n.date?`<div class="meta">⏰ آلارم جداگانه: ${jalaliDateTimeInput(n.date)} • ${noteRepeatLabel(n.repeat)}</div>`:'<div class="meta">بدون آلارم</div>';
  const accId="note-"+n.id;const isOpen=openAccordions.has(accId);
- return `<div class="note-card item accordion-card${isOpen?' open':''}" data-note-card="${esc(n.id)}" data-acc-id="${accId}"><button class="accordion-head" type="button" aria-expanded="${isOpen}" onclick="toggleAccordion(this,event)"><span><span class="note-badge">📝</span> <b>${esc(n.title)}</b></span><span class="note-count">${items.length?fa(items.filter(x=>x.done).length)+' / '+fa(items.length):''}</span><span class="acc-arrow">⌄</span></button><div class="accordion-body"><div class="note-main">${n.text?'<div class="meta note-text">'+esc(n.text)+'</div>':''}${alarm}<div class="note-checklist">${list}</div></div><div class="note-actions">${actionButtons('openNote','deleteNote',n.id)}</div></div></div>`;
+ const moveBtns=pos?`<div class="reorder-btns"><button type="button" title="انتقال به بالا" ${pos.i===0?"disabled":""} onclick="event.stopPropagation();moveNote('${n.id}',-1)">▲</button><button type="button" title="انتقال به پایین" ${pos.i===pos.total-1?"disabled":""} onclick="event.stopPropagation();moveNote('${n.id}',1)">▼</button></div>`:"";
+ return `<div class="note-card item accordion-card${isOpen?' open':''}" data-note-card="${esc(n.id)}" data-acc-id="${accId}"><button class="accordion-head" type="button" aria-expanded="${isOpen}" onclick="toggleAccordion(this,event)"><span><span class="note-badge">📝</span> <b>${esc(n.title)}</b></span><span class="note-count">${items.length?fa(items.filter(x=>x.done).length)+' / '+fa(items.length):''}</span><span class="acc-arrow">⌄</span></button><div class="accordion-body"><div class="note-main">${n.text?'<div class="meta note-text">'+esc(n.text)+'</div>':''}${alarm}<div class="note-checklist">${list}</div></div><div class="note-actions">${moveBtns}${actionButtons('openNote','deleteNote',n.id)}</div></div></div>`;
+}
+function moveNote(id,dir){
+ const sorted=[...data.notes].sort((a,b)=>(a.order??0)-(b.order??0));
+ const pos=sorted.findIndex(n=>n.id===id); if(pos<0)return;
+ const swapPos=pos+dir; if(swapPos<0||swapPos>=sorted.length)return;
+ const a=sorted[pos],b=sorted[swapPos]; const tmp=a.order??pos; a.order=b.order??swapPos; b.order=tmp;
+ touch(a);touch(b); markDirty("notes",a.id,false,a,a.updatedAt); markDirty("notes",b.id,false,b,b.updatedAt);
+ save();
 }
 function toggleAccordion(btn,event){
  if(event)event.stopPropagation();
@@ -793,7 +839,15 @@ function toggleAccordion(btn,event){
 
 
 function openReminder(id=null){const r=id&&data.reminders.find(x=>x.id===id);openModal(`<h2>${r?"ویرایش یادآوری":"یادآوری"}</h2><div class="form"><input id="rt" placeholder="عنوان" value="${esc(r?.title||"")}"><input id="ra" type="number" placeholder="مبلغ" value="${Number(r?.amount)||""}">${pickerBox("rdPicker","rtPicker",r?.date||new Date().toISOString())}<select id="rr"><option value="once" ${r?.repeat==="once"?"selected":""}>یک‌بار</option><option value="monthly" ${r?.repeat==="monthly"?"selected":""}>ماهانه</option><option value="weekly" ${r?.repeat==="weekly"?"selected":""}>هفتگی</option></select><select id="rb"><option value="expense" ${r?.type==="expense"?"selected":""}>پرداخت</option><option value="income" ${r?.type==="income"?"selected":""}>دریافت</option></select><button class="primary" onclick="saveReminder('${r?.id||""}')">${r?"ذخیره تغییرات":"ذخیره"}</button></div>`)}
-async function saveReminder(id){if(!$("rt").value||!$("rdPicker").value)return alert("عنوان و تاریخ لازم است");const o={title:$("rt").value.trim(),amount:parseMoney($("ra").value),date:pickerToISO("rdPicker","rtPicker"),repeat:$("rr").value,type:$("rb").value};if(id){const r=data.reminders.find(x=>x.id===id);Object.assign(r,o);touch(r);markDirty("reminders",r.id,false,r,r.updatedAt);save();await cancelNativeReminder(r.id);await scheduleNativeReminder(r);if((r.type||"")==="note" && (r.repeat||"once")==="once") await addToAndroidClock(r)}else{const nr=touch({id:uid(),...o});data.reminders.push(nr);markDirty("reminders",nr.id,false,nr,nr.updatedAt);save();await scheduleNativeReminder(nr);if((nr.type||"")==="note" && (nr.repeat||"once")==="once") await addToAndroidClock(nr)}logEvent(id?"ویرایش یادآوری":"ایجاد یادآوری",o.title,id?"edit":"create");closeModal()}
+function moveReminder(id,dir){
+ const sorted=data.reminders.filter(r=>!r.sourceNoteId).sort((a,b)=>(a.order??0)-(b.order??0));
+ const pos=sorted.findIndex(r=>r.id===id); if(pos<0)return;
+ const swapPos=pos+dir; if(swapPos<0||swapPos>=sorted.length)return;
+ const a=sorted[pos],b=sorted[swapPos]; const tmp=a.order??pos; a.order=b.order??swapPos; b.order=tmp;
+ touch(a);touch(b); markDirty("reminders",a.id,false,a,a.updatedAt); markDirty("reminders",b.id,false,b,b.updatedAt);
+ save();
+}
+async function saveReminder(id){if(!$("rt").value||!$("rdPicker").value)return alert("عنوان و تاریخ لازم است");const o={title:$("rt").value.trim(),amount:parseMoney($("ra").value),date:pickerToISO("rdPicker","rtPicker"),repeat:$("rr").value,type:$("rb").value};if(id){const r=data.reminders.find(x=>x.id===id);Object.assign(r,o);touch(r);markDirty("reminders",r.id,false,r,r.updatedAt);save();await cancelNativeReminder(r.id);await scheduleNativeReminder(r);if((r.type||"")==="note" && (r.repeat||"once")==="once") await addToAndroidClock(r)}else{const maxOrder=data.reminders.length?Math.max(...data.reminders.map(x=>x.order??0)):-1;const nr=touch({id:uid(),order:maxOrder+1,...o});data.reminders.push(nr);markDirty("reminders",nr.id,false,nr,nr.updatedAt);save();await scheduleNativeReminder(nr);if((nr.type||"")==="note" && (nr.repeat||"once")==="once") await addToAndroidClock(nr)}logEvent(id?"ویرایش یادآوری":"ایجاد یادآوری",o.title,id?"edit":"create");closeModal()}
 async function deleteReminder(id){if(confirm("این یادآوری حذف شود؟")){const r=data.reminders.find(x=>x.id===id);await cancelNativeReminder(id);removeRecord("reminders",id);logEvent("حذف یادآوری",r?.title||id,"delete")}}
 
 function openCheck(id=null){const c=id&&data.checks.find(x=>x.id===id);openModal(`<h2>${c?"ویرایش چک":"ثبت چک"}</h2><div class="form"><select id="ct"><option value="receive" ${c?.type==="receive"?"selected":""}>چک دریافتی</option><option value="pay" ${c?.type==="pay"?"selected":""}>چک پرداختی</option></select><input id="cn" placeholder="نام شخص" value="${esc(c?.name||"")}"><input id="camount" type="number" placeholder="مبلغ" value="${Number(c?.amount)||""}">${simpleDateField("cdate",jalaliInputValue(c?.date||""))}<input id="cnum" placeholder="شماره چک" value="${esc(c?.number||"")}"><input id="cbank" placeholder="بانک" value="${esc(c?.bank||"")}"><textarea id="cnote" placeholder="توضیحات">${esc(c?.note||"")}</textarea><button class="primary" onclick="saveCheck('${c?.id||""}')">${c?"ذخیره تغییرات":"ذخیره"}</button></div>`)}
@@ -972,6 +1026,88 @@ function previewBrandFile(input,type){const f=input?.files?.[0];if(!f)return;ope
 /* ===== Image framer: Telegram/Instagram-style fixed frame for logo/stamp/signature ===== */
 const framerState={img:null,type:null,input:null,scale:1,offX:0,offY:0,baseScale:1,stageW:260,stageH:260,dragging:false,startX:0,startY:0};
 const FRAMER_SIZES={logo:{stageW:220,stageH:220,outW:500,outH:500,round:true},stamp:{stageW:220,stageH:220,outW:500,outH:500,round:true},signature:{stageW:260,stageH:150,outW:640,outH:370,round:false}};
+
+/* ---- v5.5: on-device "AI enhance" for logo/stamp/signature photos ----
+ * There is no real image-editing model wired into this app, so this runs a small
+ * client-side pipeline (auto contrast stretch + unsharp-mask sharpening + background
+ * whitening) that noticeably cleans up a phone photo of a stamp/signature/logo:
+ * sharper edges and a clean white background instead of a dull/gray paper scan. */
+function aiClamp255(v){return v<0?0:v>255?255:v}
+function aiBoxBlurRGB(data,w,h,radius){
+  const size=radius*2+1;
+  const tmp=new Float32Array(data.length);
+  for(let y=0;y<h;y++){
+    let rSum=0,gSum=0,bSum=0;
+    for(let x=-radius;x<=radius;x++){const xi=Math.min(w-1,Math.max(0,x));const idx=(y*w+xi)*4;rSum+=data[idx];gSum+=data[idx+1];bSum+=data[idx+2]}
+    for(let x=0;x<w;x++){
+      const idx=(y*w+x)*4;
+      tmp[idx]=rSum/size;tmp[idx+1]=gSum/size;tmp[idx+2]=bSum/size;
+      const addXi=Math.min(w-1,x+radius+1),subXi=Math.max(0,x-radius);
+      const addIdx=(y*w+addXi)*4,subIdx=(y*w+subXi)*4;
+      rSum+=data[addIdx]-data[subIdx];gSum+=data[addIdx+1]-data[subIdx+1];bSum+=data[addIdx+2]-data[subIdx+2];
+    }
+  }
+  const out=new Float32Array(data.length);
+  for(let x=0;x<w;x++){
+    let rSum=0,gSum=0,bSum=0;
+    for(let y=-radius;y<=radius;y++){const yi=Math.min(h-1,Math.max(0,y));const idx=(yi*w+x)*4;rSum+=tmp[idx];gSum+=tmp[idx+1];bSum+=tmp[idx+2]}
+    for(let y=0;y<h;y++){
+      const idx=(y*w+x)*4;
+      out[idx]=rSum/size;out[idx+1]=gSum/size;out[idx+2]=bSum/size;
+      const addYi=Math.min(h-1,y+radius+1),subYi=Math.max(0,y-radius);
+      const addIdx=(addYi*w+x)*4,subIdx=(subYi*w+x)*4;
+      rSum+=tmp[addIdx]-tmp[subIdx];gSum+=tmp[addIdx+1]-tmp[subIdx+1];bSum+=tmp[addIdx+2]-tmp[subIdx+2];
+    }
+  }
+  return out;
+}
+function aiEnhancePixels(imageData,w,h){
+  const data=imageData.data;
+  let minR=255,maxR=0,minG=255,maxG=0,minB=255,maxB=0;
+  for(let i=0;i<data.length;i+=4){
+    const r=data[i],g=data[i+1],b=data[i+2];
+    if(r<minR)minR=r; if(r>maxR)maxR=r;
+    if(g<minG)minG=g; if(g>maxG)maxG=g;
+    if(b<minB)minB=b; if(b>maxB)maxB=b;
+  }
+  const stretch=(v,mn,mx)=>mx<=mn?v:aiClamp255(((v-mn)/(mx-mn))*255);
+  for(let i=0;i<data.length;i+=4){data[i]=stretch(data[i],minR,maxR);data[i+1]=stretch(data[i+1],minG,maxG);data[i+2]=stretch(data[i+2],minB,maxB)}
+  const blurred=aiBoxBlurRGB(data,w,h,2);
+  const amount=0.6;
+  for(let i=0;i<data.length;i+=4){
+    data[i]=aiClamp255(data[i]+amount*(data[i]-blurred[i]));
+    data[i+1]=aiClamp255(data[i+1]+amount*(data[i+1]-blurred[i+1]));
+    data[i+2]=aiClamp255(data[i+2]+amount*(data[i+2]-blurred[i+2]));
+  }
+  for(let i=0;i<data.length;i+=4){
+    const lum=0.299*data[i]+0.587*data[i+1]+0.114*data[i+2];
+    if(lum>210){const boost=Math.min(1,(lum-210)/45);data[i]=aiClamp255(data[i]+boost*(255-data[i]));data[i+1]=aiClamp255(data[i+1]+boost*(255-data[i+1]));data[i+2]=aiClamp255(data[i+2]+boost*(255-data[i+2]))}
+  }
+  return imageData;
+}
+async function aiEnhanceFramerImage(){
+  const s=framerState; if(!s.img)return;
+  const btn=$("framerEnhanceBtn"); if(btn){btn.disabled=true;btn.textContent="⏳ در حال بهبود تصویر..."}
+  try{
+    const srcW=s.img.naturalWidth,srcH=s.img.naturalHeight;
+    const procMax=900,down=Math.min(1,procMax/Math.max(srcW,srcH));
+    const pw=Math.max(1,Math.round(srcW*down)),ph=Math.max(1,Math.round(srcH*down));
+    const proc=document.createElement("canvas");proc.width=pw;proc.height=ph;
+    const pctx=proc.getContext("2d");pctx.drawImage(s.img,0,0,pw,ph);
+    const imgData=aiEnhancePixels(pctx.getImageData(0,0,pw,ph),pw,ph);
+    pctx.putImageData(imgData,0,0);
+    const full=document.createElement("canvas");full.width=srcW;full.height=srcH;
+    const fctx=full.getContext("2d");fctx.imageSmoothingEnabled=true;fctx.imageSmoothingQuality="high";fctx.drawImage(proc,0,0,srcW,srcH);
+    const dataUrl=full.toDataURL("image/png",0.95);
+    const enhancedImg=new Image();
+    await new Promise((resolve,reject)=>{enhancedImg.onload=resolve;enhancedImg.onerror=reject;enhancedImg.src=dataUrl});
+    s.img=enhancedImg;
+    const imgEl=$("framerImg");if(imgEl)imgEl.src=dataUrl;
+    updateFramerTransform();
+    logEvent("بهبود هوشمند تصویر",s.type==="logo"?"لوگو":s.type==="stamp"?"مهر":"امضا","edit");
+  }catch(e){console.warn("ai enhance",e);alert("بهبود تصویر ممکن نشد؛ دوباره امتحان کن.")}
+  if(btn){btn.disabled=false;btn.textContent="🪄 واضح‌تر و تمیزتر کن (AI)"}
+}
 function openFramer(file,type,input){
  const cfg=FRAMER_SIZES[type]||FRAMER_SIZES.logo;
  const r=new FileReader();
@@ -1113,26 +1249,36 @@ function currentJalaliYear(){const j=gregorianToJalali(new Date().getFullYear(),
 function settleCurrentYear(){const y=currentJalaliYear();const debt=data.people.filter(p=>p.type==="debt").reduce((s,p)=>s+Math.max(0,(Number(p.amount)||0)-(Number(p.paid)||0)),0);const credit=data.people.filter(p=>p.type==="credit").reduce((s,p)=>s+Math.max(0,(Number(p.amount)||0)-(Number(p.paid)||0)),0);if(debt>0||credit>0){return alert(`سال ${fa(y)} هنوز تسویه کامل نشده است.\nبدهی باقی‌مانده: ${money(debt)}\nطلب باقی‌مانده: ${money(credit)}\nاین مبالغ به سال بعد منتقل می‌شوند.`)}if(!confirm(`سال ${fa(y)} به‌عنوان «تسویه کامل» ثبت شود؟ اطلاعات سال حذف نمی‌شود.`))return;data.yearSettlements[y]={settled:true,at:new Date().toISOString()};save();logEvent("تسویه کامل سال",`سال ${y} تسویه شد؛ بدهی و طلب باقی‌مانده صفر بود`,`payment`);renderYearSettlement();alert("تسویه کامل سال ثبت شد")}
 function renderYearSettlement(){const box=$("yearSettlementBox");if(!box)return;const y=currentJalaliYear(),st=data.yearSettlements?.[y];const debt=data.people.filter(p=>p.type==="debt").reduce((s,p)=>s+Math.max(0,(Number(p.amount)||0)-(Number(p.paid)||0)),0),credit=data.people.filter(p=>p.type==="credit").reduce((s,p)=>s+Math.max(0,(Number(p.amount)||0)-(Number(p.paid)||0)),0);const rb=$("yearStatusReport");if(rb)rb.innerHTML=st?.settled?`<div class="card settlement-ok">🟢 سال ${fa(y)} تسویه شده است.</div>`:`<div class="card settlement-pending">🟡 سال ${fa(y)} هنوز تسویه نشده است.</div>`;box.innerHTML=st?.settled?`<div class="settlement-ok">🟢 سال ${fa(y)} تسویه شده است.</div>`:`<div class="settlement-pending">🟡 سال ${fa(y)} هنوز تسویه نشده است.<br>بدهی: ${money(debt)} • طلب: ${money(credit)}<br><small>بدهی‌ها و مطالبات تا تسویه کامل باقی می‌مانند.</small></div>`}
 function renderBrandingInSettings(){loadBrandingSettings();renderYearSettlement()}
+/* v5.5 perf fix: previously render() recomputed every single page's HTML (accounts,
+   transactions, audit log, charts, reports...) on every save/log event regardless of
+   which page was actually on screen. With more data this caused visible lag on every
+   tap. pageActive() lets each expensive section skip itself when its page isn't the
+   one currently shown; it still refreshes fully the moment the user navigates there
+   (activatePage() calls render() again right after switching pages). */
+function pageActive(id){const el=$(id);return !!(el&&el.classList.contains("active"))}
 function render(){
  const inc=data.transactions.filter(t=>t.type==="income").reduce((s,t)=>s+(Number(t.amount)||0),0),exp=data.transactions.filter(t=>t.type==="expense").reduce((s,t)=>s+(Number(t.amount)||0),0),base=data.accounts.reduce((s,a)=>s+(Number(a.balance)||0),0),net=inc-exp;
  if($("balance"))$("balance").textContent=money(base+net);if($("income"))$("income").textContent=money(inc);if($("expense"))$("expense").textContent=money(exp);
  if($("recent"))$("recent").innerHTML=data.transactions.slice(0,6).map(txHTML).join("")||empty("هنوز تراکنشی ثبت نشده");
- if($("accountList"))$("accountList").innerHTML=data.accounts.map(a=>`<div class="item account-item"><div class="account-main"><b>${esc(a.name)}</b><div class="meta">${esc(a.bank||"حساب شخصی")}${a.sender?" • فرستنده: "+esc(a.sender):""}</div>${cardActions(a)}</div><div><strong>${money(accountBalance(a.id))}</strong>${actionButtons("openAccount","deleteAccount",a.id)}<button type="button" title="گزارش Excel" onclick="exportAccountExcel('${a.id}')">📊</button></div></div>`).join("")||empty("هنوز حسابی اضافه نشده");
+ if($("accountList")&&pageActive("accounts"))$("accountList").innerHTML=data.accounts.map(a=>`<div class="item account-item"><div class="account-main"><b>${esc(a.name)}</b><div class="meta">${esc(a.bank||"حساب شخصی")}${a.sender?" • فرستنده: "+esc(a.sender):""}</div>${cardActions(a)}</div><div><strong>${money(accountBalance(a.id))}</strong>${actionButtons("openAccount","deleteAccount",a.id)}<button type="button" title="گزارش Excel" onclick="exportAccountExcel('${a.id}')">📊</button></div></div>`).join("")||empty("هنوز حسابی اضافه نشده");
  const q=$("search")?.value?.trim()||"",ft=$("filterType")?.value||"",fc=$("filterCat")?.value||"";
- if($("reportAccount")){const rv=$("reportAccount").value;$("reportAccount").innerHTML='<option value="">همه حساب‌ها</option>'+data.accounts.map(a=>`<option value="${esc(a.id)}">${esc(a.name)}</option>`).join("");$("reportAccount").value=rv;}
- if($("filterCat")){let opts='<option value="">همه دسته‌ها</option>'+[...data.expenseCats,...data.incomeCats].map(c=>`<option value="${esc(c.name)}">${esc(c.name)}</option>`).join("");$("filterCat").innerHTML=opts;$("filterCat").value=fc}
- if($("txList"))$("txList").innerHTML=data.transactions.filter(t=>(!q||String(t.title).includes(q)||String(t.category||"").includes(q))&&(!ft||t.type===ft)&&(!fc||t.category===fc)).map(txHTML).join("")||empty("تراکنشی پیدا نشد");
- if($("customerList"))renderCustomers();
- if($("peopleList"))$("peopleList").innerHTML=data.people.filter(p=>(p.type||"debt")===peopleMode).map(p=>{const total=Number(p.amount)||0,paid=Math.min(Number(p.paid)||0,total),remaining=Math.max(0,total-paid);return `<div class="item"><div><b>${esc(p.name)}</b><div class="meta">${p.due?"سررسید: "+p.due:""}${p.note?" • "+esc(p.note):""}</div><div class="meta">کل: ${money(total)} • تسویه: ${money(paid)}</div></div><div><strong>${money(remaining)}</strong><div class="actions"><button type="button" onclick="payPerson('${p.id}')">تسویه</button>${actionButtons("openPerson","deletePerson",p.id)}</div></div></div>`}).join("")||empty(peopleMode==="debt"?"هنوز بدهکاری ثبت نشده":"هنوز طلبی ثبت نشده");
- if($("reminderList")){const normalReminders=data.reminders.filter(r=>!r.sourceNoteId); const noteAlarms=data.reminders.filter(r=>r.sourceNoteId); const normal=normalReminders.map(r=>{const accId="rem-"+r.id;const isOpen=openAccordions.has(accId);return `<div class="item accordion-card${isOpen?' open':''}" data-acc-id="${accId}"><button class="accordion-head" type="button" aria-expanded="${isOpen}" onclick="toggleAccordion(this,event)"><span>🔔 <b>${esc(r.title)}</b></span><span>⌄</span></button><div class="accordion-body"><div class="meta">${jalaliLabel(r.date)} • ${r.repeat==="once"?"یک‌بار":r.repeat==="weekly"?"هفتگی":"ماهانه"}</div><div class="accordion-actions"><strong>${r.amount?money(r.amount):""}</strong>${actionButtons("openReminder","deleteReminder",r.id)}</div></div></div>`}).join(""); $("reminderList").innerHTML=`<div class="section-label">🔔 یادآوری‌های مستقل</div>${normal||empty("یادآوری مستقلی ندارید")}${noteAlarms.length?`<div class="section-label">📝⏰ آلارم یادداشت‌ها</div>`+noteAlarms.map(r=>{const accId="remnote-"+r.id;const isOpen=openAccordions.has(accId);return `<div class="item accordion-card${isOpen?' open':''}" data-acc-id="${accId}"><button class="accordion-head" type="button" aria-expanded="${isOpen}" onclick="toggleAccordion(this,event)"><span>📝 <b>${esc(r.title)}</b></span><span>⌄</span></button><div class="accordion-body"><div class="meta">${jalaliLabel(r.date)} • ${r.repeat==="once"?"یک‌بار":r.repeat==="weekly"?"هفتگی":"ماهانه"}</div></div></div>`}).join(""):``}`;}
- if($("noteList"))$("noteList").innerHTML=data.notes.map(noteHTML).join("")||empty("یادداشتی ندارید");
- if($("invoiceList"))$("invoiceList").innerHTML=data.invoices.map(invoiceHTML).join("")||empty("هنوز فاکتوری ساخته نشده است");
- if($("checkList"))$("checkList").innerHTML=data.checks.map(c=>`<div class="item"><div><b>${c.type==="receive"?"دریافتی":"پرداختی"} • ${esc(c.name)}</b><div class="meta">${jalaliLabel(c.date)}${c.bank?" • "+esc(c.bank):""}</div></div><div><strong>${money(c.amount)}</strong>${actionButtons("openCheck","deleteCheck",c.id)}</div></div>`).join("")||empty("چکی ثبت نشده");
- if($("categoryList"))$("categoryList").innerHTML='<div class="card"><b>هزینه‌ها</b><p>'+data.expenseCats.map(c=>esc(c.name)).join(" • ")+'</p><b>دریافت‌ها</b><p>'+data.incomeCats.map(c=>esc(c.name)).join(" • ")+'</p></div>';
- const debt=data.people.filter(p=>p.type==="debt").reduce((s,p)=>s+((Number(p.amount)||0)-(Number(p.paid)||0)),0),credit=data.people.filter(p=>p.type==="credit").reduce((s,p)=>s+((Number(p.amount)||0)-(Number(p.paid)||0)),0);
- if($("totalDebt"))$("totalDebt").textContent=money(debt);if($("totalCredit"))$("totalCredit").textContent=money(credit);
- if($("reportStats")){const now=new Date(),m=now.getMonth(),y=now.getFullYear();const mt=data.transactions.filter(t=>{const d=new Date(t.date);return !isNaN(d)&&d.getMonth()===m&&d.getFullYear()===y});const mi=mt.filter(t=>t.type==="income").reduce((s,t)=>s+Number(t.amount||0),0),me=mt.filter(t=>t.type==="expense").reduce((s,t)=>s+Number(t.amount||0),0);const cats={};mt.filter(t=>t.type==="expense").forEach(t=>cats[t.category||"سایر"]=(cats[t.category||"سایر"]||0)+Number(t.amount||0));const top=Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,5);$("reportStats").innerHTML=`<div class="grid"><div class="card"><span>تعداد تراکنش</span><b>${fa(data.transactions.length)}</b></div><div class="card"><span>تعداد چک</span><b>${fa(data.checks.length)}</b></div><div class="card"><span>درآمد این ماه</span><b class="income">${money(mi)}</b></div><div class="card"><span>هزینه این ماه</span><b class="expense">${money(me)}</b></div></div><div class="card report-card"><h3>📊 بیشترین دسته‌های هزینه این ماه</h3>${top.map((x,i)=>`<div class="report-row"><span>${fa(i+1)}. ${esc(x[0])}</span><strong>${money(x[1])}</strong></div>`).join("")||`<p class="hint">هنوز هزینه‌ای در این ماه ثبت نشده.</p>`}</div><div class="card report-card"><h3>🏦 مانده حساب‌ها</h3>${data.accounts.map(a=>`<div class="report-row"><span>${esc(a.name)}</span><strong>${money(accountBalance(a.id))}</strong></div>`).join("")||`<p class="hint">حسابی ثبت نشده.</p>`}</div>`;}
- drawChart(inc,exp);renderAudit();renderAdvancedReport();renderYearSettlement();renderDueSoon();if($("settings" )?.classList.contains("active"))renderBrandingInSettings()}
+ if($("reportAccount")&&pageActive("reports")){const rv=$("reportAccount").value;$("reportAccount").innerHTML='<option value="">همه حساب‌ها</option>'+data.accounts.map(a=>`<option value="${esc(a.id)}">${esc(a.name)}</option>`).join("");$("reportAccount").value=rv;}
+ if($("filterCat")&&pageActive("transactions")){let opts='<option value="">همه دسته‌ها</option>'+[...data.expenseCats,...data.incomeCats].map(c=>`<option value="${esc(c.name)}">${esc(c.name)}</option>`).join("");$("filterCat").innerHTML=opts;$("filterCat").value=fc}
+ if($("txList")&&pageActive("transactions"))$("txList").innerHTML=data.transactions.filter(t=>(!q||String(t.title).includes(q)||String(t.category||"").includes(q))&&(!ft||t.type===ft)&&(!fc||t.category===fc)).map(txHTML).join("")||empty("تراکنشی پیدا نشد");
+ if($("customerList")&&pageActive("customers"))renderCustomers();
+ if($("peopleList")&&pageActive("people"))$("peopleList").innerHTML=data.people.filter(p=>(p.type||"debt")===peopleMode).map(p=>{const total=Number(p.amount)||0,paid=Math.min(Number(p.paid)||0,total),remaining=Math.max(0,total-paid);return `<div class="item"><div><b>${esc(p.name)}</b><div class="meta">${p.due?"سررسید: "+p.due:""}${p.note?" • "+esc(p.note):""}</div><div class="meta">کل: ${money(total)} • تسویه: ${money(paid)}</div></div><div><strong>${money(remaining)}</strong><div class="actions"><button type="button" onclick="payPerson('${p.id}')">تسویه</button>${actionButtons("openPerson","deletePerson",p.id)}</div></div></div>`}).join("")||empty(peopleMode==="debt"?"هنوز بدهکاری ثبت نشده":"هنوز طلبی ثبت نشده");
+ if($("reminderList")&&pageActive("reminders")){const normalReminders=data.reminders.filter(r=>!r.sourceNoteId).sort((a,b)=>(a.order??0)-(b.order??0)); const noteAlarms=data.reminders.filter(r=>r.sourceNoteId); const normal=normalReminders.map((r,i)=>{const accId="rem-"+r.id;const isOpen=openAccordions.has(accId);return `<div class="item accordion-card${isOpen?' open':''}" data-acc-id="${accId}"><button class="accordion-head" type="button" aria-expanded="${isOpen}" onclick="toggleAccordion(this,event)"><span>🔔 <b>${esc(r.title)}</b></span><span>⌄</span></button><div class="accordion-body"><div class="meta">${jalaliLabel(r.date)} • ${r.repeat==="once"?"یک‌بار":r.repeat==="weekly"?"هفتگی":"ماهانه"}</div><div class="accordion-actions"><strong>${r.amount?money(r.amount):""}</strong><div class="reorder-btns"><button type="button" title="انتقال به بالا" ${i===0?"disabled":""} onclick="event.stopPropagation();moveReminder('${r.id}',-1)">▲</button><button type="button" title="انتقال به پایین" ${i===normalReminders.length-1?"disabled":""} onclick="event.stopPropagation();moveReminder('${r.id}',1)">▼</button></div>${actionButtons("openReminder","deleteReminder",r.id)}</div></div></div>`}).join(""); $("reminderList").innerHTML=`<div class="section-label">🔔 یادآوری‌های مستقل</div>${normal||empty("یادآوری مستقلی ندارید")}${noteAlarms.length?`<div class="section-label">📝⏰ آلارم یادداشت‌ها</div>`+noteAlarms.map(r=>{const accId="remnote-"+r.id;const isOpen=openAccordions.has(accId);return `<div class="item accordion-card${isOpen?' open':''}" data-acc-id="${accId}"><button class="accordion-head" type="button" aria-expanded="${isOpen}" onclick="toggleAccordion(this,event)"><span>📝 <b>${esc(r.title)}</b></span><span>⌄</span></button><div class="accordion-body"><div class="meta">${jalaliLabel(r.date)} • ${r.repeat==="once"?"یک‌بار":r.repeat==="weekly"?"هفتگی":"ماهانه"}</div></div></div>`}).join(""):``}`;}
+ if($("noteList")&&pageActive("notes")){const sortedNotes=[...data.notes].sort((a,b)=>(a.order??0)-(b.order??0));$("noteList").innerHTML=sortedNotes.map((n,i)=>noteHTML(n,{i,total:sortedNotes.length})).join("")||empty("یادداشتی ندارید");}
+ if($("invoiceList")&&pageActive("invoices"))$("invoiceList").innerHTML=data.invoices.map(invoiceHTML).join("")||empty("هنوز فاکتوری ساخته نشده است");
+ if($("checkList")&&pageActive("checks"))$("checkList").innerHTML=data.checks.map(c=>`<div class="item"><div><b>${c.type==="receive"?"دریافتی":"پرداختی"} • ${esc(c.name)}</b><div class="meta">${jalaliLabel(c.date)}${c.bank?" • "+esc(c.bank):""}</div></div><div><strong>${money(c.amount)}</strong>${actionButtons("openCheck","deleteCheck",c.id)}</div></div>`).join("")||empty("چکی ثبت نشده");
+ if($("categoryList")&&pageActive("categories")){const catLine=c=>esc(c.name)+((c.children||[]).length?" ("+c.children.map(ch=>esc(ch.name)).join("، ")+")":"");$("categoryList").innerHTML='<div class="card"><b>هزینه‌ها</b><p>'+data.expenseCats.map(catLine).join(" • ")+'</p><b>دریافت‌ها</b><p>'+data.incomeCats.map(catLine).join(" • ")+'</p></div>';}
+ if(pageActive("reports")){
+   const debt=data.people.filter(p=>p.type==="debt").reduce((s,p)=>s+((Number(p.amount)||0)-(Number(p.paid)||0)),0),credit=data.people.filter(p=>p.type==="credit").reduce((s,p)=>s+((Number(p.amount)||0)-(Number(p.paid)||0)),0);
+   if($("totalDebt"))$("totalDebt").textContent=money(debt);if($("totalCredit"))$("totalCredit").textContent=money(credit);
+   if($("reportStats")){const now=new Date(),m=now.getMonth(),y=now.getFullYear();const mt=data.transactions.filter(t=>{const d=new Date(t.date);return !isNaN(d)&&d.getMonth()===m&&d.getFullYear()===y});const mi=mt.filter(t=>t.type==="income").reduce((s,t)=>s+Number(t.amount||0),0),me=mt.filter(t=>t.type==="expense").reduce((s,t)=>s+Number(t.amount||0),0);const cats={};mt.filter(t=>t.type==="expense").forEach(t=>cats[t.category||"سایر"]=(cats[t.category||"سایر"]||0)+Number(t.amount||0));const top=Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,5);$("reportStats").innerHTML=`<div class="grid"><div class="card"><span>تعداد تراکنش</span><b>${fa(data.transactions.length)}</b></div><div class="card"><span>تعداد چک</span><b>${fa(data.checks.length)}</b></div><div class="card"><span>درآمد این ماه</span><b class="income">${money(mi)}</b></div><div class="card"><span>هزینه این ماه</span><b class="expense">${money(me)}</b></div></div><div class="card report-card"><h3>📊 بیشترین دسته‌های هزینه این ماه</h3>${top.map((x,i)=>`<div class="report-row"><span>${fa(i+1)}. ${esc(x[0])}</span><strong>${money(x[1])}</strong></div>`).join("")||`<p class="hint">هنوز هزینه‌ای در این ماه ثبت نشده.</p>`}</div><div class="card report-card"><h3>🏦 مانده حساب‌ها</h3>${data.accounts.map(a=>`<div class="report-row"><span>${esc(a.name)}</span><strong>${money(accountBalance(a.id))}</strong></div>`).join("")||`<p class="hint">حسابی ثبت نشده.</p>`}</div>`;}
+   drawChart(inc,exp);renderAudit();renderAdvancedReport();
+ }
+ renderYearSettlement();renderDueSoon();if($("settings" )?.classList.contains("active"))renderBrandingInSettings()}
 const renderDebounced=debounce(render,120);
 function renderAdvancedReport(){
  const box=$("advancedReport"); if(!box)return;

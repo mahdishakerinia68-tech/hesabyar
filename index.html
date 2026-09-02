@@ -22,7 +22,7 @@
     <button id="menuBtn" class="menu-trigger" aria-label="باز کردن منو" aria-haspopup="true" aria-expanded="false" aria-controls="menuModal">⋯</button>
     <img class="app-logo" src="logo.png" alt="حساب‌یار">
     <div class="top-bar-titles">
-      <h1>حساب‌یار <span class="version-pill" id="versionPill">5.4</span></h1>
+      <h1>حساب‌یار <span class="version-pill" id="versionPill">5.5</span></h1>
       <div id="syncBadge" class="sync-badge">☁️ آفلاین</div>
     </div>
   </div>
@@ -37,11 +37,11 @@
   <div class="section-head home-head"><h2>خانه</h2><button class="dash-customize-btn" onclick="openDashboardCustomize()">🎛</button></div>
 
   <div class="dash-widget" data-widget="hero">
-    <div class="hero">
-      <span>موجودی کل</span>
+    <button type="button" class="hero hero-clickable" onclick="goToPage('accounts')" aria-label="مشاهده حساب‌ها و موجودی">
+      <span>موجودی کل <span class="hero-arrow">‹ حساب‌ها</span></span>
       <strong id="balance">۰ تومان</strong>
       <div id="dueSoon"></div>
-    </div>
+    </button>
   </div>
 
   <div class="dash-widget" data-widget="stats">
@@ -253,7 +253,7 @@
     </div>
 
   </div>
-  <p class="hint settings-footer">نسخه <span id="appVersionText">5.4</span> • بکاپ خودکار • بروزرسانی • اتصال دو گوشی • تقویم شمسی کامل</p>
+  <p class="hint settings-footer">نسخه <span id="appVersionText">5.5</span> • بکاپ خودکار • بروزرسانی • اتصال دو گوشی • تقویم شمسی کامل</p>
   <p class="hint">تغییرات روی این گوشی ذخیره می‌شود و در صورت اتصال به Firebase با گوشی دوم ادغام می‌گردد.</p>
 </section>
 
@@ -331,6 +331,10 @@
       </div>
     </div>
     <input id="framerZoom" type="range" min="1" max="3" step="0.01" value="1" oninput="framerZoomChange(this.value)">
+    <div class="ai-enhance-row">
+      <button type="button" id="framerEnhanceBtn" class="ai-enhance-btn" onclick="aiEnhanceFramerImage()">🪄 واضح‌تر و تمیزتر کن (AI)</button>
+      <span class="ai-enhance-hint">تصویر را شارپ‌تر و پس‌زمینه‌اش را تمیزتر می‌کند</span>
+    </div>
     <button class="primary" onclick="confirmFramer()">✅ تایید و برش عکس</button>
   </div>
 </div>
@@ -340,6 +344,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="capacitor-local-notifications-bridge.js"></script>
 <script src="app.js"></script>
-<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js?v=5.4").catch(console.error)}</script>
+<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js?v=5.5").catch(console.error)}</script>
 </body>
 </html>

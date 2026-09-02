@@ -472,3 +472,43 @@ body:not(.dark) .dash-cfg-move button{background:#F2F2F7}
 .framer-stage.framer-round{border-radius:50%}
 .framer-stage img{position:absolute;top:0;left:0;max-width:none;user-select:none;-webkit-user-drag:none}
 #framerZoom{width:100%;accent-color:var(--blue);margin:6px 0 4px}
+
+/* ===== v5.5: clickable hero balance card ===== */
+.hero.hero-clickable{
+  width:100%;border:none;cursor:pointer;font:inherit;display:block;text-align:right;-webkit-appearance:none;appearance:none;
+}
+.hero.hero-clickable:active{transform:scale(.98)}
+.hero-arrow{font-size:11.5px;opacity:.8;margin-inline-start:6px;font-weight:600;background:rgba(255,255,255,.18);padding:3px 9px;border-radius:999px;display:inline-block}
+
+/* ===== v5.5: category groups with subcategories ===== */
+.cat-group{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.cat-caret{font-size:11px;opacity:.7;margin-inline-start:2px}
+.cat-children{display:flex;flex-wrap:wrap;gap:6px;padding-inline-start:10px;border-inline-start:2px solid var(--sep)}
+.cat-chip{border:.5px solid var(--sep);background:var(--bg3);padding:6px 12px;border-radius:999px;font-size:12px;color:var(--label2)}
+body:not(.dark) .cat-chip{background:#F2F2F7}
+.cat-chip.selected-cat{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:700}
+.cat-manage-row{display:flex;flex-direction:column;gap:6px;padding:10px 0;border-bottom:.5px solid var(--sep)}
+.cat-manage-row:last-child{border-bottom:none}
+.cat-manage-head{display:flex;justify-content:space-between;align-items:center}
+.cat-sub-list{display:flex;flex-wrap:wrap;gap:6px;padding-inline-start:10px}
+.cat-sub-chip{display:flex;align-items:center;gap:6px;border:.5px solid var(--sep);background:var(--bg3);padding:5px 6px 5px 12px;border-radius:999px;font-size:12px}
+body:not(.dark) .cat-sub-chip{background:#F2F2F7}
+.cat-sub-chip button{width:22px;height:22px;border:none;border-radius:50%;background:transparent;color:var(--label2);font-size:11px}
+.cat-sub-add{border:1px dashed var(--sep);background:transparent;color:var(--label2);padding:5px 12px;border-radius:999px;font-size:12px}
+
+/* ===== v5.5: reorder (move up/down) buttons for notes / reminders / note items ===== */
+.reorder-btns{display:flex;gap:4px}
+.reorder-btns button{width:28px;height:28px;border:none;border-radius:8px;background:var(--bg3);color:var(--label);font-size:13px;line-height:1}
+body:not(.dark) .reorder-btns button{background:#F2F2F7}
+.reorder-btns button:disabled{opacity:.3}
+.reorder-btns button:active{transform:scale(.9)}
+.note-edit-row{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.note-edit-row input{flex:1}
+
+/* ===== v5.5: AI enhance button for logo / stamp / signature ===== */
+.ai-enhance-row{display:flex;gap:8px;align-items:center;margin:6px 0 10px;flex-wrap:wrap}
+.ai-enhance-btn{border:none;border-radius:999px;padding:8px 14px;font-size:12.5px;font-weight:700;color:#fff;
+  background:linear-gradient(135deg,#0A84FF,#5AC8FA);box-shadow:0 4px 12px rgba(10,132,255,.3)}
+.ai-enhance-btn:active{transform:scale(.96)}
+.ai-enhance-btn:disabled{opacity:.55}
+.ai-enhance-hint{font-size:11.5px;color:var(--label2)}

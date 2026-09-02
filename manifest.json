@@ -1,5 +1,5 @@
 {
-  "name": "حساب‌یار 5.4",
+  "name": "حساب‌یار 5.5",
   "short_name": "حساب‌یار",
   "start_url": "./",
   "display": "standalone",
@@ -15,5 +15,5 @@
       "purpose": "any maskable"
     }
   ],
-  "version": "5.4"
+  "version": "5.5"
 }
