@@ -204,7 +204,7 @@
 
     <div class="settings-group card upgrade-card" id="stgGroup-backup">
       <div class="settings-group-head"><span>🚀</span><div><h3>پشتیبان و بروزرسانی</h3><p class="hint">پشتیبان خودکار و بررسی نسخه جدید.</p></div></div>
-      <label class="feature-row"><input id="autoBackupToggle" type="checkbox" onchange="setAutoBackupEnabled(this.checked)"><span><b>حالت اتوماتیک بکاپ</b><small>هر ۶ ساعت یک فایل پشتیبان واقعی داخل گوشی ساخته می‌شود (حداکثر ۵ فایل)</small></span></label>
+      <label class="feature-row"><input id="autoBackupToggle" type="checkbox" onchange="setAutoBackupEnabled(this.checked)"><span><b>حالت اتوماتیک بکاپ</b><small>پشتیبان داخلی هر ۶ ساعت، حداکثر ۵ نسخه</small></span></label>
       <div id="autoBackupLast" class="hint"></div>
       <div class="settings-actions">
         <button onclick="restoreLatestAutoBackup()">♻️ بازیابی آخرین بکاپ خودکار</button>
@@ -343,8 +343,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="capacitor-local-notifications-bridge.js"></script>
-<script src="capacitor-filesystem-bridge.js"></script>
 <script src="app.js"></script>
-<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js?v=5.7").catch(console.error)}</script>
+<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js?v=5.6").catch(console.error)}</script>
 </body>
 </html>
