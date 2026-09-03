@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="6.7.6";
+const APP_VERSION="6.8.0";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
@@ -649,7 +649,7 @@ async function setBiometricEnabled(v){
  save();logEvent(v?"فعال‌سازی قفل بیومتریک":"غیرفعال‌سازی قفل بیومتریک","","settings");renderSettingsFeatures();
 }
 
-const WHATS_NEW_KEY="hesabdar-whats-new-seen-6.7.6";
+const WHATS_NEW_KEY="hesabdar-whats-new-seen-6.8.0";
 function showWhatsNewOnce(){
  if(localStorage.getItem(WHATS_NEW_KEY)==="1")return;
  localStorage.setItem(WHATS_NEW_KEY,"1");
@@ -1847,10 +1847,15 @@ function exportData(){
  setTimeout(()=>URL.revokeObjectURL(a.href),5000);logEvent("پشتیبان‌گیری","فایل پشتیبان JSON صادر شد","settings");
  alert("فایل پشتیبان ساخته شد. آن را به گوشی دیگر منتقل کن و از گزینه بازیابی انتخابش کن.");
 }
+function stripBom(s){return s&&s.charCodeAt(0)===0xFEFF?s.slice(1):s}
 async function readBackupFile(file){
  if(!file)throw new Error("no-file");
- try{const text=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result||""));r.onerror=()=>reject(r.error||new Error("FileReader failed"));r.readAsText(file,"utf-8")});if(text.trim())return text}catch(e){console.warn("FileReader backup read failed",e)}
- if(typeof file.text==="function"){const text=await file.text();if(String(text||"").trim())return String(text)}
+ // Android content:// files (received via Telegram/WhatsApp/Bluetooth/Drive etc.) sometimes
+ // fail silently with FileReader.readAsText on certain OEM WebViews, or come back with a
+ // byte-order-mark that breaks JSON.parse. Try several read strategies before giving up.
+ try{const text=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result||""));r.onerror=()=>reject(r.error||new Error("FileReader failed"));r.readAsText(file,"utf-8")});const t=stripBom(text);if(t.trim())return t}catch(e){console.warn("FileReader backup read failed",e)}
+ try{if(typeof file.text==="function"){const text=await file.text();const t=stripBom(String(text||""));if(t.trim())return t}}catch(e){console.warn("file.text() backup read failed",e)}
+ try{const buf=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(r.error||new Error("FileReader arrayBuffer failed"));r.readAsArrayBuffer(file)});const t=stripBom(new TextDecoder("utf-8").decode(buf));if(t.trim())return t}catch(e){console.warn("ArrayBuffer backup read failed",e)}
  throw new Error("empty-backup");
 }
 async function replaceCloudAfterRestore(){
@@ -1895,7 +1900,9 @@ async function importData(e){
    if(sync.user&&sync.db&&!sync.unsubscribe){sync.unsubscribe=recordsCollection().onSnapshot(snap=>{if(sync.hydrating)return;const remote=snap.docs.map(d=>d.data());if(mergeCloud(remote)){localStorage.setItem(KEY,JSON.stringify(data));render();syncSave()}setSyncStatus("☁️ آنلاین • همگام‌سازی لحظه‌ای")},err=>setSyncStatus("⚠️ همگام‌سازی: "+(err.code||err.message)))}
   }
   finish();alert("بازیابی با موفقیت انجام شد. اطلاعات فایل پشتیبان روی این گوشی جایگزین شد.");
- }catch(err){finish();console.error("backup restore",err);alert("بازیابی انجام نشد: فایل پشتیبان خوانده یا معتبر نیست. فایل JSON اصلی را دوباره انتخاب کن.")}
+ }catch(err){finish();console.error("backup restore",err);
+  const msg=err&&err.message==="empty-backup"?"بازیابی انجام نشد: فایل انتخاب‌شده خوانده نشد (خالی بود). اگر فایل از تلگرام/بلوتوث دریافت شده، اول آن را دانلود کن (نه فقط پیش‌نمایش) و از پوشه Download انتخابش کن.":"بازیابی انجام نشد: فایل پشتیبان خوانده یا معتبر نیست. فایل JSON اصلی را دوباره انتخاب کن.";
+  alert(msg)}
 }
 function clearData(){if(confirm("همه اطلاعات حذف شود؟")){const pin=data.pin,pinHash=data.pinHash,pinSalt=data.pinSalt,patternHash=data.patternHash,patternSalt=data.patternSalt,lockMethod=data.lockMethod,biometricEnabled=data.biometricEnabled,webauthnCredId=data.webauthnCredId,lang=data.lang;data=blankData();data.pin=pin;data.pinHash=pinHash;data.pinSalt=pinSalt;data.patternHash=patternHash;data.patternSalt=patternSalt;data.lockMethod=lockMethod;data.biometricEnabled=biometricEnabled;data.webauthnCredId=webauthnCredId;data.lang=lang;save();logEvent("پاک کردن اطلاعات","اطلاعات برنامه پاک شد","delete");}}
 (async function initApp(){normalizeData();await migratePinSecurity();showLock();render();applyDashboardConfig();applyAppMode();renderBrandingInSettings();renderSettingsFeatures();applyLanguage();maybeAutoBackup("اجرای برنامه");processRecurringTransactions();logEvent("اجرای برنامه","برنامه حسابدار اجرا شد","system");await initSync();if(!sync.auth){[4000,12000,30000].forEach(ms=>setTimeout(()=>{if(!sync.auth)initSync()},ms))}syncAllNotesToReminders().catch(console.error);rescheduleAllNativeReminders().catch(console.error);startUpdateChecker();startReminderChecker();if(!hasLockCode())setTimeout(showWhatsNewOnce,320);})();
