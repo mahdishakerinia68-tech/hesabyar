@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="6.8.1";
+const APP_VERSION="6.8.2";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
@@ -649,7 +649,7 @@ async function setBiometricEnabled(v){
  save();logEvent(v?"فعال‌سازی قفل بیومتریک":"غیرفعال‌سازی قفل بیومتریک","","settings");renderSettingsFeatures();
 }
 
-const WHATS_NEW_KEY="hesabdar-whats-new-seen-6.8.1";
+const WHATS_NEW_KEY="hesabdar-whats-new-seen-6.8.2";
 function showWhatsNewOnce(){
  if(localStorage.getItem(WHATS_NEW_KEY)==="1")return;
  localStorage.setItem(WHATS_NEW_KEY,"1");
@@ -660,6 +660,8 @@ function showWhatsNewOnce(){
   <div class="whats-new-section">
    <h3>🛠 تغییرات این نسخه</h3>
    <ul>
+    <li>فاکتورهای مانده‌دار یا پرداخت‌نشده حالا خودکار به بخش بدهکار/بستانکار اضافه می‌شوند.</li>
+    <li>با تسویه از بخش بدهکار/بستانکار، هم تراکنش ثبت می‌شود و هم وضعیت فاکتور به‌روز می‌شود.</li>
     <li>رفع مشکل بازیابی فایل پشتیبان ارسال‌شده (تلگرام/بلوتوث و...) در اندروید.</li>
     <li>امکان افزودن عکس رسید واریز/دریافت به هر قسط بدهکار و بستانکار.</li>
     <li>رفع نمایش نسخه قدیمی در صفحه «امکانات و تغییرات».</li>
@@ -1055,7 +1057,7 @@ function savePerson(id){
   }
   localStorage.setItem(KEY,JSON.stringify(data));render();syncSave();logEvent(id?"ویرایش شخص":"ایجاد شخص",`${name} • ${money(amount)}`,id?"edit":"create");closeModal()
 }
-function deletePerson(id){if(confirm("این مورد حذف شود؟")){const p=data.people.find(x=>x.id===id);removeRecord("people",id);logEvent("حذف شخص",p?.name||id,"delete")}}
+function deletePerson(id){if(confirm("این مورد حذف شود؟")){const p=data.people.find(x=>x.id===id);if(p?.invoiceId){const inv=data.invoices.find(x=>x.id===p.invoiceId);if(inv){inv.personId="";touch(inv);markDirty("invoices",inv.id,false,inv,inv.updatedAt)}}removeRecord("people",id);logEvent("حذف شخص",p?.name||id,"delete")}}
 function payPerson(id){openPersonPayment(id)}
 function openPersonPayment(id){
   const p=data.people.find(x=>x.id===id);if(!p)return;
@@ -1075,6 +1077,7 @@ function confirmPersonPayment(id){
   const category=p.type==="credit"?"دریافت طلب":"پرداخت بدهی";
   const nt=touch({id:uid(),title:`تسویه ${p.name}`,amount:n,type:txType,category,accountID,date:new Date().toISOString(),source:"person-settle",personId:p.id});
   data.transactions.unshift(nt);markDirty("transactions",nt.id,false,nt,nt.updatedAt);
+  syncInvoiceFromPerson(p);
   save();
   logEvent("تسویه شخص",`${p.name} • ${money(n)} • ${data.accounts.find(a=>a.id===accountID)?.name||""}`,"payment");
   closeModal();
@@ -1116,7 +1119,8 @@ function toggleInstallment(personId,instId){
     if(it.txId){removeRecordSilent("transactions",it.txId);it.txId=null}
     it.paid=false;it.paidAt="";
     p.paid=p.installments.items.filter(x=>x.paid).reduce((s,x)=>s+(Number(x.amount)||0),0);
-    touch(p);markDirty("people",p.id,false,p,p.updatedAt);save();
+    touch(p);markDirty("people",p.id,false,p,p.updatedAt);
+    syncInvoiceFromPerson(p);save();
     logEvent("لغو پرداخت قسط",`${p.name} • ${money(it.amount)}`,"payment");
     const box=$("installmentsBox");if(box)box.innerHTML=p.installments.items.map((x,i)=>installmentRowHTML(p,x,i)).join("");
     return;
@@ -1150,10 +1154,12 @@ async function confirmInstallmentPayment(personId,instId){
   data.transactions.unshift(nt);markDirty("transactions",nt.id,false,nt,nt.updatedAt);
   it.txId=nt.id;
   p.paid=p.installments.items.filter(x=>x.paid).reduce((s,x)=>s+(Number(x.amount)||0),0);
-  touch(p);markDirty("people",p.id,false,p,p.updatedAt);save();
+  touch(p);markDirty("people",p.id,false,p,p.updatedAt);
+  const linkedInvoiceId=p.invoiceId;
+  syncInvoiceFromPerson(p);save();
   logEvent("پرداخت قسط",`${p.name} • ${money(it.amount)} • ${data.accounts.find(a=>a.id===accountID)?.name||""}`,"payment");
   closeModal();
-  openInstallments(personId);
+  if(!linkedInvoiceId||data.people.find(x=>x.id===personId))openInstallments(personId);
 }
 
 function pickerDateValue(v){if(!v)return todayJalali();let d=new Date(v);if(Number.isNaN(d.getTime()))return toFaDigits(String(v));let j=gregorianToJalali(d.getFullYear(),d.getMonth()+1,d.getDate());return `${toFaDigits(j[0])}/${padFa(j[1])}/${padFa(j[2])}`;}
@@ -1541,11 +1547,51 @@ function saveInvoice(id){
  const discount=Math.max(0,Number($("invDiscount").value)||0),discountPercent=Math.min(100,Math.max(0,Number($("invDiscountPercent").value)||0)),taxRate=Math.max(0,Number($("invTax").value)||0);let paid=Math.max(0,Number($("invPaid").value)||0);
  const customerName=$("invCustomerName")?.value.trim()||"";
  const o={name,seller,date,number,items,customerId:$("invCustomer").value||"",customerName,address:$("invAddress").value.trim(),discount,discountPercent,taxRate,paid,status:$("invStatus").value,total:0};o.total=invoiceTotal(o);if(o.status==="paid")o.paid=o.total;if(o.paid>=o.total&&o.total>0)o.status="paid";else if(o.paid>0)o.status="partial";else o.status="unpaid";
- if(id){const x=data.invoices.find(v=>v.id===id);if(x)adjustStockForInvoice(x,+1);Object.assign(x,o);touch(x);markDirty("invoices",x.id,false,x,x.updatedAt);adjustStockForInvoice(x,-1)}else{const x=touch({id:uid(),...o});data.invoices.unshift(x);markDirty("invoices",x.id,false,x,x.updatedAt);adjustStockForInvoice(x,-1)}
+ let x;
+ if(id){x=data.invoices.find(v=>v.id===id);if(x){adjustStockForInvoice(x,+1);Object.assign(x,o);touch(x);markDirty("invoices",x.id,false,x,x.updatedAt);adjustStockForInvoice(x,-1)}}else{x=touch({id:uid(),...o});data.invoices.unshift(x);markDirty("invoices",x.id,false,x,x.updatedAt);adjustStockForInvoice(x,-1)}
+ if(x)syncPersonForInvoice(x);
  save();logEvent(id?"ویرایش فاکتور":"ساخت فاکتور",`${name} • ${money(o.total)}`,id?"edit":"create");closeModal()
 }
+/* --- اتصال فاکتورهای مانده‌دار/تسویه‌نشده به بخش طلبکاران و همگام‌سازی برگشتی با تراکنش‌ها --- */
+function syncPersonForInvoice(inv){
+ if(!inv)return;
+ const remaining=invoiceRemaining(inv);
+ const custName=invoiceCustomerLabel(inv)||inv.name||"مشتری فاکتور";
+ if(remaining>0){
+  let p=inv.personId?data.people.find(x=>x.id===inv.personId):null;
+  if(!p){
+   p=touch({id:uid(),type:"credit",name:custName,amount:0,paid:0,note:"",source:"invoice",invoiceId:inv.id});
+   data.people.push(p);
+   inv.personId=p.id;
+  }
+  p.name=custName;
+  p.amount=invoiceTotal(inv);
+  p.paid=Number(inv.paid)||0;
+  p.note=`فاکتور: ${inv.name||""}${inv.number?" • شماره "+inv.number:""}`;
+  touch(p);markDirty("people",p.id,false,p,p.updatedAt);
+  touch(inv);markDirty("invoices",inv.id,false,inv,inv.updatedAt);
+ }else if(inv.personId){
+  removeRecordSilent("people",inv.personId);
+  inv.personId="";
+  touch(inv);markDirty("invoices",inv.id,false,inv,inv.updatedAt);
+ }
+}
+function syncInvoiceFromPerson(p){
+ if(!p||!p.invoiceId)return;
+ const inv=data.invoices.find(x=>x.id===p.invoiceId);
+ if(!inv)return;
+ const total=invoiceTotal(inv);
+ inv.paid=Math.min(total,Number(p.paid)||0);
+ if(inv.paid>=total&&total>0)inv.status="paid";else if(inv.paid>0)inv.status="partial";else inv.status="unpaid";
+ touch(inv);markDirty("invoices",inv.id,false,inv,inv.updatedAt);
+ if(inv.paid>=total&&total>0){
+  removeRecordSilent("people",p.id);
+  inv.personId="";
+  touch(inv);markDirty("invoices",inv.id,false,inv,inv.updatedAt);
+ }
+}
 function duplicateInvoice(id){const inv=data.invoices.find(x=>x.id===id);if(!inv)return;const x=touch({...JSON.parse(JSON.stringify(inv)),id:uid(),number:"",date:new Date().toISOString().slice(0,10),status:"unpaid",paid:0});data.invoices.unshift(x);markDirty("invoices",x.id,false,x,x.updatedAt);save();logEvent("تکرار فاکتور",x.name,"create")}
-function deleteInvoice(id){if(!confirm("این فاکتور حذف شود؟"))return;const x=data.invoices.find(v=>v.id===id);adjustStockForInvoice(x,+1);removeRecord("invoices",id);logEvent("حذف فاکتور",x?.name||id,"delete")}
+function deleteInvoice(id){if(!confirm("این فاکتور حذف شود؟"))return;const x=data.invoices.find(v=>v.id===id);adjustStockForInvoice(x,+1);if(x?.personId)removeRecordSilent("people",x.personId);removeRecord("invoices",id);logEvent("حذف فاکتور",x?.name||id,"delete")}
 function invoiceCustomerLabel(inv){if(inv.customerName)return inv.customerName;const c=inv.customerId?data.customers.find(x=>x.id===inv.customerId):null;return c?.name||""}
 function invoiceHTML(inv){
  const total=invoiceTotal(inv);
@@ -1843,7 +1889,7 @@ function render(){
  if($("filterCat")&&pageActive("transactions")){let opts='<option value="">همه دسته‌ها</option>'+[...data.expenseCats,...data.incomeCats].map(c=>`<option value="${esc(c.name)}">${esc(c.name)}</option>`).join("");$("filterCat").innerHTML=opts;$("filterCat").value=fc}
  if($("txList")&&pageActive("transactions"))$("txList").innerHTML=data.transactions.filter(t=>(!q||String(t.title).includes(q)||String(t.category||"").includes(q))&&(!ft||t.type===ft)&&(!fc||t.category===fc)).map(txHTML).join("")||empty("تراکنشی پیدا نشد");
  if($("customerList")&&pageActive("customers"))renderCustomers();
- if($("peopleList")&&pageActive("people"))$("peopleList").innerHTML=data.people.filter(p=>(p.type||"debt")===peopleMode).map(p=>{const total=Number(p.amount)||0,paid=Math.min(Number(p.paid)||0,total),remaining=Math.max(0,total-paid);const inst=p.installments;const instMeta=inst?`<div class="meta">🧾 اقساط: ${fa(inst.items.filter(x=>x.paid).length)} از ${fa(inst.count)} پرداخت‌شده</div>`:"";const instBtn=inst?`<button type="button" onclick="openInstallments('${p.id}')">اقساط</button>`:`<button type="button" onclick="payPerson('${p.id}')">تسویه</button>`;return `<div class="item"><div><b>${esc(p.name)}</b><div class="meta">${p.due?"سررسید: "+p.due:""}${p.note?" • "+esc(p.note):""}</div><div class="meta">کل: ${money(total)} • تسویه: ${money(paid)}</div>${instMeta}</div><div><strong>${money(remaining)}</strong><div class="actions">${instBtn}${actionButtons("openPerson","deletePerson",p.id)}</div></div></div>`}).join("")||empty(peopleMode==="debt"?"هنوز بدهکاری ثبت نشده":"هنوز طلبی ثبت نشده");
+ if($("peopleList")&&pageActive("people"))$("peopleList").innerHTML=data.people.filter(p=>(p.type||"debt")===peopleMode).map(p=>{const total=Number(p.amount)||0,paid=Math.min(Number(p.paid)||0,total),remaining=Math.max(0,total-paid);const inst=p.installments;const instMeta=inst?`<div class="meta">🧾 اقساط: ${fa(inst.items.filter(x=>x.paid).length)} از ${fa(inst.count)} پرداخت‌شده</div>`:"";const instBtn=inst?`<button type="button" onclick="openInstallments('${p.id}')">اقساط</button>`:`<button type="button" onclick="payPerson('${p.id}')">تسویه</button>`;const invBadge=p.source==="invoice"?`<div class="meta">🧾 مانده فاکتور</div>`:"";return `<div class="item"><div><b>${esc(p.name)}</b>${invBadge}<div class="meta">${p.due?"سررسید: "+p.due:""}${p.note?" • "+esc(p.note):""}</div><div class="meta">کل: ${money(total)} • تسویه: ${money(paid)}</div>${instMeta}</div><div><strong>${money(remaining)}</strong><div class="actions">${instBtn}${actionButtons("openPerson","deletePerson",p.id)}</div></div></div>`}).join("")||empty(peopleMode==="debt"?"هنوز بدهکاری ثبت نشده":"هنوز طلبی ثبت نشده");
  if($("reminderList")&&pageActive("reminders")){const normalReminders=data.reminders.filter(r=>!r.sourceNoteId).sort((a,b)=>(a.order??0)-(b.order??0)); const noteAlarms=data.reminders.filter(r=>r.sourceNoteId); const normal=normalReminders.map((r,i)=>{const accId="rem-"+r.id;const isOpen=openAccordions.has(accId);return `<div class="item accordion-card${isOpen?' open':''}" data-acc-id="${accId}"><button class="accordion-head" type="button" aria-expanded="${isOpen}" onclick="toggleAccordion(this,event)"><span>🔔 <b>${esc(r.title)}</b></span><span>⌄</span></button><div class="accordion-body"><div class="meta">${jalaliLabel(r.date)} • ${r.repeat==="once"?"یک‌بار":r.repeat==="weekly"?"هفتگی":"ماهانه"}</div><div class="accordion-actions"><strong>${r.amount?money(r.amount):""}</strong><div class="reorder-btns"><button type="button" title="انتقال به بالا" ${i===0?"disabled":""} onclick="event.stopPropagation();moveReminder('${r.id}',-1)">▲</button><button type="button" title="انتقال به پایین" ${i===normalReminders.length-1?"disabled":""} onclick="event.stopPropagation();moveReminder('${r.id}',1)">▼</button></div>${actionButtons("openReminder","deleteReminder",r.id)}</div></div></div>`}).join(""); $("reminderList").innerHTML=`<div class="section-label">🔔 یادآوری‌های مستقل</div>${normal||empty("یادآوری مستقلی ندارید")}${noteAlarms.length?`<div class="section-label">📝⏰ آلارم یادداشت‌ها</div>`+noteAlarms.map(r=>{const accId="remnote-"+r.id;const isOpen=openAccordions.has(accId);return `<div class="item accordion-card${isOpen?' open':''}" data-acc-id="${accId}"><button class="accordion-head" type="button" aria-expanded="${isOpen}" onclick="toggleAccordion(this,event)"><span>📝 <b>${esc(r.title)}</b></span><span>⌄</span></button><div class="accordion-body"><div class="meta">${jalaliLabel(r.date)} • ${r.repeat==="once"?"یک‌بار":r.repeat==="weekly"?"هفتگی":"ماهانه"}</div></div></div>`}).join(""):``}`;}
  if($("noteList")&&pageActive("notes")){const sortedNotes=[...data.notes].sort((a,b)=>(a.order??0)-(b.order??0));$("noteList").innerHTML=sortedNotes.map((n,i)=>noteHTML(n,{i,total:sortedNotes.length})).join("")||empty("یادداشتی ندارید");}
  if($("invoiceList")&&pageActive("invoices"))$("invoiceList").innerHTML=data.invoices.map(invoiceHTML).join("")||empty("هنوز فاکتوری ساخته نشده است");
