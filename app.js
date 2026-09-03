@@ -1,12 +1,13 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="5.9";
+const APP_VERSION="6.0";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v1";
 const AUTO_BACKUP_MS=6*60*60*1000;
+const OPENAI_KEY_STORAGE="hesabdar-openai-key-v1";
 const DEVICE_ID_KEY="hesabdar-device-id-v1";
 const DEVICE_PRESENCE_MS=45*1000;
 const DEVICE_PRESENCE_INTERVAL=20*1000;
@@ -145,6 +146,7 @@ function renderSettingsFeatures(){const e=$("autoBackupToggle");if(e)e.checked=a
  const bio=$("biometricToggle");if(bio)bio.checked=!!data.biometricEnabled;
  const mh=$("securityMethodHint");if(mh)mh.textContent=hasLockCode()?("روش فعلی: "+(data.lockMethod==="pattern"?"رمز الگو":"رمز عددی")+(data.biometricEnabled?" + بیومتریک":"")):"هنوز رمزی برای ورود تنظیم نشده.";
  const bf=$("langBtnFa"),be=$("langBtnEn");if(bf)bf.classList.toggle("primary",data.lang!=="en");if(be)be.classList.toggle("primary",data.lang==="en");
+ const oaiStatus=$("openaiKeyStatus");if(oaiStatus)oaiStatus.textContent=openaiKey()?"🟢 کلید OpenAI تنظیم شده است":"🔴 هنوز کلیدی تنظیم نشده";
 }
 function setSyncStatus(t){const e=$("syncStatus");if(e)e.textContent=t||"";const b=$("syncBadge");if(!b)return;const s=String(t||"");let cls="offline",label="☁️ آفلاین";if(s.includes("آنلاین")||s.includes("انجام شد")||s.includes("متصل است")){cls="online";label="☁️ متصل"}else if(s.includes("⚠️")||s.includes("ناموفق")){cls="error";label="⚠️ خطای اتصال"}else if(s.includes("در حال")||s.includes("بررسی")){cls="pending";label="☁️ در حال اتصال..."}else if(s.includes("وارد شوید")||s.includes("ابتدا")){cls="offline";label="☁️ واردنشده"}b.textContent=label;b.className="sync-badge "+cls}
 
@@ -940,10 +942,62 @@ function exportAccountExcel(id){const a=data.accounts.find(x=>x.id===id);if(!a)r
 function exportCustomerExcel(id){const c=data.customers.find(x=>x.id===id);if(!c)return;const inv=data.invoices.filter(x=>x.customerId===id);const rows=inv.map(x=>[invoiceDateLabel(x.date),x.number||"",x.name||"",invoiceTotal(x),Number(x.paid||0),invoiceRemaining(x),x.status==="paid"?"پرداخت کامل":x.status==="partial"?"پرداخت بخشی":"پرداخت نشده"]);exportXLS(`مشتری-${c.name}`,['تاریخ','شماره فاکتور','عنوان','مبلغ','پرداخت','مانده','وضعیت'],rows)}
 function exportAllCustomersExcel(){const rows=data.customers.map(c=>{const st=customerStats(c);return [c.name,c.phone||"",st.count,st.total,st.paid,st.due]});exportXLS('همه-مشتریان',['نام مشتری','شماره تماس','تعداد فاکتور','مجموع خرید','مجموع پرداخت','مانده'],rows)}
 
-function openPerson(id=null){const p=id&&data.people.find(x=>x.id===id);openModal(`<h2>${p?"ویرایش بدهکار/بستانکار":"بدهکار / بستانکار"}</h2><div class="form"><select id="pt"><option value="debt" ${p?.type==="debt"?"selected":""}>من بدهکارم</option><option value="credit" ${p?.type==="credit"?"selected":""}>من طلبکارم</option></select><input id="pn" placeholder="نام شخص" value="${esc(p?.name||"")}"><input id="pa" type="number" placeholder="مبلغ" value="${Number(p?.amount)||""}">${simpleDateField("pd",jalaliInputValue(p?.due||""))}<textarea id="pnote" placeholder="توضیحات">${esc(p?.note||"")}</textarea><button class="primary" onclick="savePerson('${p?.id||""}')">${p?"ذخیره تغییرات":"ذخیره"}</button></div>`)}
-function savePerson(id){const name=$("pn").value.trim(),amount=parseMoney($("pa").value);if(!name||!amount)return alert("نام و مبلغ را وارد کنید");const o={type:$("pt").value,name,amount,due:jalaliToISO($("pd").value),note:$("pnote").value.trim()};if(id){const p=data.people.find(x=>x.id===id);if(!p)return alert("این شخص پیدا نشد");Object.assign(p,o);p.paid=Math.min(Number(p.paid)||0,amount);touch(p);markDirty("people",p.id,false,p,p.updatedAt)}else{const np=touch({id:uid(),paid:0,...o});data.people.push(np);markDirty("people",np.id,false,np,np.updatedAt)}localStorage.setItem(KEY,JSON.stringify(data));render();syncSave();logEvent(id?"ویرایش شخص":"ایجاد شخص",`${name} • ${money(amount)}`,id?"edit":"create");closeModal()}
+function openPerson(id=null){const p=id&&data.people.find(x=>x.id===id);const instCount=p?.installments?.count||1;openModal(`<h2>${p?"ویرایش بدهکار/بستانکار":"بدهکار / بستانکار"}</h2><div class="form"><select id="pt"><option value="debt" ${p?.type==="debt"?"selected":""}>من بدهکارم</option><option value="credit" ${p?.type==="credit"?"selected":""}>من طلبکارم</option></select><input id="pn" placeholder="نام شخص" value="${esc(p?.name||"")}"><input id="pa" type="number" placeholder="مبلغ کل" value="${Number(p?.amount)||""}">${simpleDateField("pd",jalaliInputValue(p?.due||""))}${invField("تعداد اقساط","اگر پرداخت قسطی است عددی بزرگ‌تر از ۱ بگذار؛ برای پرداخت یکجا همان ۱ بماند",`<input id="pInstCount" type="number" min="1" value="${instCount}">`)}<textarea id="pnote" placeholder="توضیحات">${esc(p?.note||"")}</textarea><button class="primary" onclick="savePerson('${p?.id||""}')">${p?"ذخیره تغییرات":"ذخیره"}</button></div>`)}
+function generateInstallments(amount,count,startISO){
+  count=Math.max(1,Math.floor(count)||1);
+  const base=Math.floor(amount/count);
+  let startDate=startISO?new Date(startISO):new Date();
+  if(Number.isNaN(startDate.getTime()))startDate=new Date();
+  const items=[];
+  for(let i=0;i<count;i++){
+    const due=addMonthsSafe(startDate,i);
+    const amt=i===count-1?amount-base*(count-1):base;
+    items.push({id:uid(),amount:amt,due:due.toISOString().slice(0,10),paid:false,paidAt:""});
+  }
+  return {count,items};
+}
+function savePerson(id){
+  const name=$("pn").value.trim(),amount=parseMoney($("pa").value);
+  if(!name||!amount)return alert("نام و مبلغ را وارد کنید");
+  const instCount=Math.max(1,parseInt($("pInstCount")?.value)||1);
+  const due=jalaliToISO($("pd").value);
+  const o={type:$("pt").value,name,amount,due,note:$("pnote").value.trim()};
+  if(id){
+    const p=data.people.find(x=>x.id===id);if(!p)return alert("این شخص پیدا نشد");
+    const prevCount=p.installments?.count||1;
+    Object.assign(p,o);
+    if(instCount>1){
+      if(instCount!==prevCount||!p.installments){p.installments=generateInstallments(amount,instCount,due);p.paid=0}
+    }else{delete p.installments}
+    p.paid=Math.min(Number(p.paid)||0,amount);
+    touch(p);markDirty("people",p.id,false,p,p.updatedAt);
+  }else{
+    const np=touch({id:uid(),paid:0,...o});
+    if(instCount>1)np.installments=generateInstallments(amount,instCount,due);
+    data.people.push(np);markDirty("people",np.id,false,np,np.updatedAt);
+  }
+  localStorage.setItem(KEY,JSON.stringify(data));render();syncSave();logEvent(id?"ویرایش شخص":"ایجاد شخص",`${name} • ${money(amount)}`,id?"edit":"create");closeModal()
+}
 function deletePerson(id){if(confirm("این مورد حذف شود؟")){const p=data.people.find(x=>x.id===id);removeRecord("people",id);logEvent("حذف شخص",p?.name||id,"delete")}}
 function payPerson(id){const p=data.people.find(x=>x.id===id);if(!p)return;const remaining=Math.max(0,(Number(p.amount)||0)-(Number(p.paid)||0));const v=prompt("مبلغ تسویه:",String(remaining));if(v!==null){const n=parseMoney(v);if(!n)return alert("مبلغ نامعتبر است");p.paid=Math.min(Number(p.amount)||0,(Number(p.paid)||0)+n);touch(p);markDirty("people",p.id,false,p,p.updatedAt);save();logEvent("تسویه شخص",`${p.name} • ${money(n)}`,"payment")}}
+function openInstallments(id){
+  const p=data.people.find(x=>x.id===id);if(!p?.installments)return;
+  const items=p.installments.items||[];
+  const paidCount=items.filter(x=>x.paid).length;
+  openModal(`<h2>📅 اقساط ${esc(p.name)}</h2><p class="hint">${fa(paidCount)} از ${fa(items.length)} قسط پرداخت شده • مبلغ کل: ${money(p.amount)}</p><div id="installmentsBox">${items.map((it,i)=>installmentRowHTML(p,it,i)).join("")}</div>`);
+}
+function installmentRowHTML(p,it,i){
+  return `<div class="item"><div><b>قسط ${fa(i+1)}</b><div class="meta">سررسید: ${jalaliLabel(it.due)}${it.paid?" • پرداخت‌شده در "+jalaliLabel(it.paidAt):""}</div></div><div><strong>${money(it.amount)}</strong><div class="actions"><button type="button" class="${it.paid?"":"primary"}" onclick="toggleInstallment('${p.id}','${it.id}')">${it.paid?"↩️ لغو پرداخت":"✅ پرداخت"}</button></div></div></div>`;
+}
+function toggleInstallment(personId,instId){
+  const p=data.people.find(x=>x.id===personId);if(!p?.installments)return;
+  const it=p.installments.items.find(x=>x.id===instId);if(!it)return;
+  it.paid=!it.paid;it.paidAt=it.paid?new Date().toISOString():"";
+  p.paid=p.installments.items.filter(x=>x.paid).reduce((s,x)=>s+(Number(x.amount)||0),0);
+  touch(p);markDirty("people",p.id,false,p,p.updatedAt);save();
+  logEvent(it.paid?"پرداخت قسط":"لغو پرداخت قسط",`${p.name} • ${money(it.amount)}`,"payment");
+  const box=$("installmentsBox");if(box)box.innerHTML=p.installments.items.map((x,i)=>installmentRowHTML(p,x,i)).join("");
+}
 
 function pickerDateValue(v){if(!v)return todayJalali();let d=new Date(v);if(Number.isNaN(d.getTime()))return toFaDigits(String(v));let j=gregorianToJalali(d.getFullYear(),d.getMonth()+1,d.getDate());return `${toFaDigits(j[0])}/${padFa(j[1])}/${padFa(j[2])}`;}
 function pickerTimeValue(v){const d=v?new Date(v):new Date(); if(Number.isNaN(d.getTime())) return ""; return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;}
@@ -1094,6 +1148,132 @@ function saveCheck(id){if(!$("cn").value.trim()||!parseMoney($("camount").value)
 function deleteCheck(id){if(confirm("این چک حذف شود؟")){const c=data.checks.find(x=>x.id===id);removeRecord("checks",id);logEvent("حذف چک",c?.name||id,"delete")}}
 function githubRepo(){return (localStorage.getItem(GITHUB_KEY)||"").trim().replace(/^https?:\/\/github\.com\//i,"").replace(/\.git$/i,"").replace(/\/$/,"")}
 function saveGithubRepo(){const v=$("githubRepo")?.value.trim().replace(/^https?:\/\/github\.com\//i,"").replace(/\.git$/i,"").replace(/\/$/,"");if(!/^[^/\s]+\/[^/\s]+$/.test(v))return alert("مخزن را به شکل username/repository وارد کن");localStorage.setItem(GITHUB_KEY,v);setUpdateStatus("مخزن GitHub ذخیره شد: "+v);checkForUpdates(true)}
+
+/* ============================================================
+ * یادداشت هوشمند (Smart Note) — تحلیل متن آزاد با OpenAI
+ * متن فارسی کاربر تحلیل می‌شود و مواردی مثل بدهی/طلب، یادآوری
+ * یا تراکنش از آن استخراج و برای تایید نهایی به کاربر نشان داده می‌شود.
+ * ============================================================ */
+function openaiKey(){return (localStorage.getItem(OPENAI_KEY_STORAGE)||"").trim()}
+function saveOpenAIKey(){const v=$("openaiKeyInput")?.value.trim();if(!v)return alert("کلید OpenAI را وارد کن");localStorage.setItem(OPENAI_KEY_STORAGE,v);if($("openaiKeyInput"))$("openaiKeyInput").value="";renderSettingsFeatures();alert("کلید OpenAI ذخیره شد.")}
+function clearOpenAIKey(){if(!openaiKey())return alert("کلیدی ثبت نشده است");if(!confirm("کلید OpenAI حذف شود؟"))return;localStorage.removeItem(OPENAI_KEY_STORAGE);renderSettingsFeatures();alert("کلید OpenAI حذف شد.")}
+
+const SMART_NOTE_KIND_LABEL={debt:"من بدهکارم",credit:"من طلبکارم",reminder:"یادآوری",expense:"هزینه (پرداخت شد)",income:"دریافت (پول گرفتم)"};
+let smartNoteItems=[];
+
+function openSmartNote(){
+  if(!openaiKey()){
+    if(confirm("برای یادداشت هوشمند اول باید یک کلید API از OpenAI در تنظیمات ثبت کنی. الان به تنظیمات بروم؟")){closeModal();goToPage("settings");setTimeout(()=>$("openaiKeyInput")?.focus(),300)}
+    return;
+  }
+  smartNoteItems=[];
+  openModal(`<h2>✨ یادداشت هوشمند</h2><p class="hint">یک متن آزاد بنویس، مثلاً «فردا باید ۲۰۰ تومن به رضا بدم» یا «از علی ۵۰۰ تومن طلب دارم، پس‌فردا یادم بنداز». هوش مصنوعی متن را می‌خواند و مواردی که پیدا کند برای تایید نشانت می‌دهد.</p><div class="form"><textarea id="smartNoteText" rows="5" placeholder="متن یادداشت را اینجا بنویس..."></textarea><button type="button" class="primary" id="smartNoteAnalyzeBtn" onclick="analyzeSmartNote()">🔎 تحلیل با هوش مصنوعی</button><div id="smartNoteResults"></div></div>`);
+}
+
+async function analyzeSmartNote(){
+  const text=$("smartNoteText")?.value.trim();
+  if(!text)return alert("اول متن یادداشت را بنویس");
+  const key=openaiKey();
+  if(!key)return alert("کلید OpenAI تنظیم نشده است");
+  const btn=$("smartNoteAnalyzeBtn");
+  const resultsBox=$("smartNoteResults");
+  if(btn){btn.disabled=true;btn.textContent="⏳ در حال تحلیل..."}
+  if(resultsBox)resultsBox.innerHTML="";
+  try{
+    const today=todayJalali();
+    const sys=`تو یک دستیار مالی فارسی‌زبان هستی. کاربر یک یادداشت آزاد می‌نویسد و تو باید موارد مالی/یادآوری داخل آن را استخراج کنی.
+امروز به تقویم شمسی: ${today} است. تاریخ‌های نسبی مثل «فردا»، «پس‌فردا»، «هفته دیگه»، «ماه دیگه» را بر همین اساس به تاریخ شمسی دقیق (YYYY/MM/DD) تبدیل کن.
+هر مورد یکی از این نوع‌هاست:
+- "debt": کاربر باید به شخصی پول بدهد (کاربر بدهکار است)
+- "credit": شخصی باید به کاربر پول بدهد (کاربر طلبکار است)
+- "reminder": یک یادآوری ساده بدون تراکنش مالی مشخص یا با مبلغ نامشخص
+- "expense": کاربر همین حالا/همان لحظه پول خرج کرده (هزینه قطعی‌شده)
+- "income": کاربر همین حالا/همان لحظه پول دریافت کرده (درآمد قطعی‌شده)
+فقط یک JSON با این ساختار برگردان و هیچ توضیح اضافه‌ای ننویس:
+{"items":[{"kind":"debt|credit|reminder|expense|income","person":"نام شخص یا خالی","title":"عنوان کوتاه","amount":عدد به تومان یا 0 اگر نامشخص,"date":"YYYY/MM/DD شمسی یا خالی","note":"توضیح کوتاه اختیاری"}]}
+اگر متن هیچ مورد قابل استخراجی نداشت، items را آرایه خالی بگذار.`;
+    const res=await fetch("https://api.openai.com/v1/chat/completions",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},
+      body:JSON.stringify({model:"gpt-4o-mini",temperature:0,response_format:{type:"json_object"},messages:[{role:"system",content:sys},{role:"user",content:text}]})
+    });
+    if(!res.ok){const errBody=await res.text().catch(()=>"")
+      ;throw new Error("HTTP "+res.status+" "+errBody.slice(0,200))}
+    const data2=await res.json();
+    const raw=data2?.choices?.[0]?.message?.content||"{}";
+    const clean=raw.replace(/```json|```/g,"").trim();
+    let parsed;try{parsed=JSON.parse(clean)}catch(e){throw new Error("پاسخ هوش مصنوعی قابل خواندن نبود")}
+    const items=Array.isArray(parsed.items)?parsed.items:[];
+    smartNoteItems=items.map(it=>({
+      id:uid(),
+      kind:["debt","credit","reminder","expense","income"].includes(it.kind)?it.kind:"reminder",
+      person:String(it.person||"").trim(),
+      title:String(it.title||"").trim(),
+      amount:Math.max(0,Number(String(it.amount||0).replace(/[^\d.]/g,""))||0),
+      date:String(it.date||"").trim(),
+      note:String(it.note||"").trim(),
+      selected:true
+    }));
+    renderSmartNoteResults();
+  }catch(e){
+    console.warn("smart note analyze",e);
+    if(resultsBox)resultsBox.innerHTML=`<div class="card hint">⚠️ تحلیل انجام نشد. کلید API، اتصال اینترنت یا اعتبار حساب OpenAI را بررسی کن.<br><small>${esc(e.message||"")}</small></div>`;
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent="🔎 تحلیل با هوش مصنوعی"}
+  }
+}
+
+function renderSmartNoteResults(){
+  const box=$("smartNoteResults");if(!box)return;
+  if(!smartNoteItems.length){box.innerHTML=`<div class="card hint">هیچ مورد قابل تشخیصی در متن پیدا نشد.</div>`;return}
+  box.innerHTML=`<div class="section-head"><h3>موارد پیدا‌شده</h3></div>${smartNoteItems.map((it,i)=>smartNoteItemRow(it,i)).join("")}<button type="button" class="primary" onclick="addSmartNoteSelected()">✅ افزودن موارد انتخاب‌شده</button>`;
+}
+
+function smartNoteItemRow(it,i){
+  return `<div class="item smart-note-row" data-smart-idx="${i}">
+    <div class="form" style="flex:1">
+      <label class="feature-row"><input type="checkbox" ${it.selected?"checked":""} onchange="smartNoteItems[${i}].selected=this.checked"><span><b>${esc(it.title||it.person||"مورد بدون عنوان")}</b></span></label>
+      <select onchange="smartNoteItems[${i}].kind=this.value">${Object.entries(SMART_NOTE_KIND_LABEL).map(([k,l])=>`<option value="${k}" ${it.kind===k?"selected":""}>${l}</option>`).join("")}</select>
+      <input placeholder="نام شخص (اختیاری)" value="${esc(it.person)}" oninput="smartNoteItems[${i}].person=this.value">
+      <input placeholder="عنوان" value="${esc(it.title)}" oninput="smartNoteItems[${i}].title=this.value">
+      <input type="number" placeholder="مبلغ" value="${it.amount||""}" oninput="smartNoteItems[${i}].amount=parseMoney(this.value)">
+      <input placeholder="تاریخ شمسی مثل ۱۴۰۵/۰۶/۱۰ (اختیاری)" value="${esc(it.date)}" oninput="smartNoteItems[${i}].date=this.value">
+    </div>
+  </div>`;
+}
+
+function applySmartNoteItem(it){
+  const iso=it.date?jalaliToISO(it.date):"";
+  if(it.kind==="debt"||it.kind==="credit"){
+    const name=it.person||it.title||"شخص";
+    const np=touch({id:uid(),type:it.kind,name,amount:it.amount||0,paid:0,due:iso,note:it.note||""});
+    data.people.push(np);markDirty("people",np.id,false,np,np.updatedAt);
+    logEvent("افزودن از یادداشت هوشمند",`${name} • ${money(it.amount||0)}`,"create");
+    return;
+  }
+  if(it.kind==="expense"||it.kind==="income"){
+    if(!data.accounts.length)return;
+    const accountID=data.accounts.find(a=>a.default)?.id||data.accounts[0].id;
+    const nt=touch({id:uid(),title:it.title||it.person||(it.kind==="expense"?"هزینه":"دریافت"),amount:it.amount||0,type:it.kind,category:"سایر",accountID,date:iso?jalaliDateTimeToISO(it.date+" 00:00"):new Date().toISOString(),source:"smart-note"});
+    data.transactions.unshift(nt);markDirty("transactions",nt.id,false,nt,nt.updatedAt);
+    logEvent("افزودن از یادداشت هوشمند",`${nt.title} • ${money(it.amount||0)}`,"create");
+    return;
+  }
+  const maxOrder=data.reminders.length?Math.max(...data.reminders.map(x=>x.order??0)):-1;
+  const nr=touch({id:uid(),order:maxOrder+1,title:it.title||it.person||"یادآوری",amount:it.amount||0,date:iso?jalaliDateTimeToISO(it.date+" 09:00"):new Date().toISOString(),repeat:"once",type:"expense"});
+  data.reminders.push(nr);markDirty("reminders",nr.id,false,nr,nr.updatedAt);
+  scheduleNativeReminder(nr).catch(()=>{});
+  logEvent("افزودن از یادداشت هوشمند",nr.title,"create");
+}
+
+function addSmartNoteSelected(){
+  const chosen=smartNoteItems.filter(x=>x.selected);
+  if(!chosen.length)return alert("حداقل یک مورد را انتخاب کن");
+  for(const it of chosen)applySmartNoteItem(it);
+  localStorage.setItem(KEY,JSON.stringify(data));save();syncSave();
+  alert(`${fa(chosen.length)} مورد اضافه شد.`);
+  closeModal();
+}
 function setUpdateStatus(t){const e=$("updateStatus");if(e)e.textContent=t||""}
 function versionParts(v){return String(v||"").replace(/^v/i,"").split(".").map(x=>parseInt(x,10)||0)}
 function isNewerVersion(remote,local){const a=versionParts(remote),b=versionParts(local);for(let i=0;i<Math.max(a.length,b.length);i++){if((a[i]||0)>(b[i]||0))return true;if((a[i]||0)<(b[i]||0))return false}return false}
@@ -1505,7 +1685,7 @@ function render(){
  if($("filterCat")&&pageActive("transactions")){let opts='<option value="">همه دسته‌ها</option>'+[...data.expenseCats,...data.incomeCats].map(c=>`<option value="${esc(c.name)}">${esc(c.name)}</option>`).join("");$("filterCat").innerHTML=opts;$("filterCat").value=fc}
  if($("txList")&&pageActive("transactions"))$("txList").innerHTML=data.transactions.filter(t=>(!q||String(t.title).includes(q)||String(t.category||"").includes(q))&&(!ft||t.type===ft)&&(!fc||t.category===fc)).map(txHTML).join("")||empty("تراکنشی پیدا نشد");
  if($("customerList")&&pageActive("customers"))renderCustomers();
- if($("peopleList")&&pageActive("people"))$("peopleList").innerHTML=data.people.filter(p=>(p.type||"debt")===peopleMode).map(p=>{const total=Number(p.amount)||0,paid=Math.min(Number(p.paid)||0,total),remaining=Math.max(0,total-paid);return `<div class="item"><div><b>${esc(p.name)}</b><div class="meta">${p.due?"سررسید: "+p.due:""}${p.note?" • "+esc(p.note):""}</div><div class="meta">کل: ${money(total)} • تسویه: ${money(paid)}</div></div><div><strong>${money(remaining)}</strong><div class="actions"><button type="button" onclick="payPerson('${p.id}')">تسویه</button>${actionButtons("openPerson","deletePerson",p.id)}</div></div></div>`}).join("")||empty(peopleMode==="debt"?"هنوز بدهکاری ثبت نشده":"هنوز طلبی ثبت نشده");
+ if($("peopleList")&&pageActive("people"))$("peopleList").innerHTML=data.people.filter(p=>(p.type||"debt")===peopleMode).map(p=>{const total=Number(p.amount)||0,paid=Math.min(Number(p.paid)||0,total),remaining=Math.max(0,total-paid);const inst=p.installments;const instMeta=inst?`<div class="meta">🧾 اقساط: ${fa(inst.items.filter(x=>x.paid).length)} از ${fa(inst.count)} پرداخت‌شده</div>`:"";const instBtn=inst?`<button type="button" onclick="openInstallments('${p.id}')">اقساط</button>`:`<button type="button" onclick="payPerson('${p.id}')">تسویه</button>`;return `<div class="item"><div><b>${esc(p.name)}</b><div class="meta">${p.due?"سررسید: "+p.due:""}${p.note?" • "+esc(p.note):""}</div><div class="meta">کل: ${money(total)} • تسویه: ${money(paid)}</div>${instMeta}</div><div><strong>${money(remaining)}</strong><div class="actions">${instBtn}${actionButtons("openPerson","deletePerson",p.id)}</div></div></div>`}).join("")||empty(peopleMode==="debt"?"هنوز بدهکاری ثبت نشده":"هنوز طلبی ثبت نشده");
  if($("reminderList")&&pageActive("reminders")){const normalReminders=data.reminders.filter(r=>!r.sourceNoteId).sort((a,b)=>(a.order??0)-(b.order??0)); const noteAlarms=data.reminders.filter(r=>r.sourceNoteId); const normal=normalReminders.map((r,i)=>{const accId="rem-"+r.id;const isOpen=openAccordions.has(accId);return `<div class="item accordion-card${isOpen?' open':''}" data-acc-id="${accId}"><button class="accordion-head" type="button" aria-expanded="${isOpen}" onclick="toggleAccordion(this,event)"><span>🔔 <b>${esc(r.title)}</b></span><span>⌄</span></button><div class="accordion-body"><div class="meta">${jalaliLabel(r.date)} • ${r.repeat==="once"?"یک‌بار":r.repeat==="weekly"?"هفتگی":"ماهانه"}</div><div class="accordion-actions"><strong>${r.amount?money(r.amount):""}</strong><div class="reorder-btns"><button type="button" title="انتقال به بالا" ${i===0?"disabled":""} onclick="event.stopPropagation();moveReminder('${r.id}',-1)">▲</button><button type="button" title="انتقال به پایین" ${i===normalReminders.length-1?"disabled":""} onclick="event.stopPropagation();moveReminder('${r.id}',1)">▼</button></div>${actionButtons("openReminder","deleteReminder",r.id)}</div></div></div>`}).join(""); $("reminderList").innerHTML=`<div class="section-label">🔔 یادآوری‌های مستقل</div>${normal||empty("یادآوری مستقلی ندارید")}${noteAlarms.length?`<div class="section-label">📝⏰ آلارم یادداشت‌ها</div>`+noteAlarms.map(r=>{const accId="remnote-"+r.id;const isOpen=openAccordions.has(accId);return `<div class="item accordion-card${isOpen?' open':''}" data-acc-id="${accId}"><button class="accordion-head" type="button" aria-expanded="${isOpen}" onclick="toggleAccordion(this,event)"><span>📝 <b>${esc(r.title)}</b></span><span>⌄</span></button><div class="accordion-body"><div class="meta">${jalaliLabel(r.date)} • ${r.repeat==="once"?"یک‌بار":r.repeat==="weekly"?"هفتگی":"ماهانه"}</div></div></div>`}).join(""):``}`;}
  if($("noteList")&&pageActive("notes")){const sortedNotes=[...data.notes].sort((a,b)=>(a.order??0)-(b.order??0));$("noteList").innerHTML=sortedNotes.map((n,i)=>noteHTML(n,{i,total:sortedNotes.length})).join("")||empty("یادداشتی ندارید");}
  if($("invoiceList")&&pageActive("invoices"))$("invoiceList").innerHTML=data.invoices.map(invoiceHTML).join("")||empty("هنوز فاکتوری ساخته نشده است");

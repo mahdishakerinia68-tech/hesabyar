@@ -22,7 +22,7 @@
     <button id="menuBtn" class="menu-trigger" aria-label="باز کردن منو" aria-haspopup="true" aria-expanded="false" aria-controls="menuModal">⋯</button>
     <img class="app-logo" src="logo.png" alt="حساب‌یار">
     <div class="top-bar-titles">
-      <h1>حساب‌یار <span class="version-pill" id="versionPill">5.9</span></h1>
+      <h1>حساب‌یار <span class="version-pill" id="versionPill">6.0</span></h1>
       <div id="syncBadge" class="sync-badge">☁️ آفلاین</div>
     </div>
   </div>
@@ -126,8 +126,9 @@
 </section>
 
 <section id="notes" class="page">
-  <div class="section-head"><h2 data-i18n="page.notes">📝 یادداشت‌ها</h2><button onclick="openNote()">＋</button></div>
+  <div class="section-head"><h2 data-i18n="page.notes">📝 یادداشت‌ها</h2><div class="actions"><button onclick="openSmartNote()">✨</button><button onclick="openNote()">＋</button></div></div>
   <div class="card hint">مثل یک لیست کار بساز؛ برای یادداشت زمان بگذار و چند آیتم زیر آن اضافه کن. هر آیتم جداگانه قابل تیک‌زدن، حذف و ویرایش است.</div>
+  <button class="tool-card smart-note-btn" onclick="openSmartNote()">✨<b>یادداشت هوشمند</b><small>یک متن آزاد بنویس تا هوش مصنوعی بدهی، طلب، یادآوری یا تراکنش را از آن پیدا کند</small></button>
   <div id="noteList"></div>
 </section>
 
@@ -189,6 +190,16 @@
       <label class="file-label">✍️ امضا<input id="brandSignature" type="file" accept="image/*" onchange="previewBrandFile(this,'signature')"></label>
       <div id="brandSignaturePreview"></div>
       <div class="settings-actions"><button class="primary" onclick="saveBranding()">💾 ذخیره مشخصات فاکتور</button><button onclick="clearBranding()">🧹 حذف لوگو، مهر و امضا</button></div>
+    </div>
+
+    <div class="settings-group card" id="stgGroup-ai">
+      <div class="settings-group-head"><span>✨</span><div><h3>یادداشت هوشمند (OpenAI)</h3><p class="hint">برای استفاده از «یادداشت هوشمند» در صفحه یادداشت‌ها، کلید API شخصی خودت از OpenAI را اینجا وارد کن. این کلید فقط روی همین گوشی ذخیره می‌شود.</p></div></div>
+      <div id="openaiKeyStatus" class="hint"></div>
+      <input id="openaiKeyInput" type="password" placeholder="sk-..." autocomplete="off">
+      <div class="settings-actions">
+        <button class="primary" onclick="saveOpenAIKey()">💾 ذخیره کلید</button>
+        <button class="danger" onclick="clearOpenAIKey()">🗑 حذف کلید</button>
+      </div>
     </div>
 
     <div class="settings-group card" id="stgGroup-year">
@@ -264,7 +275,7 @@
     </div>
 
   </div>
-  <p class="hint settings-footer">نسخه <span id="appVersionText">5.9</span> • بکاپ خودکار • بروزرسانی • اتصال دو گوشی • تقویم شمسی کامل</p>
+  <p class="hint settings-footer">نسخه <span id="appVersionText">6.0</span> • بکاپ خودکار • بروزرسانی • اتصال دو گوشی • تقویم شمسی کامل</p>
   <p class="hint">تغییرات روی این گوشی ذخیره می‌شود و در صورت اتصال به Firebase با گوشی دوم ادغام می‌گردد.</p>
 </section>
 
@@ -357,6 +368,6 @@
 <script src="capacitor-filesystem-bridge.js"></script>
 <script src="capacitor-biometric-bridge.js"></script>
 <script src="app.js"></script>
-<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js?v=5.9").catch(console.error)}</script>
+<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js?v=6.0").catch(console.error)}</script>
 </body>
 </html>
