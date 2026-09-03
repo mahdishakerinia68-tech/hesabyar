@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="6.7";
+const APP_VERSION="6.7.1";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
@@ -649,6 +649,35 @@ async function setBiometricEnabled(v){
  save();logEvent(v?"فعال‌سازی قفل بیومتریک":"غیرفعال‌سازی قفل بیومتریک","","settings");renderSettingsFeatures();
 }
 
+const WHATS_NEW_KEY="hesabdar-whats-new-seen-6.7.1";
+function showWhatsNewOnce(){
+ if(localStorage.getItem(WHATS_NEW_KEY)==="1")return;
+ localStorage.setItem(WHATS_NEW_KEY,"1");
+ openModal(`<div class="whats-new">
+  <div class="whats-new-badge">نسخه ۶.۷.۱</div>
+  <h2>🎉 به حساب‌یار خوش آمدی</h2>
+  <p class="hint">این صفحه فقط یک‌بار در اولین اجرای این نسخه نمایش داده می‌شود.</p>
+  <div class="whats-new-section">
+   <h3>🛠 تغییرات این نسخه</h3>
+   <ul>
+    <li>رفع مشکل اسکرول و بالا/پایین رفتن صفحات در اندروید.</li>
+    <li>بهبود بازیابی پشتیبان JSON، مخصوصاً انتقال فایل از اندروید به آیفون.</li>
+    <li>پس از بازیابی، اطلاعات فوراً روی صفحه تازه‌سازی می‌شوند و فایل انتخابی دوباره قابل انتخاب است.</li>
+   </ul>
+  </div>
+  <div class="whats-new-section">
+   <h3>✨ امکانات حساب‌یار</h3>
+   <ul>
+    <li>حساب‌ها و بانک‌ها، تراکنش‌ها، درآمد و هزینه و انتقال بین حساب‌ها.</li>
+    <li>فاکتور، مشتری و محصولات، یادآوری، چک و گزارش‌ها.</li>
+    <li>پشتیبان‌گیری و بازیابی، پشتیبان خودکار و همگام‌سازی ابری دو گوشی.</li>
+    <li>اعلان‌ها، قفل عددی/الگویی و ورود بیومتریک در نسخه‌های سازگار.</li>
+    <li>ماشین‌حساب، ثبت سریع تراکنش و ابزارهای کاربردی روزمره.</li>
+   </ul>
+  </div>
+  <button class="primary" onclick="closeModal()">🚀 شروع کار با حساب‌یار</button>
+ </div>`);
+}
 function showLock(){
  let old=$("lock"); if(old) old.remove();
  if(!hasLockCode())return;
@@ -664,7 +693,7 @@ function showLock(){
   const svg=$("patternSvg");
   svg.onpointerdown=e=>patternDown(e,async path=>{
    const ok=await verifyPattern(path).catch(()=>false);
-   if(ok){$("lock")?.remove();return}
+   if(ok){$("lock")?.remove();setTimeout(showWhatsNewOnce,180);return}
    $("lockMsg").textContent="الگو اشتباه است";patternPath=[];patternRedraw(svg);
   });
  }else{
@@ -673,7 +702,7 @@ function showLock(){
  }
  if(bioBtn)$("bioUnlockBtn").onclick=async()=>{const ok=await biometricVerify().catch(()=>false);if(ok)$("lock")?.remove();else alert("تایید بیومتریک انجام نشد")};
 }
-async function unlock(){const input=$("pinInput");if(!input)return;const ok=await verifyPin(input.value).catch(()=>false);if(!ok)return alert("رمز اشتباه است");$("lock")?.remove()}
+async function unlock(){const input=$("pinInput");if(!input)return;const ok=await verifyPin(input.value).catch(()=>false);if(!ok)return alert("رمز اشتباه است");$("lock")?.remove();setTimeout(showWhatsNewOnce,180)}
 async function setPin(){
  if(data.lockMethod==="pattern"&&data.patternHash){alert("در حال حاضر قفل الگو فعال است. برای تغییر به رمز عددی، اول با «حذف رمز ورود» آن را غیرفعال کن.");return}
  const old=data.pinHash||data.pin?(prompt("رمز فعلی را وارد کن:")||""):"";
@@ -1826,6 +1855,35 @@ function renderAdvancedReport(){
 }
 function drawChart(inc,exp){const c=$("chart");if(!c)return;const x=c.getContext("2d"),w=c.width,h=c.height;x.clearRect(0,0,w,h);const max=Math.max(inc,exp,1);[[inc,"درآمد"],[exp,"هزینه"]].forEach((v,i)=>{const bh=v[0]/max*170;x.fillStyle=i?"#C1483A":"#2F9E5B";x.fillRect(150+i*190,h-45-bh,90,bh);x.fillStyle="#5B564A";x.font="20px sans-serif";x.fillText(v[1],155+i*190,h-12)})}
 function exportData(){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));a.download="hesabdar-backup.json";a.click();logEvent("پشتیبان‌گیری","فایل JSON صادر شد","settings")}
-function importData(e){const file=e.target.files?.[0];if(!file)return;const r=new FileReader();r.onload=async()=>{try{data=JSON.parse(r.result);normalizeData();await migratePinSecurity();data.audit??=[];data.notes??=[];save();logEvent("بازیابی اطلاعات","پشتیبان وارد شد","settings");showLock();alert("بازیابی شد")}catch{alert("فایل نامعتبر است")}};r.readAsText(file)}
+function importData(e){
+ const input=e?.target,file=input?.files?.[0];
+ if(!file)return;
+ const finish=()=>{if(input)input.value="";};
+ const r=new FileReader();
+ r.onerror=()=>{finish();alert("خواندن فایل پشتیبان در این گوشی انجام نشد. دوباره فایل JSON را انتخاب کن.")};
+ r.onload=async()=>{
+  try{
+   const parsed=JSON.parse(String(r.result||""));
+   if(!parsed||typeof parsed!=="object")throw new Error("invalid");
+   const previousLock={pin:data.pin,pinHash:data.pinHash,pinSalt:data.pinSalt,patternHash:data.patternHash,patternSalt:data.patternSalt,lockMethod:data.lockMethod,biometricEnabled:data.biometricEnabled,webauthnCredId:data.webauthnCredId};
+   data=parsed;
+   normalizeData();
+   await migratePinSecurity();
+   data.audit??=[];data.notes??=[];
+   // Keep the security method of the destination phone; the backup is data, not the phone's lock.
+   Object.assign(data,previousLock);
+   save();
+   logEvent("بازیابی اطلاعات","پشتیبان وارد شد و اطلاعات روی این گوشی جایگزین شد","settings");
+   render();
+   finish();
+   alert("بازیابی با موفقیت انجام شد. اطلاعات پشتیبان روی این گوشی جایگزین شد.");
+  }catch(err){
+   finish();
+   console.error("backup restore",err);
+   alert("فایل پشتیبان نامعتبر یا ناقص است و بازیابی نشد.");
+  }
+ };
+ try{r.readAsText(file,"utf-8")}catch(err){finish();alert("امکان خواندن فایل پشتیبان وجود ندارد.")}
+}
 function clearData(){if(confirm("همه اطلاعات حذف شود؟")){const pin=data.pin,pinHash=data.pinHash,pinSalt=data.pinSalt,patternHash=data.patternHash,patternSalt=data.patternSalt,lockMethod=data.lockMethod,biometricEnabled=data.biometricEnabled,webauthnCredId=data.webauthnCredId,lang=data.lang;data=blankData();data.pin=pin;data.pinHash=pinHash;data.pinSalt=pinSalt;data.patternHash=patternHash;data.patternSalt=patternSalt;data.lockMethod=lockMethod;data.biometricEnabled=biometricEnabled;data.webauthnCredId=webauthnCredId;data.lang=lang;save();logEvent("پاک کردن اطلاعات","اطلاعات برنامه پاک شد","delete");}}
-(async function initApp(){normalizeData();await migratePinSecurity();showLock();render();applyDashboardConfig();applyAppMode();renderBrandingInSettings();renderSettingsFeatures();applyLanguage();maybeAutoBackup("اجرای برنامه");processRecurringTransactions();logEvent("اجرای برنامه","برنامه حسابدار اجرا شد","system");await initSync();if(!sync.auth){[4000,12000,30000].forEach(ms=>setTimeout(()=>{if(!sync.auth)initSync()},ms))}syncAllNotesToReminders().catch(console.error);rescheduleAllNativeReminders().catch(console.error);startUpdateChecker();startReminderChecker();})();
+(async function initApp(){normalizeData();await migratePinSecurity();showLock();render();applyDashboardConfig();applyAppMode();renderBrandingInSettings();renderSettingsFeatures();applyLanguage();maybeAutoBackup("اجرای برنامه");processRecurringTransactions();logEvent("اجرای برنامه","برنامه حسابدار اجرا شد","system");await initSync();if(!sync.auth){[4000,12000,30000].forEach(ms=>setTimeout(()=>{if(!sync.auth)initSync()},ms))}syncAllNotesToReminders().catch(console.error);rescheduleAllNativeReminders().catch(console.error);startUpdateChecker();startReminderChecker();if(!hasLockCode())setTimeout(showWhatsNewOnce,320);})();

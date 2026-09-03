@@ -18,13 +18,13 @@ body.dark{
   color-scheme: dark;
 }
 *{box-sizing:border-box; -webkit-tap-highlight-color: transparent; min-width:0;}
-html{background:var(--bg); overflow-x:hidden}
+html{background:var(--bg);overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch}
 body{
   margin:0; min-height:100vh; background:var(--bg); color:var(--label);
   font-family:"Vazirmatn",-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Tahoma,sans-serif;
   -webkit-font-smoothing:antialiased; overscroll-behavior-y:none; overscroll-behavior-x:none;
   transition:background .25s ease,color .25s ease;
-  overflow-x:hidden; width:100%;
+  overflow-x:hidden; overflow-y:auto; width:100%; min-height:100%; -webkit-overflow-scrolling:touch;
   /* Stop the browser's own edge-swipe-back gesture (which can trigger a real
      page reload / flash of unstyled content) from fighting with our custom
      swipe-back handler in app.js; vertical scrolling still works normally. */
@@ -37,7 +37,7 @@ img,svg,canvas{max-width:100%}
 /* Nothing in the app should ever be wide enough to need a horizontal drag —
    every page and every sheet clips instead of scrolling sideways. */
 .app,main,.page,.sheet,.modal{overflow-x:hidden}
-.app{max-width:600px;margin:0 auto;min-height:100vh;padding-bottom:calc(var(--safe-b) + 18px);width:100%}
+.app{max-width:600px;margin:0 auto;min-height:100vh;height:auto;padding-bottom:calc(var(--safe-b) + 32px);width:100%;}
 
 /* ===== Top bar ===== */
 .top-bar{
@@ -552,3 +552,19 @@ body.personal-mode [data-page="customers"],
 body.personal-mode [data-page="invoices"],
 body.personal-mode [data-widget="invoiceBtn"]{display:none!important}
 #appModeBtnPersonal.primary,#appModeBtnBusiness.primary{background:var(--blue);color:#fff}
+
+/* v6.7.1 — reliable vertical scrolling in Android WebView/Capacitor */
+main{display:block;min-height:0}
+.page{min-height:0;touch-action:pan-y}
+@media (max-width:700px){
+  html,body{overflow-y:auto!important;min-height:100%;height:auto}
+  .app{height:auto!important;overflow:visible!important}
+  main{overflow:visible!important}
+}
+.whats-new{padding:8px 0 calc(8px + var(--safe-b));line-height:1.75}
+.whats-new h2{font-size:24px;margin:6px 0 4px}
+.whats-new-badge{display:inline-block;background:var(--blue);color:#fff;border-radius:999px;padding:5px 12px;font-weight:800;font-size:12px}
+.whats-new-section{margin:14px 0;padding:13px;border:1px solid var(--sep);border-radius:14px;background:var(--card)}
+.whats-new-section h3{font-size:14px;margin-bottom:6px}
+.whats-new-section ul{margin:0;padding-inline-start:20px}
+.whats-new-section li{margin:4px 0;font-size:13px}
