@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="6.7.4";
+const APP_VERSION="6.7.6";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
@@ -649,12 +649,12 @@ async function setBiometricEnabled(v){
  save();logEvent(v?"فعال‌سازی قفل بیومتریک":"غیرفعال‌سازی قفل بیومتریک","","settings");renderSettingsFeatures();
 }
 
-const WHATS_NEW_KEY="hesabdar-whats-new-seen-6.7.4";
+const WHATS_NEW_KEY="hesabdar-whats-new-seen-6.7.6";
 function showWhatsNewOnce(){
  if(localStorage.getItem(WHATS_NEW_KEY)==="1")return;
  localStorage.setItem(WHATS_NEW_KEY,"1");
  openModal(`<div class="whats-new">
-  <div class="whats-new-badge">نسخه ۶.۷.۲</div>
+  <div class="whats-new-badge">نسخه ۶.۷.۶</div>
   <h2>🎉 به حساب‌یار خوش آمدی</h2>
   <p class="hint">این صفحه فقط یک‌بار در اولین اجرای این نسخه نمایش داده می‌شود.</p>
   <div class="whats-new-section">
@@ -1840,36 +1840,62 @@ function renderAdvancedReport(){
  box.innerHTML=`<div class="report-summary"><div><span>دریافتی</span><b class="income">${money(income)}</b></div><div><span>هزینه</span><b class="expense">${money(expense)}</b></div><div><span>خالص</span><b>${money(income-expense)}</b></div></div><div class="report-table">${rows.slice(0,100).map(t=>`<div class="report-row"><span>${esc(t.title||"تراکنش")}<small>${jalaliDateTimeInput(t.date)} • ${esc(t.category||"")}</small></span><strong class="${t.type}">${t.type==="income"?"+":"−"}${money(t.amount)}</strong></div>`).join("")||`<p class="hint">موردی با این فیلتر پیدا نشد.</p>`}</div>`;
 }
 function drawChart(inc,exp){const c=$("chart");if(!c)return;const x=c.getContext("2d"),w=c.width,h=c.height;x.clearRect(0,0,w,h);const max=Math.max(inc,exp,1);[[inc,"درآمد"],[exp,"هزینه"]].forEach((v,i)=>{const bh=v[0]/max*170;x.fillStyle=i?"#C1483A":"#2F9E5B";x.fillRect(150+i*190,h-45-bh,90,bh);x.fillStyle="#5B564A";x.font="20px sans-serif";x.fillText(v[1],155+i*190,h-12)})}
-function exportData(){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));a.download="hesabdar-backup.json";a.click();logEvent("پشتیبان‌گیری","فایل JSON صادر شد","settings")}
-function importData(e){
- const input=e?.target,file=input?.files?.[0];
- if(!file)return;
- const finish=()=>{if(input)input.value="";};
- const r=new FileReader();
- r.onerror=()=>{finish();alert("خواندن فایل پشتیبان در این گوشی انجام نشد. دوباره فایل JSON را انتخاب کن.")};
- r.onload=async()=>{
+function backupPayload(){return {format:"hesabdar-backup",version:2,appVersion:APP_VERSION,createdAt:new Date().toISOString(),data:JSON.parse(JSON.stringify(data))}}
+function exportData(){
+ const json=JSON.stringify(backupPayload(),null,2),blob=new Blob([json],{type:"application/json;charset=utf-8"});
+ const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="hesabdar-backup.json";document.body.appendChild(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(a.href),5000);logEvent("پشتیبان‌گیری","فایل پشتیبان JSON صادر شد","settings");
+ alert("فایل پشتیبان ساخته شد. آن را به گوشی دیگر منتقل کن و از گزینه بازیابی انتخابش کن.");
+}
+async function readBackupFile(file){
+ if(!file)throw new Error("no-file");
+ try{const text=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result||""));r.onerror=()=>reject(r.error||new Error("FileReader failed"));r.readAsText(file,"utf-8")});if(text.trim())return text}catch(e){console.warn("FileReader backup read failed",e)}
+ if(typeof file.text==="function"){const text=await file.text();if(String(text||"").trim())return String(text)}
+ throw new Error("empty-backup");
+}
+async function replaceCloudAfterRestore(){
+ if(!sync.user||!sync.db)return;
+ const restoreAt=new Date().toISOString();
+ const ks=["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats","audit"];
+ // A file restore is authoritative. Give every restored record a fresh timestamp so
+ // an older pending change on the other phone cannot win the timestamp merge later.
+ for(const k of ks){for(const r of (data[k]||[])){r.updatedAt=restoreAt;r.updatedBy=sync.user.uid}}
+ data._sync??={tombstones:{}};data._sync.tombstones??={};
+ for(const k of ks){for(const id of Object.keys(data._sync.tombstones?.[k]||{}))data._sync.tombstones[k][id]=restoreAt}
+ localStorage.setItem(KEY,JSON.stringify(data));
+ const col=recordsCollection(),snap=await col.get(),localMap=new Map(recordsFromLocal().map(x=>[x.id,x]));
+ for(let i=0;i<snap.docs.length;i+=450){const batch=sync.db.batch();for(const d of snap.docs.slice(i,i+450)){if(!localMap.has(d.id))batch.delete(d.ref)}await batch.commit()}
+ const all=recordsFromLocal();sync.dirty.clear();await commitChunks(all);
+ await sync.db.collection("users").doc(sync.user.uid).set({appVersion:APP_VERSION,lastRestoreAt:restoreAt,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+}
+async function importData(e){
+ const input=e?.target,file=input?.files?.[0];if(!file)return;const finish=()=>{if(input)input.value=""};
+ try{
+  const raw=await readBackupFile(file),parsed=JSON.parse(raw);
+  const restored=parsed?.format==="hesabdar-backup"&&parsed.data&&typeof parsed.data==="object"?parsed.data:parsed;
+  if(!restored||typeof restored!=="object"||Array.isArray(restored))throw new Error("invalid-backup");
+  const previousLock={pin:data.pin,pinHash:data.pinHash,pinSalt:data.pinSalt,patternHash:data.patternHash,patternSalt:data.patternSalt,lockMethod:data.lockMethod,biometricEnabled:data.biometricEnabled,webauthnCredId:data.webauthnCredId};
+  const wasHydrating=sync.hydrating;sync.hydrating=true;
   try{
-   const parsed=JSON.parse(String(r.result||""));
-   if(!parsed||typeof parsed!=="object")throw new Error("invalid");
-   const previousLock={pin:data.pin,pinHash:data.pinHash,pinSalt:data.pinSalt,patternHash:data.patternHash,patternSalt:data.patternSalt,lockMethod:data.lockMethod,biometricEnabled:data.biometricEnabled,webauthnCredId:data.webauthnCredId};
-   data=parsed;
-   normalizeData();
-   await migratePinSecurity();
-   data.audit??=[];data.notes??=[];
-   // Keep the security method of the destination phone; the backup is data, not the phone's lock.
-   Object.assign(data,previousLock);
-   save();
-   logEvent("بازیابی اطلاعات","پشتیبان وارد شد و اطلاعات روی این گوشی جایگزین شد","settings");
-   render();
-   finish();
-   alert("بازیابی با موفقیت انجام شد. اطلاعات پشتیبان روی این گوشی جایگزین شد.");
-  }catch(err){
-   finish();
-   console.error("backup restore",err);
-   alert("فایل پشتیبان نامعتبر یا ناقص است و بازیابی نشد.");
+   data=JSON.parse(JSON.stringify(restored));normalizeData();Object.assign(data,previousLock);data.audit??=[];data.notes??=[];
+   // Mark the restore as a complete replacement locally before any async work.
+   localStorage.setItem(KEY,JSON.stringify(data));render();
+   if(sync.unsubscribe){sync.unsubscribe();sync.unsubscribe=null}
+   sync.dirty.clear();
+   if(sync.user&&sync.db)await replaceCloudAfterRestore();
+   // Verify the exact restored collections, not just two arrays.
+   const checkBefore=JSON.parse(localStorage.getItem(KEY)||"null");
+   for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats"]){if(!Array.isArray(checkBefore?.[k]))throw new Error("storage-verification-failed:"+k)}
+   const check=JSON.parse(localStorage.getItem(KEY)||"null");
+   if(!check||!Array.isArray(check.accounts)||!Array.isArray(check.transactions))throw new Error("storage-verification-failed");
+   data=check;normalizeData();render();localStorage.setItem(KEY,JSON.stringify(data));
+   logEvent("بازیابی اطلاعات","پشتیبان وارد شد و اطلاعات روی این گوشی جایگزین شد","settings");localStorage.setItem(KEY,JSON.stringify(data));
+  }finally{
+   sync.hydrating=wasHydrating;
+   if(sync.user&&sync.db&&!sync.unsubscribe){sync.unsubscribe=recordsCollection().onSnapshot(snap=>{if(sync.hydrating)return;const remote=snap.docs.map(d=>d.data());if(mergeCloud(remote)){localStorage.setItem(KEY,JSON.stringify(data));render();syncSave()}setSyncStatus("☁️ آنلاین • همگام‌سازی لحظه‌ای")},err=>setSyncStatus("⚠️ همگام‌سازی: "+(err.code||err.message)))}
   }
- };
- try{r.readAsText(file,"utf-8")}catch(err){finish();alert("امکان خواندن فایل پشتیبان وجود ندارد.")}
+  finish();alert("بازیابی با موفقیت انجام شد. اطلاعات فایل پشتیبان روی این گوشی جایگزین شد.");
+ }catch(err){finish();console.error("backup restore",err);alert("بازیابی انجام نشد: فایل پشتیبان خوانده یا معتبر نیست. فایل JSON اصلی را دوباره انتخاب کن.")}
 }
 function clearData(){if(confirm("همه اطلاعات حذف شود؟")){const pin=data.pin,pinHash=data.pinHash,pinSalt=data.pinSalt,patternHash=data.patternHash,patternSalt=data.patternSalt,lockMethod=data.lockMethod,biometricEnabled=data.biometricEnabled,webauthnCredId=data.webauthnCredId,lang=data.lang;data=blankData();data.pin=pin;data.pinHash=pinHash;data.pinSalt=pinSalt;data.patternHash=patternHash;data.patternSalt=patternSalt;data.lockMethod=lockMethod;data.biometricEnabled=biometricEnabled;data.webauthnCredId=webauthnCredId;data.lang=lang;save();logEvent("پاک کردن اطلاعات","اطلاعات برنامه پاک شد","delete");}}
 (async function initApp(){normalizeData();await migratePinSecurity();showLock();render();applyDashboardConfig();applyAppMode();renderBrandingInSettings();renderSettingsFeatures();applyLanguage();maybeAutoBackup("اجرای برنامه");processRecurringTransactions();logEvent("اجرای برنامه","برنامه حسابدار اجرا شد","system");await initSync();if(!sync.auth){[4000,12000,30000].forEach(ms=>setTimeout(()=>{if(!sync.auth)initSync()},ms))}syncAllNotesToReminders().catch(console.error);rescheduleAllNativeReminders().catch(console.error);startUpdateChecker();startReminderChecker();if(!hasLockCode())setTimeout(showWhatsNewOnce,320);})();

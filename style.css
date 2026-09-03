@@ -553,7 +553,7 @@ body.personal-mode [data-page="invoices"],
 body.personal-mode [data-widget="invoiceBtn"]{display:none!important}
 #appModeBtnPersonal.primary,#appModeBtnBusiness.primary{background:var(--blue);color:#fff}
 
-/* v6.7.4 — Android WebView: one dedicated native scroll surface
+/* v6.7.6 — Android WebView: one dedicated native scroll surface
  * Keep the page itself fixed and make #app the ONLY vertical scroll container.
  * This avoids WebView/body scrolling differences and avoids nested scrolling.
  */
