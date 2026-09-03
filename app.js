@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="6.7.1";
+const APP_VERSION="6.7.3";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
@@ -649,18 +649,18 @@ async function setBiometricEnabled(v){
  save();logEvent(v?"فعال‌سازی قفل بیومتریک":"غیرفعال‌سازی قفل بیومتریک","","settings");renderSettingsFeatures();
 }
 
-const WHATS_NEW_KEY="hesabdar-whats-new-seen-6.7.1";
+const WHATS_NEW_KEY="hesabdar-whats-new-seen-6.7.3";
 function showWhatsNewOnce(){
  if(localStorage.getItem(WHATS_NEW_KEY)==="1")return;
  localStorage.setItem(WHATS_NEW_KEY,"1");
  openModal(`<div class="whats-new">
-  <div class="whats-new-badge">نسخه ۶.۷.۱</div>
+  <div class="whats-new-badge">نسخه ۶.۷.۲</div>
   <h2>🎉 به حساب‌یار خوش آمدی</h2>
   <p class="hint">این صفحه فقط یک‌بار در اولین اجرای این نسخه نمایش داده می‌شود.</p>
   <div class="whats-new-section">
    <h3>🛠 تغییرات این نسخه</h3>
    <ul>
-    <li>رفع مشکل اسکرول و بالا/پایین رفتن صفحات در اندروید.</li>
+    <li>رفع اساسی اسکرول و بالا/پایین رفتن صفحات و ورود به بخش‌ها در اندروید.</li>
     <li>بهبود بازیابی پشتیبان JSON، مخصوصاً انتقال فایل از اندروید به آیفون.</li>
     <li>پس از بازیابی، اطلاعات فوراً روی صفحه تازه‌سازی می‌شوند و فایل انتخابی دوباره قابل انتخاب است.</li>
    </ul>

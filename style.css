@@ -553,14 +553,18 @@ body.personal-mode [data-page="invoices"],
 body.personal-mode [data-widget="invoiceBtn"]{display:none!important}
 #appModeBtnPersonal.primary,#appModeBtnBusiness.primary{background:var(--blue);color:#fff}
 
-/* v6.7.1 — reliable vertical scrolling in Android WebView/Capacitor */
-main{display:block;min-height:0}
-.page{min-height:0;touch-action:pan-y}
-@media (max-width:700px){
-  html,body{overflow-y:auto!important;min-height:100%;height:auto}
-  .app{height:auto!important;overflow:visible!important}
-  main{overflow:visible!important}
-}
+/* v6.7.3 — Android WebView scrolling/navigation hardening
+ * Keep the document itself as the primary scroll container. Fixed-height nested
+ * scroll containers are fragile in Android WebView and can prevent page content
+ * from being reachable. Only overlays/sheets keep their own scrolling. */
+html{width:100%;min-height:100%;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;scroll-behavior:auto}
+body{width:100%;min-height:100%;height:auto;margin:0;overflow-x:hidden;overflow-y:auto!important;-webkit-overflow-scrolling:touch;touch-action:pan-y}
+.app{width:100%;max-width:600px;min-height:100vh;height:auto;display:block;overflow:visible!important;padding-bottom:calc(var(--safe-b) + 32px)}
+main{width:100%;min-height:0;height:auto;display:block;overflow:visible!important;padding:0;touch-action:pan-y}
+.page{min-height:0;height:auto;touch-action:pan-y}
+.page.active{display:block}
+button,.nav,a,input,select,textarea{touch-action:manipulation}
+@supports (min-height:100svh){.app{min-height:100svh}}
 .whats-new{padding:8px 0 calc(8px + var(--safe-b));line-height:1.75}
 .whats-new h2{font-size:24px;margin:6px 0 4px}
 .whats-new-badge{display:inline-block;background:var(--blue);color:#fff;border-radius:999px;padding:5px 12px;font-weight:800;font-size:12px}
