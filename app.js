@@ -1,13 +1,13 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="6.1";
+const APP_VERSION="6.2";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v1";
 const AUTO_BACKUP_MS=6*60*60*1000;
-const OPENAI_KEY_STORAGE="hesabdar-openai-key-v1";
+const ANTHROPIC_KEY_STORAGE="hesabdar-anthropic-key-v1";
 const DEVICE_ID_KEY="hesabdar-device-id-v1";
 const DEVICE_PRESENCE_MS=45*1000;
 const DEVICE_PRESENCE_INTERVAL=20*1000;
@@ -146,7 +146,7 @@ function renderSettingsFeatures(){const e=$("autoBackupToggle");if(e)e.checked=a
  const bio=$("biometricToggle");if(bio)bio.checked=!!data.biometricEnabled;
  const mh=$("securityMethodHint");if(mh)mh.textContent=hasLockCode()?("روش فعلی: "+(data.lockMethod==="pattern"?"رمز الگو":"رمز عددی")+(data.biometricEnabled?" + بیومتریک":"")):"هنوز رمزی برای ورود تنظیم نشده.";
  const bf=$("langBtnFa"),be=$("langBtnEn");if(bf)bf.classList.toggle("primary",data.lang!=="en");if(be)be.classList.toggle("primary",data.lang==="en");
- const oaiStatus=$("openaiKeyStatus");if(oaiStatus)oaiStatus.textContent=openaiKey()?"🟢 کلید OpenAI تنظیم شده است":"🔴 هنوز کلیدی تنظیم نشده";
+ const aiStatus=$("anthropicKeyStatus");if(aiStatus)aiStatus.textContent=anthropicKey()?"🟢 کلید Claude تنظیم شده است":"🔴 هنوز کلیدی تنظیم نشده";
 }
 function setSyncStatus(t){const e=$("syncStatus");if(e)e.textContent=t||"";const b=$("syncBadge");if(!b)return;const s=String(t||"");let cls="offline",label="☁️ آفلاین";if(s.includes("آنلاین")||s.includes("انجام شد")||s.includes("متصل است")){cls="online";label="☁️ متصل"}else if(s.includes("⚠️")||s.includes("ناموفق")){cls="error";label="⚠️ خطای اتصال"}else if(s.includes("در حال")||s.includes("بررسی")){cls="pending";label="☁️ در حال اتصال..."}else if(s.includes("وارد شوید")||s.includes("ابتدا")){cls="offline";label="☁️ واردنشده"}b.textContent=label;b.className="sync-badge "+cls}
 
@@ -1152,20 +1152,21 @@ function githubRepo(){return (localStorage.getItem(GITHUB_KEY)||"").trim().repla
 function saveGithubRepo(){const v=$("githubRepo")?.value.trim().replace(/^https?:\/\/github\.com\//i,"").replace(/\.git$/i,"").replace(/\/$/,"");if(!/^[^/\s]+\/[^/\s]+$/.test(v))return alert("مخزن را به شکل username/repository وارد کن");localStorage.setItem(GITHUB_KEY,v);setUpdateStatus("مخزن GitHub ذخیره شد: "+v);checkForUpdates(true)}
 
 /* ============================================================
- * یادداشت هوشمند (Smart Note) — تحلیل متن آزاد با OpenAI
+ * یادداشت هوشمند (Smart Note) — تحلیل متن آزاد با Claude (Anthropic)
  * متن فارسی کاربر تحلیل می‌شود و مواردی مثل بدهی/طلب، یادآوری
  * یا تراکنش از آن استخراج و برای تایید نهایی به کاربر نشان داده می‌شود.
  * ============================================================ */
-function openaiKey(){return (localStorage.getItem(OPENAI_KEY_STORAGE)||"").trim()}
-function saveOpenAIKey(){const v=$("openaiKeyInput")?.value.trim();if(!v)return alert("کلید OpenAI را وارد کن");localStorage.setItem(OPENAI_KEY_STORAGE,v);if($("openaiKeyInput"))$("openaiKeyInput").value="";renderSettingsFeatures();alert("کلید OpenAI ذخیره شد.")}
-function clearOpenAIKey(){if(!openaiKey())return alert("کلیدی ثبت نشده است");if(!confirm("کلید OpenAI حذف شود؟"))return;localStorage.removeItem(OPENAI_KEY_STORAGE);renderSettingsFeatures();alert("کلید OpenAI حذف شد.")}
+const ANTHROPIC_MODEL="claude-haiku-4-5-20251001";
+function anthropicKey(){return (localStorage.getItem(ANTHROPIC_KEY_STORAGE)||"").trim()}
+function saveAnthropicKey(){const v=$("anthropicKeyInput")?.value.trim();if(!v)return alert("کلید Claude را وارد کن");localStorage.setItem(ANTHROPIC_KEY_STORAGE,v);if($("anthropicKeyInput"))$("anthropicKeyInput").value="";renderSettingsFeatures();alert("کلید Claude ذخیره شد.")}
+function clearAnthropicKey(){if(!anthropicKey())return alert("کلیدی ثبت نشده است");if(!confirm("کلید Claude حذف شود؟"))return;localStorage.removeItem(ANTHROPIC_KEY_STORAGE);renderSettingsFeatures();alert("کلید Claude حذف شد.")}
 
 const SMART_NOTE_KIND_LABEL={debt:"من بدهکارم",credit:"من طلبکارم",reminder:"یادآوری",expense:"هزینه (پرداخت شد)",income:"دریافت (پول گرفتم)"};
 let smartNoteItems=[];
 
 function openSmartNote(){
-  if(!openaiKey()){
-    if(confirm("برای یادداشت هوشمند اول باید یک کلید API از OpenAI در تنظیمات ثبت کنی. الان به تنظیمات بروم؟")){closeModal();goToPage("settings");setTimeout(()=>$("openaiKeyInput")?.focus(),300)}
+  if(!anthropicKey()){
+    if(confirm("برای یادداشت هوشمند اول باید یک کلید API از Claude (Anthropic) در تنظیمات ثبت کنی. الان به تنظیمات بروم؟")){closeModal();goToPage("settings");setTimeout(()=>$("anthropicKeyInput")?.focus(),300)}
     return;
   }
   smartNoteItems=[];
@@ -1175,8 +1176,8 @@ function openSmartNote(){
 async function analyzeSmartNote(){
   const text=$("smartNoteText")?.value.trim();
   if(!text)return alert("اول متن یادداشت را بنویس");
-  const key=openaiKey();
-  if(!key)return alert("کلید OpenAI تنظیم نشده است");
+  const key=anthropicKey();
+  if(!key)return alert("کلید Claude تنظیم نشده است");
   const btn=$("smartNoteAnalyzeBtn");
   const resultsBox=$("smartNoteResults");
   if(btn){btn.disabled=true;btn.textContent="⏳ در حال تحلیل..."}
@@ -1191,18 +1192,18 @@ async function analyzeSmartNote(){
 - "reminder": یک یادآوری ساده بدون تراکنش مالی مشخص یا با مبلغ نامشخص
 - "expense": کاربر همین حالا/همان لحظه پول خرج کرده (هزینه قطعی‌شده)
 - "income": کاربر همین حالا/همان لحظه پول دریافت کرده (درآمد قطعی‌شده)
-فقط یک JSON با این ساختار برگردان و هیچ توضیح اضافه‌ای ننویس:
+فقط و فقط یک JSON خام با این ساختار برگردان، بدون هیچ توضیح اضافه و بدون بک‌تیک یا کد بلاک:
 {"items":[{"kind":"debt|credit|reminder|expense|income","person":"نام شخص یا خالی","title":"عنوان کوتاه","amount":عدد به تومان یا 0 اگر نامشخص,"date":"YYYY/MM/DD شمسی یا خالی","note":"توضیح کوتاه اختیاری"}]}
 اگر متن هیچ مورد قابل استخراجی نداشت، items را آرایه خالی بگذار.`;
-    const res=await fetch("https://api.openai.com/v1/chat/completions",{
+    const res=await fetch("https://api.anthropic.com/v1/messages",{
       method:"POST",
-      headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},
-      body:JSON.stringify({model:"gpt-4o-mini",temperature:0,response_format:{type:"json_object"},messages:[{role:"system",content:sys},{role:"user",content:text}]})
+      headers:{"Content-Type":"application/json","x-api-key":key,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+      body:JSON.stringify({model:ANTHROPIC_MODEL,max_tokens:1024,temperature:0,system:sys,messages:[{role:"user",content:text}]})
     });
     if(!res.ok){const errBody=await res.text().catch(()=>"")
       ;throw new Error("HTTP "+res.status+" "+errBody.slice(0,200))}
     const data2=await res.json();
-    const raw=data2?.choices?.[0]?.message?.content||"{}";
+    const raw=(data2?.content||[]).map(b=>b?.text||"").join("")||"{}";
     const clean=raw.replace(/```json|```/g,"").trim();
     let parsed;try{parsed=JSON.parse(clean)}catch(e){throw new Error("پاسخ هوش مصنوعی قابل خواندن نبود")}
     const items=Array.isArray(parsed.items)?parsed.items:[];
@@ -1219,7 +1220,7 @@ async function analyzeSmartNote(){
     renderSmartNoteResults();
   }catch(e){
     console.warn("smart note analyze",e);
-    if(resultsBox)resultsBox.innerHTML=`<div class="card hint">⚠️ تحلیل انجام نشد. کلید API، اتصال اینترنت یا اعتبار حساب OpenAI را بررسی کن.<br><small>${esc(e.message||"")}</small></div>`;
+    if(resultsBox)resultsBox.innerHTML=`<div class="card hint">⚠️ تحلیل انجام نشد. کلید API، اتصال اینترنت یا اعتبار حساب Claude را بررسی کن.<br><small>${esc(e.message||"")}</small></div>`;
   }finally{
     if(btn){btn.disabled=false;btn.textContent="🔎 تحلیل با هوش مصنوعی"}
   }
