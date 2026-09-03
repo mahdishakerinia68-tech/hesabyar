@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="6.4";
+const APP_VERSION="6.5";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
@@ -966,8 +966,8 @@ function renderBudgets(){
   const spent=budgetSpentByCategory();
   box.innerHTML=cats.map(c=>{
     const s=spent[c.name]||0,pct=Math.min(100,Math.round(s/c.budget*100));
-    const color=pct>=100?"#ef4444":pct>=80?"#f59e0b":"#22c55e";
-    return `<div class="budget-row"><div class="budget-row-head"><span>${esc(c.name)}</span><strong>${money(s)} / ${money(c.budget)}</strong></div><div class="budget-bar"><div class="budget-bar-fill" style="width:${pct}%;background:${color}"></div></div>${pct>=100?'<div class="hint" style="color:#ef4444">⚠️ از سقف بودجه رد شدی</div>':""}</div>`;
+    const color=pct>=100?"#C1483A":pct>=80?"#D98E04":"#2F9E5B";
+    return `<div class="budget-row"><div class="budget-row-head"><span>${esc(c.name)}</span><strong>${money(s)} / ${money(c.budget)}</strong></div><div class="budget-bar"><div class="budget-bar-fill" style="width:${pct}%;background:${color}"></div></div>${pct>=100?'<div class="hint" style="color:#C1483A">⚠️ از سقف بودجه رد شدی</div>':""}</div>`;
   }).join("");
 }
 function openCategory(){openModal(`<h2>🏷 دسته‌ها</h2><p class="hint">هر دسته می‌تواند چند زیرمجموعه داشته باشد؛ هنگام ثبت تراکنش می‌توانی دسته یا زیرمجموعه دقیق‌تر آن را انتخاب کنی.</p><div class="section-head"><b>دسته‌های هزینه</b><button onclick="addCatPrompt('expense')">＋</button></div>${data.expenseCats.map(c=>categoryManageRow('expense',c)).join("")||empty("هنوز دسته‌ای اضافه نشده")}<div class="section-head"><b>دسته‌های دریافت</b><button onclick="addCatPrompt('income')">＋</button></div>${data.incomeCats.map(c=>categoryManageRow('income',c)).join("")||empty("هنوز دسته‌ای اضافه نشده")}`)}
@@ -1786,7 +1786,7 @@ function renderAdvancedReport(){
  const income=rows.filter(t=>t.type==="income").reduce((s,t)=>s+Number(t.amount||0),0), expense=rows.filter(t=>t.type==="expense").reduce((s,t)=>s+Number(t.amount||0),0);
  box.innerHTML=`<div class="report-summary"><div><span>دریافتی</span><b class="income">${money(income)}</b></div><div><span>هزینه</span><b class="expense">${money(expense)}</b></div><div><span>خالص</span><b>${money(income-expense)}</b></div></div><div class="report-table">${rows.slice(0,100).map(t=>`<div class="report-row"><span>${esc(t.title||"تراکنش")}<small>${jalaliDateTimeInput(t.date)} • ${esc(t.category||"")}</small></span><strong class="${t.type}">${t.type==="income"?"+":"−"}${money(t.amount)}</strong></div>`).join("")||`<p class="hint">موردی با این فیلتر پیدا نشد.</p>`}</div>`;
 }
-function drawChart(inc,exp){const c=$("chart");if(!c)return;const x=c.getContext("2d"),w=c.width,h=c.height;x.clearRect(0,0,w,h);const max=Math.max(inc,exp,1);[[inc,"درآمد"],[exp,"هزینه"]].forEach((v,i)=>{const bh=v[0]/max*170;x.fillStyle=i?"#ef4444":"#22c55e";x.fillRect(150+i*190,h-45-bh,90,bh);x.fillStyle="#374151";x.font="20px sans-serif";x.fillText(v[1],155+i*190,h-12)})}
+function drawChart(inc,exp){const c=$("chart");if(!c)return;const x=c.getContext("2d"),w=c.width,h=c.height;x.clearRect(0,0,w,h);const max=Math.max(inc,exp,1);[[inc,"درآمد"],[exp,"هزینه"]].forEach((v,i)=>{const bh=v[0]/max*170;x.fillStyle=i?"#C1483A":"#2F9E5B";x.fillRect(150+i*190,h-45-bh,90,bh);x.fillStyle="#5B564A";x.font="20px sans-serif";x.fillText(v[1],155+i*190,h-12)})}
 function exportData(){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));a.download="hesabdar-backup.json";a.click();logEvent("پشتیبان‌گیری","فایل JSON صادر شد","settings")}
 function importData(e){const file=e.target.files?.[0];if(!file)return;const r=new FileReader();r.onload=async()=>{try{data=JSON.parse(r.result);normalizeData();await migratePinSecurity();data.audit??=[];data.notes??=[];save();logEvent("بازیابی اطلاعات","پشتیبان وارد شد","settings");showLock();alert("بازیابی شد")}catch{alert("فایل نامعتبر است")}};r.readAsText(file)}
 function clearData(){if(confirm("همه اطلاعات حذف شود؟")){const pin=data.pin,pinHash=data.pinHash,pinSalt=data.pinSalt,patternHash=data.patternHash,patternSalt=data.patternSalt,lockMethod=data.lockMethod,biometricEnabled=data.biometricEnabled,webauthnCredId=data.webauthnCredId,lang=data.lang;data=blankData();data.pin=pin;data.pinHash=pinHash;data.pinSalt=pinSalt;data.patternHash=patternHash;data.patternSalt=patternSalt;data.lockMethod=lockMethod;data.biometricEnabled=biometricEnabled;data.webauthnCredId=webauthnCredId;data.lang=lang;save();logEvent("پاک کردن اطلاعات","اطلاعات برنامه پاک شد","delete");}}
