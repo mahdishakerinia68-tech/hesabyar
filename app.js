@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="6.7.3";
+const APP_VERSION="6.7.4";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
@@ -649,7 +649,7 @@ async function setBiometricEnabled(v){
  save();logEvent(v?"فعال‌سازی قفل بیومتریک":"غیرفعال‌سازی قفل بیومتریک","","settings");renderSettingsFeatures();
 }
 
-const WHATS_NEW_KEY="hesabdar-whats-new-seen-6.7.3";
+const WHATS_NEW_KEY="hesabdar-whats-new-seen-6.7.4";
 function showWhatsNewOnce(){
  if(localStorage.getItem(WHATS_NEW_KEY)==="1")return;
  localStorage.setItem(WHATS_NEW_KEY,"1");
@@ -789,29 +789,15 @@ armBackTrap();
 window.addEventListener("popstate",()=>{performBack();armBackTrap()});
 (function initSwipeBack(){
  const EDGE=28,THRESH=65,MAXV_RATIO=.55;
- let sx=0,sy=0,active=false,claimed=false;
+ let sx=0,sy=0,active=false;
  document.addEventListener("touchstart",e=>{
   if(e.touches.length!==1)return;
-  const t=e.touches[0];
-  sx=t.clientX;sy=t.clientY;
+  const t=e.touches[0]; sx=t.clientX; sy=t.clientY;
   active=(sx<=EDGE||sx>=window.innerWidth-EDGE);
-  claimed=false;
  },{passive:true});
- /* Once it's clearly a horizontal drag from the edge, take over the gesture
-  * ourselves (preventDefault) so the browser/WebView can't also treat it as
-  * a native back-navigation — that double handling is what caused the
-  * multi-second delay and raw/unstyled flash the user was seeing. */
- document.addEventListener("touchmove",e=>{
-  if(!active||claimed)return;
-  const t=e.touches[0];
-  const dx=t.clientX-sx,dy=Math.abs(t.clientY-sy);
-  if(Math.abs(dx)>12&&dy<Math.abs(dx)*MAXV_RATIO){claimed=true;if(e.cancelable)e.preventDefault()}
- },{passive:false});
  document.addEventListener("touchend",e=>{
-  if(!active){return}
-  active=false;
-  const t=e.changedTouches[0];
-  const dx=t.clientX-sx,dy=Math.abs(t.clientY-sy);
+  if(!active)return; active=false;
+  const t=e.changedTouches[0],dx=t.clientX-sx,dy=Math.abs(t.clientY-sy);
   if(Math.abs(dx)>THRESH&&dy<Math.abs(dx)*MAXV_RATIO)performBack();
  },{passive:true});
 })();
