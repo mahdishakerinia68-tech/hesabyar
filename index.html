@@ -22,7 +22,7 @@
     <button id="menuBtn" class="menu-trigger" aria-label="باز کردن منو" aria-haspopup="true" aria-expanded="false" aria-controls="menuModal">⋯</button>
     <img class="app-logo" src="logo.png" alt="حساب‌یار">
     <div class="top-bar-titles">
-      <h1>حساب‌یار <span class="version-pill" id="versionPill">6.8.2</span></h1>
+      <h1>حساب‌یار <span class="version-pill" id="versionPill">2</span></h1>
       <div id="syncBadge" class="sync-badge">☁️ آفلاین</div>
     </div>
   </div>
@@ -78,13 +78,27 @@
 </section>
 
 <section id="accounts" class="page">
-  <div class="section-head"><h2 data-i18n="page.accounts">حساب‌ها و بانک‌ها</h2><button onclick="openAccount()">＋</button></div>
-  <div id="accountList"></div>
-  <div class="section-head"><h2 data-i18n="page.transfer">انتقال بین حساب‌ها</h2><button onclick="openTransfer()">＋</button></div>
-  <div class="card hint">انتقال بین حساب‌های خودت به‌عنوان هزینه محاسبه نمی‌شود.</div>
-  <div class="section-head"><h2 data-i18n="page.bankMsg">پیامک بانک</h2><button onclick="openBankMessage()">＋</button></div>
-  <div class="card hint">شماره فرستنده بانک را برای هر حساب ثبت کن و متن پیامک را برای تشخیص وارد کن.
-    <button class="primary" onclick="openBankMessage()">تشخیص پیامک بانکی</button>
+  <div class="item accordion-card page-accordion" data-acc-id="pageAcc-accountsList">
+    <button class="accordion-head" type="button" aria-expanded="false" onclick="toggleAccordion(this,event)"><b data-i18n="page.accounts">حساب‌ها و بانک‌ها</b><span class="acc-arrow">⌄</span></button>
+    <div class="accordion-body">
+      <div class="section-head"><span></span><button onclick="event.stopPropagation();openAccount()">＋</button></div>
+      <div id="accountList"></div>
+    </div>
+  </div>
+  <div class="item accordion-card page-accordion" data-acc-id="pageAcc-transfer">
+    <button class="accordion-head" type="button" aria-expanded="false" onclick="toggleAccordion(this,event)"><b data-i18n="page.transfer">انتقال بین حساب‌ها</b><span class="acc-arrow">⌄</span></button>
+    <div class="accordion-body">
+      <div class="section-head"><span></span><button onclick="event.stopPropagation();openTransfer()">＋</button></div>
+      <div class="card hint">انتقال بین حساب‌های خودت به‌عنوان هزینه محاسبه نمی‌شود.</div>
+    </div>
+  </div>
+  <div class="item accordion-card page-accordion" data-acc-id="pageAcc-bankMsg">
+    <button class="accordion-head" type="button" aria-expanded="false" onclick="toggleAccordion(this,event)"><b data-i18n="page.bankMsg">پیامک بانک</b><span class="acc-arrow">⌄</span></button>
+    <div class="accordion-body">
+      <div class="card hint">شماره فرستنده بانک را برای هر حساب ثبت کن و متن پیامک را برای تشخیص وارد کن.
+        <button class="primary" onclick="event.stopPropagation();openBankMessage()">تشخیص پیامک بانکی</button>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -281,7 +295,7 @@
     </div>
 
   </div>
-  <p class="hint settings-footer">نسخه <span id="appVersionText">6.8.2</span> • بکاپ خودکار • بروزرسانی • اتصال دو گوشی • تقویم شمسی کامل</p>
+  <p class="hint settings-footer">نسخه <span id="appVersionText">2</span> • بکاپ خودکار • بروزرسانی • اتصال دو گوشی • تقویم شمسی کامل</p>
   <p class="hint">تغییرات روی این گوشی ذخیره می‌شود و در صورت اتصال به Firebase با گوشی دوم ادغام می‌گردد.</p>
 </section>
 
@@ -374,6 +388,6 @@
 <script src="capacitor-filesystem-bridge.js"></script>
 <script src="capacitor-biometric-bridge.js"></script>
 <script src="app.js"></script>
-<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js?v=6.8.2").catch(console.error)}</script>
+<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js?v=2").catch(console.error)}</script>
 </body>
 </html>

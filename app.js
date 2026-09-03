@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="6.8.2";
+const APP_VERSION="2";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
@@ -649,7 +649,7 @@ async function setBiometricEnabled(v){
  save();logEvent(v?"فعال‌سازی قفل بیومتریک":"غیرفعال‌سازی قفل بیومتریک","","settings");renderSettingsFeatures();
 }
 
-const WHATS_NEW_KEY="hesabdar-whats-new-seen-6.8.2";
+const WHATS_NEW_KEY="hesabdar-whats-new-seen-2";
 function showWhatsNewOnce(){
  if(localStorage.getItem(WHATS_NEW_KEY)==="1")return;
  localStorage.setItem(WHATS_NEW_KEY,"1");
@@ -662,6 +662,8 @@ function showWhatsNewOnce(){
    <ul>
     <li>فاکتورهای مانده‌دار یا پرداخت‌نشده حالا خودکار به بخش بدهکار/بستانکار اضافه می‌شوند.</li>
     <li>با تسویه از بخش بدهکار/بستانکار، هم تراکنش ثبت می‌شود و هم وضعیت فاکتور به‌روز می‌شود.</li>
+    <li>امکان افزودن عکس رسید هنگام تسویه کامل بدهکار/بستانکار (علاوه بر اقساط).</li>
+    <li>صفحه حساب‌ها و بانک‌ها حالا جمع‌شده (بسته) باز می‌شود و با زدن روی هر بخش، همان بخش باز می‌شود.</li>
     <li>رفع مشکل بازیابی فایل پشتیبان ارسال‌شده (تلگرام/بلوتوث و...) در اندروید.</li>
     <li>امکان افزودن عکس رسید واریز/دریافت به هر قسط بدهکار و بستانکار.</li>
     <li>رفع نمایش نسخه قدیمی در صفحه «امکانات و تغییرات».</li>
@@ -1065,17 +1067,24 @@ function openPersonPayment(id){
   const remaining=Math.max(0,(Number(p.amount)||0)-(Number(p.paid)||0));
   const accLabel=p.type==="credit"?"واریز به حساب":"پرداخت از حساب";
   const defAcc=data.accounts.find(a=>a.default)?.id||data.accounts[0].id;
-  openModal(`<h2>💳 تسویه ${esc(p.name)}</h2><div class="form"><p class="hint">مانده فعلی: ${money(remaining)}</p><input id="ppAmount" type="number" placeholder="مبلغ تسویه" value="${remaining||""}">${invField(accLabel,"این تسویه در این حساب ثبت می‌شود",accountSelect("ppAccount",defAcc))}<button class="primary" onclick="confirmPersonPayment('${p.id}')">✅ ثبت تسویه</button></div>`);
+  openModal(`<h2>💳 تسویه ${esc(p.name)}</h2><div class="form"><p class="hint">مانده فعلی: ${money(remaining)}</p><input id="ppAmount" type="number" placeholder="مبلغ تسویه" value="${remaining||""}">${invField(accLabel,"این تسویه در این حساب ثبت می‌شود",accountSelect("ppAccount",defAcc))}<label class="file-label">📎 عکس رسید ${p.type==="credit"?"دریافتی":"واریزی"} (اختیاری)<input id="ppImage" type="file" accept="image/*" onchange="previewPersonPaymentImage(this)"></label><div id="ppImagePreview"></div><button class="primary" onclick="confirmPersonPayment('${p.id}')">✅ ثبت تسویه</button></div>`);
 }
-function confirmPersonPayment(id){
+function previewPersonPaymentImage(input){
+  const f=input?.files?.[0],box=$("ppImagePreview");if(!box||!f)return;
+  const r=new FileReader();r.onload=()=>box.innerHTML=`<div class="attachment-preview"><img src="${r.result}" alt="پیش‌نمایش"></div>`;r.readAsDataURL(f)
+}
+async function confirmPersonPayment(id){
   const p=data.people.find(x=>x.id===id);if(!p)return;
   const n=parseMoney($("ppAmount")?.value||"");if(!n)return alert("مبلغ نامعتبر است");
   const accountID=$("ppAccount")?.value;if(!accountID)return alert("حساب را انتخاب کنید");
+  let receipt=null;const file=$("ppImage")?.files?.[0];
+  if(file){try{receipt=await compressImage(file,1200,.72)}catch(e){console.warn(e)}}
   p.paid=Math.min(Number(p.amount)||0,(Number(p.paid)||0)+n);
   touch(p);markDirty("people",p.id,false,p,p.updatedAt);
   const txType=p.type==="credit"?"income":"expense";
   const category=p.type==="credit"?"دریافت طلب":"پرداخت بدهی";
   const nt=touch({id:uid(),title:`تسویه ${p.name}`,amount:n,type:txType,category,accountID,date:new Date().toISOString(),source:"person-settle",personId:p.id});
+  if(receipt)nt.image=receipt;
   data.transactions.unshift(nt);markDirty("transactions",nt.id,false,nt,nt.updatedAt);
   syncInvoiceFromPerson(p);
   save();
