@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="6.6";
+const APP_VERSION="6.7";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
@@ -141,9 +141,8 @@ function applyLanguage(){
   const key=el.getAttribute("data-i18n");
   el.textContent=lang==="en"?(I18N_EN[key]||el.dataset.i18nOrig):el.dataset.i18nOrig;
  });
- const bf=$("langBtnFa"),be=$("langBtnEn");
- if(bf)bf.classList.toggle("primary",lang==="fa");
- if(be)be.classList.toggle("primary",lang==="en");
+ const lt=$("langToggle");
+ if(lt){lt.textContent=lang==="en"?"فا":"EN";lt.setAttribute("aria-label",lang==="en"?"تغییر زبان به فارسی":"Switch language to English")}
  render();
 }
 function setAppLanguage(lang){
@@ -151,11 +150,12 @@ function setAppLanguage(lang){
  logEvent(lang==="en"?"Language switched to English":"زبان برنامه به فارسی تغییر کرد","","settings");
  applyLanguage();
 }
+function toggleAppLanguage(){setAppLanguage(data.lang==="en"?"fa":"en")}
 
 function renderSettingsFeatures(){const e=$("autoBackupToggle");if(e)e.checked=autoBackupEnabled(); const last=$("autoBackupLast"); if(last){const d=getAutoBackupInfo();const f=getAutoBackupFileInfo();last.textContent=d?"آخرین پشتیبان: "+d.toLocaleString("fa-IR")+(f?.filename?` • فایل: ${f.filename} (${f.where})`:""):"هنوز پشتیبان خودکاری ساخته نشده";} const v=$("appVersionText");if(v)v.textContent=APP_VERSION; const vp=$("versionPill");if(vp)vp.textContent=APP_VERSION;
  const bio=$("biometricToggle");if(bio)bio.checked=!!data.biometricEnabled;
  const mh=$("securityMethodHint");if(mh)mh.textContent=hasLockCode()?("روش فعلی: "+(data.lockMethod==="pattern"?"رمز الگو":"رمز عددی")+(data.biometricEnabled?" + بیومتریک":"")):"هنوز رمزی برای ورود تنظیم نشده.";
- const bf=$("langBtnFa"),be=$("langBtnEn");if(bf)bf.classList.toggle("primary",data.lang!=="en");if(be)be.classList.toggle("primary",data.lang==="en");
+ const lt=$("langToggle");if(lt){lt.textContent=data.lang==="en"?"فا":"EN";lt.setAttribute("aria-label",data.lang==="en"?"تغییر زبان به فارسی":"Switch language to English")}
  const aiStatus=$("anthropicKeyStatus");if(aiStatus)aiStatus.textContent=anthropicKey()?"🟢 کلید Claude تنظیم شده است":"🔴 هنوز کلیدی تنظیم نشده";
  applyAppMode();
 }
@@ -1041,7 +1041,29 @@ function savePerson(id){
   localStorage.setItem(KEY,JSON.stringify(data));render();syncSave();logEvent(id?"ویرایش شخص":"ایجاد شخص",`${name} • ${money(amount)}`,id?"edit":"create");closeModal()
 }
 function deletePerson(id){if(confirm("این مورد حذف شود؟")){const p=data.people.find(x=>x.id===id);removeRecord("people",id);logEvent("حذف شخص",p?.name||id,"delete")}}
-function payPerson(id){const p=data.people.find(x=>x.id===id);if(!p)return;const remaining=Math.max(0,(Number(p.amount)||0)-(Number(p.paid)||0));const v=prompt("مبلغ تسویه:",String(remaining));if(v!==null){const n=parseMoney(v);if(!n)return alert("مبلغ نامعتبر است");p.paid=Math.min(Number(p.amount)||0,(Number(p.paid)||0)+n);touch(p);markDirty("people",p.id,false,p,p.updatedAt);save();logEvent("تسویه شخص",`${p.name} • ${money(n)}`,"payment")}}
+function payPerson(id){openPersonPayment(id)}
+function openPersonPayment(id){
+  const p=data.people.find(x=>x.id===id);if(!p)return;
+  if(!data.accounts.length)return alert("اول از بخش حساب‌ها یک حساب اضافه کنید");
+  const remaining=Math.max(0,(Number(p.amount)||0)-(Number(p.paid)||0));
+  const accLabel=p.type==="credit"?"واریز به حساب":"پرداخت از حساب";
+  const defAcc=data.accounts.find(a=>a.default)?.id||data.accounts[0].id;
+  openModal(`<h2>💳 تسویه ${esc(p.name)}</h2><div class="form"><p class="hint">مانده فعلی: ${money(remaining)}</p><input id="ppAmount" type="number" placeholder="مبلغ تسویه" value="${remaining||""}">${invField(accLabel,"این تسویه در این حساب ثبت می‌شود",accountSelect("ppAccount",defAcc))}<button class="primary" onclick="confirmPersonPayment('${p.id}')">✅ ثبت تسویه</button></div>`);
+}
+function confirmPersonPayment(id){
+  const p=data.people.find(x=>x.id===id);if(!p)return;
+  const n=parseMoney($("ppAmount")?.value||"");if(!n)return alert("مبلغ نامعتبر است");
+  const accountID=$("ppAccount")?.value;if(!accountID)return alert("حساب را انتخاب کنید");
+  p.paid=Math.min(Number(p.amount)||0,(Number(p.paid)||0)+n);
+  touch(p);markDirty("people",p.id,false,p,p.updatedAt);
+  const txType=p.type==="credit"?"income":"expense";
+  const category=p.type==="credit"?"دریافت طلب":"پرداخت بدهی";
+  const nt=touch({id:uid(),title:`تسویه ${p.name}`,amount:n,type:txType,category,accountID,date:new Date().toISOString(),source:"person-settle",personId:p.id});
+  data.transactions.unshift(nt);markDirty("transactions",nt.id,false,nt,nt.updatedAt);
+  save();
+  logEvent("تسویه شخص",`${p.name} • ${money(n)} • ${data.accounts.find(a=>a.id===accountID)?.name||""}`,"payment");
+  closeModal();
+}
 function openInstallments(id){
   const p=data.people.find(x=>x.id===id);if(!p?.installments)return;
   const items=p.installments.items||[];
@@ -1057,21 +1079,37 @@ function toggleInstallment(personId,instId){
   if(it.paid){
     if(it.txId){removeRecordSilent("transactions",it.txId);it.txId=null}
     it.paid=false;it.paidAt="";
-  }else{
-    it.paid=true;it.paidAt=new Date().toISOString();
-    if(data.accounts.length){
-      const accountID=data.accounts.find(a=>a.default)?.id||data.accounts[0].id;
-      const txType=p.type==="credit"?"income":"expense";
-      const category=p.type==="credit"?"دریافت طلب":"پرداخت بدهی";
-      const nt=touch({id:uid(),title:`قسط ${p.name}`,amount:it.amount,type:txType,category,accountID,date:new Date().toISOString(),source:"installment",personId:p.id,installmentId:it.id});
-      data.transactions.unshift(nt);markDirty("transactions",nt.id,false,nt,nt.updatedAt);
-      it.txId=nt.id;
-    }
+    p.paid=p.installments.items.filter(x=>x.paid).reduce((s,x)=>s+(Number(x.amount)||0),0);
+    touch(p);markDirty("people",p.id,false,p,p.updatedAt);save();
+    logEvent("لغو پرداخت قسط",`${p.name} • ${money(it.amount)}`,"payment");
+    const box=$("installmentsBox");if(box)box.innerHTML=p.installments.items.map((x,i)=>installmentRowHTML(p,x,i)).join("");
+    return;
   }
+  openInstallmentPayment(personId,instId);
+}
+function openInstallmentPayment(personId,instId){
+  const p=data.people.find(x=>x.id===personId);if(!p?.installments)return;
+  const it=p.installments.items.find(x=>x.id===instId);if(!it)return;
+  if(!data.accounts.length)return alert("اول از بخش حساب‌ها یک حساب اضافه کنید");
+  const accLabel=p.type==="credit"?"واریز به حساب":"پرداخت از حساب";
+  const defAcc=data.accounts.find(a=>a.default)?.id||data.accounts[0].id;
+  openModal(`<h2>💳 پرداخت قسط ${esc(p.name)}</h2><div class="form"><p class="hint">مبلغ این قسط: ${money(it.amount)}</p>${invField(accLabel,"این قسط در این حساب ثبت می‌شود",accountSelect("instAccount",defAcc))}<button class="primary" onclick="confirmInstallmentPayment('${personId}','${instId}')">✅ ثبت پرداخت</button></div>`);
+}
+function confirmInstallmentPayment(personId,instId){
+  const p=data.people.find(x=>x.id===personId);if(!p?.installments)return;
+  const it=p.installments.items.find(x=>x.id===instId);if(!it)return;
+  const accountID=$("instAccount")?.value;if(!accountID)return alert("حساب را انتخاب کنید");
+  it.paid=true;it.paidAt=new Date().toISOString();
+  const txType=p.type==="credit"?"income":"expense";
+  const category=p.type==="credit"?"دریافت طلب":"پرداخت بدهی";
+  const nt=touch({id:uid(),title:`قسط ${p.name}`,amount:it.amount,type:txType,category,accountID,date:new Date().toISOString(),source:"installment",personId:p.id,installmentId:it.id});
+  data.transactions.unshift(nt);markDirty("transactions",nt.id,false,nt,nt.updatedAt);
+  it.txId=nt.id;
   p.paid=p.installments.items.filter(x=>x.paid).reduce((s,x)=>s+(Number(x.amount)||0),0);
   touch(p);markDirty("people",p.id,false,p,p.updatedAt);save();
-  logEvent(it.paid?"پرداخت قسط":"لغو پرداخت قسط",`${p.name} • ${money(it.amount)}`,"payment");
-  const box=$("installmentsBox");if(box)box.innerHTML=p.installments.items.map((x,i)=>installmentRowHTML(p,x,i)).join("");
+  logEvent("پرداخت قسط",`${p.name} • ${money(it.amount)} • ${data.accounts.find(a=>a.id===accountID)?.name||""}`,"payment");
+  closeModal();
+  openInstallments(personId);
 }
 
 function pickerDateValue(v){if(!v)return todayJalali();let d=new Date(v);if(Number.isNaN(d.getTime()))return toFaDigits(String(v));let j=gregorianToJalali(d.getFullYear(),d.getMonth()+1,d.getDate());return `${toFaDigits(j[0])}/${padFa(j[1])}/${padFa(j[2])}`;}
