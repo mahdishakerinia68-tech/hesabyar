@@ -1,12 +1,22 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="6.3";
+const APP_VERSION="6.4";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v1";
 const AUTO_BACKUP_MS=6*60*60*1000;
+const APP_MODE_KEY="hesabdar-app-mode-v1";
+function appMode(){return localStorage.getItem(APP_MODE_KEY)||"business"}
+function setAppMode(v){localStorage.setItem(APP_MODE_KEY,v);applyAppMode();if(v==="personal"&&(pageActive("products")||pageActive("customers")||pageActive("invoices")))goToPage("home")}
+function applyAppMode(){
+  const m=appMode();
+  document.body.classList.toggle("personal-mode",m==="personal");
+  const bp=$("appModeBtnPersonal"),bb=$("appModeBtnBusiness");
+  if(bp)bp.classList.toggle("primary",m==="personal");
+  if(bb)bb.classList.toggle("primary",m==="business");
+}
 const ANTHROPIC_KEY_STORAGE="hesabdar-anthropic-key-v1";
 const DEVICE_ID_KEY="hesabdar-device-id-v1";
 const DEVICE_PRESENCE_MS=45*1000;
@@ -147,6 +157,7 @@ function renderSettingsFeatures(){const e=$("autoBackupToggle");if(e)e.checked=a
  const mh=$("securityMethodHint");if(mh)mh.textContent=hasLockCode()?("روش فعلی: "+(data.lockMethod==="pattern"?"رمز الگو":"رمز عددی")+(data.biometricEnabled?" + بیومتریک":"")):"هنوز رمزی برای ورود تنظیم نشده.";
  const bf=$("langBtnFa"),be=$("langBtnEn");if(bf)bf.classList.toggle("primary",data.lang!=="en");if(be)be.classList.toggle("primary",data.lang==="en");
  const aiStatus=$("anthropicKeyStatus");if(aiStatus)aiStatus.textContent=anthropicKey()?"🟢 کلید Claude تنظیم شده است":"🔴 هنوز کلیدی تنظیم نشده";
+ applyAppMode();
 }
 function setSyncStatus(t){const e=$("syncStatus");if(e)e.textContent=t||"";const b=$("syncBadge");if(!b)return;const s=String(t||"");let cls="offline",label="☁️ آفلاین";if(s.includes("آنلاین")||s.includes("انجام شد")||s.includes("متصل است")){cls="online";label="☁️ متصل"}else if(s.includes("⚠️")||s.includes("ناموفق")){cls="error";label="⚠️ خطای اتصال"}else if(s.includes("در حال")||s.includes("بررسی")){cls="pending";label="☁️ در حال اتصال..."}else if(s.includes("وارد شوید")||s.includes("ابتدا")){cls="offline";label="☁️ واردنشده"}b.textContent=label;b.className="sync-badge "+cls}
 
@@ -1779,4 +1790,4 @@ function drawChart(inc,exp){const c=$("chart");if(!c)return;const x=c.getContext
 function exportData(){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));a.download="hesabdar-backup.json";a.click();logEvent("پشتیبان‌گیری","فایل JSON صادر شد","settings")}
 function importData(e){const file=e.target.files?.[0];if(!file)return;const r=new FileReader();r.onload=async()=>{try{data=JSON.parse(r.result);normalizeData();await migratePinSecurity();data.audit??=[];data.notes??=[];save();logEvent("بازیابی اطلاعات","پشتیبان وارد شد","settings");showLock();alert("بازیابی شد")}catch{alert("فایل نامعتبر است")}};r.readAsText(file)}
 function clearData(){if(confirm("همه اطلاعات حذف شود؟")){const pin=data.pin,pinHash=data.pinHash,pinSalt=data.pinSalt,patternHash=data.patternHash,patternSalt=data.patternSalt,lockMethod=data.lockMethod,biometricEnabled=data.biometricEnabled,webauthnCredId=data.webauthnCredId,lang=data.lang;data=blankData();data.pin=pin;data.pinHash=pinHash;data.pinSalt=pinSalt;data.patternHash=patternHash;data.patternSalt=patternSalt;data.lockMethod=lockMethod;data.biometricEnabled=biometricEnabled;data.webauthnCredId=webauthnCredId;data.lang=lang;save();logEvent("پاک کردن اطلاعات","اطلاعات برنامه پاک شد","delete");}}
-(async function initApp(){normalizeData();await migratePinSecurity();showLock();render();applyDashboardConfig();renderBrandingInSettings();renderSettingsFeatures();applyLanguage();maybeAutoBackup("اجرای برنامه");processRecurringTransactions();logEvent("اجرای برنامه","برنامه حسابدار اجرا شد","system");await initSync();if(!sync.auth){[4000,12000,30000].forEach(ms=>setTimeout(()=>{if(!sync.auth)initSync()},ms))}syncAllNotesToReminders().catch(console.error);rescheduleAllNativeReminders().catch(console.error);startUpdateChecker();startReminderChecker();})();
+(async function initApp(){normalizeData();await migratePinSecurity();showLock();render();applyDashboardConfig();applyAppMode();renderBrandingInSettings();renderSettingsFeatures();applyLanguage();maybeAutoBackup("اجرای برنامه");processRecurringTransactions();logEvent("اجرای برنامه","برنامه حسابدار اجرا شد","system");await initSync();if(!sync.auth){[4000,12000,30000].forEach(ms=>setTimeout(()=>{if(!sync.auth)initSync()},ms))}syncAllNotesToReminders().catch(console.error);rescheduleAllNativeReminders().catch(console.error);startUpdateChecker();startReminderChecker();})();

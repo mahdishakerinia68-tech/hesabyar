@@ -537,3 +537,10 @@ body:not(.dark) .reorder-btns button{background:#F2F2F7}
 .budget-row-head{display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px}
 .budget-bar{height:8px;border-radius:999px;background:var(--bg3);overflow:hidden}
 .budget-bar-fill{height:100%;border-radius:999px;transition:width .3s}
+
+/* ===== v6.4: business/personal app mode ===== */
+body.personal-mode [data-page="products"],
+body.personal-mode [data-page="customers"],
+body.personal-mode [data-page="invoices"],
+body.personal-mode [data-widget="invoiceBtn"]{display:none!important}
+#appModeBtnPersonal.primary,#appModeBtnBusiness.primary{background:var(--blue);color:#fff}

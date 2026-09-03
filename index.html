@@ -22,7 +22,7 @@
     <button id="menuBtn" class="menu-trigger" aria-label="باز کردن منو" aria-haspopup="true" aria-expanded="false" aria-controls="menuModal">⋯</button>
     <img class="app-logo" src="logo.png" alt="حساب‌یار">
     <div class="top-bar-titles">
-      <h1>حساب‌یار <span class="version-pill" id="versionPill">6.3</span></h1>
+      <h1>حساب‌یار <span class="version-pill" id="versionPill">6.4</span></h1>
       <div id="syncBadge" class="sync-badge">☁️ آفلاین</div>
     </div>
   </div>
@@ -185,6 +185,14 @@
   <p class="hint settings-intro">تنظیمات را به بخش‌های جدا تقسیم کرده‌ایم تا پیدا کردن هر گزینه راحت‌تر باشد.</p>
   <div class="settings settings-page">
 
+    <div class="settings-group card" id="stgGroup-mode">
+      <div class="settings-group-head"><span>🧑‍💼</span><div><h3>حالت اپ</h3><p class="hint">در حالت «شخصی»، بخش‌های محصولات، مشتری‌ها و فاکتور از منو و صفحه خانه مخفی می‌شوند تا اپ ساده‌تر بشه. اطلاعات این بخش‌ها پاک نمی‌شود و هر وقت خواستی می‌تونی برگردونیشون.</p></div></div>
+      <div class="settings-actions">
+        <button id="appModeBtnPersonal" onclick="setAppMode('personal')">👤 شخصی</button>
+        <button id="appModeBtnBusiness" onclick="setAppMode('business')">🏪 کسب‌وکاری</button>
+      </div>
+    </div>
+
     <div class="settings-group card" id="stgGroup-branding">
       <div class="settings-group-head"><span>🏪</span><div><h3 data-i18n="stg.branding.title">ظاهر فروشگاه و فاکتور</h3><p class="hint">نام فروشگاه، لوگو، مهر و امضا برای فاکتور.</p></div></div>
       <input id="brandStore" placeholder="نام فروشگاه"/>
@@ -280,7 +288,7 @@
     </div>
 
   </div>
-  <p class="hint settings-footer">نسخه <span id="appVersionText">6.3</span> • بکاپ خودکار • بروزرسانی • اتصال دو گوشی • تقویم شمسی کامل</p>
+  <p class="hint settings-footer">نسخه <span id="appVersionText">6.4</span> • بکاپ خودکار • بروزرسانی • اتصال دو گوشی • تقویم شمسی کامل</p>
   <p class="hint">تغییرات روی این گوشی ذخیره می‌شود و در صورت اتصال به Firebase با گوشی دوم ادغام می‌گردد.</p>
 </section>
 
@@ -373,6 +381,6 @@
 <script src="capacitor-filesystem-bridge.js"></script>
 <script src="capacitor-biometric-bridge.js"></script>
 <script src="app.js"></script>
-<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js?v=6.3").catch(console.error)}</script>
+<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js?v=6.4").catch(console.error)}</script>
 </body>
 </html>
