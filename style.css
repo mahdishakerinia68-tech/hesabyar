@@ -529,3 +529,11 @@ body:not(.dark) .reorder-btns button{background:#F2F2F7}
 .ai-enhance-btn:active{transform:scale(.96)}
 .ai-enhance-btn:disabled{opacity:.55}
 .ai-enhance-hint{font-size:11.5px;color:var(--label2)}
+
+/* ===== v6.3: budget bars + recurring/installment additions ===== */
+.cat-budget-row{display:flex;align-items:center;gap:8px;margin:6px 0;font-size:12.5px}
+.cat-budget-row input{width:120px;padding:6px 10px;border-radius:8px;border:1px solid var(--sep);background:var(--bg3);color:var(--label);font-size:12.5px}
+.budget-row{margin:10px 0}
+.budget-row-head{display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px}
+.budget-bar{height:8px;border-radius:999px;background:var(--bg3);overflow:hidden}
+.budget-bar-fill{height:100%;border-radius:999px;transition:width .3s}
