@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="6.0";
+const APP_VERSION="6.1";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
@@ -452,16 +452,18 @@ async function updateDevicePresence(){if(!sync.user||!sync.db)return false; try{
 async function verifyTwoPhoneConnection(manual=false){if(!sync.user||!sync.db){if(manual)setSyncStatus("⚠️ ابتدا با حساب همگام‌سازی وارد شوید");return false} try{await updateDevicePresence(); const snap=await cloudDoc().collection("devices").get(); const now=Date.now(); const others=snap.docs.map(d=>d.data()).filter(x=>x.deviceId!==deviceId()&&x.lastSeen&&(now-new Date(x.lastSeen).getTime())<=DEVICE_PRESENCE_MS); setSyncStatus(others.length?`📱 ${fa(others.length)} گوشی دیگر متصل است • همگام‌سازی فعال`:"📱 گوشی دوم در ۴۵ ثانیه اخیر دیده نشد • در حال بررسی مجدد"); if(others.length)logEvent("بررسی اتصال دو گوشی",`گوشی دیگر فعال است (${others.length})`,"sync",false); return !!others.length}catch(e){setSyncStatus("⚠️ بررسی اتصال دو گوشی ناموفق بود: "+(e.code||e.message));return false}}
 function startDevicePresence(){if(sync.presenceTimer)clearInterval(sync.presenceTimer); updateDevicePresence(); sync.presenceTimer=setInterval(()=>{if(sync.user)verifyTwoPhoneConnection(false)},DEVICE_PRESENCE_INTERVAL)}
 const FIREBASE_SDK_URLS=["https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js","https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js","https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"];
+const FIREBASE_LOAD_TIMEOUT_MS=9000;
+function withTimeout(promise,ms,msg){return Promise.race([promise,new Promise((_,rej)=>setTimeout(()=>rej(new Error(msg)),ms))])}
 function loadScriptOnce(src){return new Promise((resolve,reject)=>{if([...document.scripts].some(s=>s.src===src)){resolve();return}const s=document.createElement("script");s.src=src;s.onload=()=>resolve();s.onerror=()=>reject(new Error("script load failed: "+src));document.head.appendChild(s)})}
 let firebaseLoadPromise=null;
 async function ensureFirebaseLoaded(){
   if(window.firebase)return true;
   if(!navigator.onLine)return false;
   if(!firebaseLoadPromise){
-    firebaseLoadPromise=(async()=>{for(const url of FIREBASE_SDK_URLS){await loadScriptOnce(url)}})()
+    firebaseLoadPromise=(async()=>{for(const url of FIREBASE_SDK_URLS){await withTimeout(loadScriptOnce(url),FIREBASE_LOAD_TIMEOUT_MS,"سرور Firebase در زمان مناسب پاسخ نداد (احتمال فیلترشدن gstatic.com)")}})()
       .catch(e=>{console.warn("firebase sdk load failed",e);firebaseLoadPromise=null;throw e});
   }
-  try{await firebaseLoadPromise;return !!window.firebase}catch(e){return false}
+  try{await firebaseLoadPromise;return !!window.firebase}catch(e){sync.lastLoadError=e.message||String(e);return false}
 }
 async function initSync(){
   const cfg=syncConfig();if(!cfg)return;
@@ -494,12 +496,12 @@ async function syncSave(){
   sync.saving=false;
 }
 async function pushToCloud(){
-  if(!sync.user)return alert("اول با حساب همگام‌سازی وارد شو");
+  if(!sync.user){if(!await ensureSyncReady())return;if(!sync.user)return alert("اول با حساب همگام‌سازی وارد شو");}
   try{await pushRest();setSyncStatus("☁️ اطلاعات این گوشی به ابر منتقل شد — "+dataSummary(data));alert("ارسال با موفقیت انجام شد\n"+dataSummary(data));}
   catch(e){alert("ارسال ناموفق: "+(e.code||'')+"\n"+e.message)}
 }
 async function pullFromCloud(){
-  if(!sync.user)return alert("اول با حساب همگام‌سازی وارد شو");
+  if(!sync.user){if(!await ensureSyncReady())return;if(!sync.user)return alert("اول با حساب همگام‌سازی وارد شو");}
   try{
     const remote=await pullRest();
     if(!remote||!remote.length)return alert("هنوز اطلاعاتی در ابر وجود ندارد");
@@ -537,7 +539,7 @@ async function ensureSyncReady(){
  const cfg=syncConfig();
  if(!cfg||!cfg.apiKey||!cfg.authDomain||!cfg.projectId||!cfg.appId){alert("اول یک‌بار «تنظیم اتصال Firebase» را باز کن و اطلاعات Firebase را وارد کن.");return false}
  await initSync();
- if(!sync.auth){alert("اتصال Firebase آماده نیست");return false}
+ if(!sync.auth){alert("اتصال به سرویس همگام‌سازی برقرار نشد.\nاحتمال زیاد سرورهای گوگل (gstatic.com / firebaseapp.com) روی این اینترنت در دسترس نیستند.\nیک VPN را روشن کن و دوباره امتحان کن."+(sync.lastLoadError?"\n\nجزئیات: "+sync.lastLoadError:""));return false}
  return true;
 }
 function fillSettingsSyncEmail(){const e=$("settingsSyncEmail");if(e&&sync.user)e.value=sync.user.email||""}
