@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="6.8.0";
+const APP_VERSION="6.8.1";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
@@ -649,20 +649,20 @@ async function setBiometricEnabled(v){
  save();logEvent(v?"فعال‌سازی قفل بیومتریک":"غیرفعال‌سازی قفل بیومتریک","","settings");renderSettingsFeatures();
 }
 
-const WHATS_NEW_KEY="hesabdar-whats-new-seen-6.8.0";
+const WHATS_NEW_KEY="hesabdar-whats-new-seen-6.8.1";
 function showWhatsNewOnce(){
  if(localStorage.getItem(WHATS_NEW_KEY)==="1")return;
  localStorage.setItem(WHATS_NEW_KEY,"1");
  openModal(`<div class="whats-new">
-  <div class="whats-new-badge">نسخه ۶.۷.۶</div>
+  <div class="whats-new-badge">نسخه ${toFaDigits(APP_VERSION)}</div>
   <h2>🎉 به حساب‌یار خوش آمدی</h2>
   <p class="hint">این صفحه فقط یک‌بار در اولین اجرای این نسخه نمایش داده می‌شود.</p>
   <div class="whats-new-section">
    <h3>🛠 تغییرات این نسخه</h3>
    <ul>
-    <li>رفع اساسی اسکرول و بالا/پایین رفتن صفحات و ورود به بخش‌ها در اندروید.</li>
-    <li>بهبود بازیابی پشتیبان JSON، مخصوصاً انتقال فایل از اندروید به آیفون.</li>
-    <li>پس از بازیابی، اطلاعات فوراً روی صفحه تازه‌سازی می‌شوند و فایل انتخابی دوباره قابل انتخاب است.</li>
+    <li>رفع مشکل بازیابی فایل پشتیبان ارسال‌شده (تلگرام/بلوتوث و...) در اندروید.</li>
+    <li>امکان افزودن عکس رسید واریز/دریافت به هر قسط بدهکار و بستانکار.</li>
+    <li>رفع نمایش نسخه قدیمی در صفحه «امکانات و تغییرات».</li>
    </ul>
   </div>
   <div class="whats-new-section">
@@ -1086,7 +1086,28 @@ function openInstallments(id){
   openModal(`<h2>📅 اقساط ${esc(p.name)}</h2><p class="hint">${fa(paidCount)} از ${fa(items.length)} قسط پرداخت شده • مبلغ کل: ${money(p.amount)}</p><p class="hint">با زدن «پرداخت» یک تراکنش ${p.type==="credit"?"دریافتی":"هزینه"} هم به‌صورت خودکار برایت ثبت می‌شود.</p><div id="installmentsBox">${items.map((it,i)=>installmentRowHTML(p,it,i)).join("")}</div>`);
 }
 function installmentRowHTML(p,it,i){
-  return `<div class="item"><div><b>قسط ${fa(i+1)}</b><div class="meta">سررسید: ${jalaliLabel(it.due)}${it.paid?" • پرداخت‌شده در "+jalaliLabel(it.paidAt):""}</div></div><div><strong>${money(it.amount)}</strong><div class="actions"><button type="button" class="${it.paid?"":"primary"}" onclick="toggleInstallment('${p.id}','${it.id}')">${it.paid?"↩️ لغو پرداخت":"✅ پرداخت"}</button></div></div></div>`;
+  const receiptThumb=it.receipt?`<img class="tx-thumb" src="${it.receipt}" alt="رسید" onclick="viewInstallmentImage('${p.id}','${it.id}')">`:"";
+  return `<div class="item"><div><b>قسط ${fa(i+1)}</b><div class="meta">سررسید: ${jalaliLabel(it.due)}${it.paid?" • پرداخت‌شده در "+jalaliLabel(it.paidAt):""}</div>${receiptThumb}</div><div><strong>${money(it.amount)}</strong><div class="actions"><button type="button" class="${it.paid?"":"primary"}" onclick="toggleInstallment('${p.id}','${it.id}')">${it.paid?"↩️ لغو پرداخت":"✅ پرداخت"}</button><button type="button" onclick="pickInstallmentReceipt('${p.id}','${it.id}')">🖼 ${it.receipt?"تغییر رسید":"افزودن رسید"}</button></div></div></div>`;
+}
+function pickInstallmentReceipt(personId,instId){
+  const inp=document.createElement("input");inp.type="file";inp.accept="image/*";
+  inp.onchange=async()=>{
+    const f=inp.files?.[0];if(!f)return;
+    const p=data.people.find(x=>x.id===personId);if(!p?.installments)return;
+    const it=p.installments.items.find(x=>x.id===instId);if(!it)return;
+    try{
+      it.receipt=await compressImage(f,1200,.72);
+      if(it.txId){const t=data.transactions.find(x=>x.id===it.txId);if(t){t.image=it.receipt;touch(t);markDirty("transactions",t.id,false,t,t.updatedAt)}}
+      touch(p);markDirty("people",p.id,false,p,p.updatedAt);save();
+      const box=$("installmentsBox");if(box)box.innerHTML=p.installments.items.map((x,i)=>installmentRowHTML(p,x,i)).join("");
+      logEvent("عکس رسید قسط",`${p.name} • قسط ${fa(p.installments.items.indexOf(it)+1)}`,"payment");
+    }catch(e){console.warn(e);alert("خطا در بارگذاری عکس رسید")}
+  };
+  inp.click();
+}
+function viewInstallmentImage(personId,instId){
+  const p=data.people.find(x=>x.id===personId);const it=p?.installments?.items.find(x=>x.id===instId);if(!it?.receipt)return;
+  openModal(`<h2>📎 عکس رسید قسط</h2><div class="attachment-large"><img src="${it.receipt}" alt="رسید"></div>`);
 }
 function toggleInstallment(personId,instId){
   const p=data.people.find(x=>x.id===personId);if(!p?.installments)return;
@@ -1108,16 +1129,24 @@ function openInstallmentPayment(personId,instId){
   if(!data.accounts.length)return alert("اول از بخش حساب‌ها یک حساب اضافه کنید");
   const accLabel=p.type==="credit"?"واریز به حساب":"پرداخت از حساب";
   const defAcc=data.accounts.find(a=>a.default)?.id||data.accounts[0].id;
-  openModal(`<h2>💳 پرداخت قسط ${esc(p.name)}</h2><div class="form"><p class="hint">مبلغ این قسط: ${money(it.amount)}</p>${invField(accLabel,"این قسط در این حساب ثبت می‌شود",accountSelect("instAccount",defAcc))}<button class="primary" onclick="confirmInstallmentPayment('${personId}','${instId}')">✅ ثبت پرداخت</button></div>`);
+  openModal(`<h2>💳 پرداخت قسط ${esc(p.name)}</h2><div class="form"><p class="hint">مبلغ این قسط: ${money(it.amount)}</p>${invField(accLabel,"این قسط در این حساب ثبت می‌شود",accountSelect("instAccount",defAcc))}<label class="file-label">📎 عکس رسید ${p.type==="credit"?"دریافتی":"واریزی"} (اختیاری)<input id="instImage" type="file" accept="image/*" onchange="previewInstImage(this)"></label>${it.receipt?`<div class="attachment-preview"><img src="${it.receipt}" alt="رسید"></div>`:""}<div id="instImagePreview"></div><button class="primary" onclick="confirmInstallmentPayment('${personId}','${instId}')">✅ ثبت پرداخت</button></div>`);
 }
-function confirmInstallmentPayment(personId,instId){
+function previewInstImage(input){
+  const f=input?.files?.[0],box=$("instImagePreview");if(!box||!f)return;
+  const r=new FileReader();r.onload=()=>box.innerHTML=`<div class="attachment-preview"><img src="${r.result}" alt="پیش‌نمایش"></div>`;r.readAsDataURL(f)
+}
+async function confirmInstallmentPayment(personId,instId){
   const p=data.people.find(x=>x.id===personId);if(!p?.installments)return;
   const it=p.installments.items.find(x=>x.id===instId);if(!it)return;
   const accountID=$("instAccount")?.value;if(!accountID)return alert("حساب را انتخاب کنید");
+  let receipt=it.receipt||null;const file=$("instImage")?.files?.[0];
+  if(file){try{receipt=await compressImage(file,1200,.72)}catch(e){console.warn(e)}}
   it.paid=true;it.paidAt=new Date().toISOString();
+  if(receipt)it.receipt=receipt;
   const txType=p.type==="credit"?"income":"expense";
   const category=p.type==="credit"?"دریافت طلب":"پرداخت بدهی";
   const nt=touch({id:uid(),title:`قسط ${p.name}`,amount:it.amount,type:txType,category,accountID,date:new Date().toISOString(),source:"installment",personId:p.id,installmentId:it.id});
+  if(receipt)nt.image=receipt;
   data.transactions.unshift(nt);markDirty("transactions",nt.id,false,nt,nt.updatedAt);
   it.txId=nt.id;
   p.paid=p.installments.items.filter(x=>x.paid).reduce((s,x)=>s+(Number(x.amount)||0),0);
