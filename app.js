@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="2";
+const APP_VERSION="2.1";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
@@ -348,7 +348,21 @@ function renderAudit(){
   box.innerHTML=logs.map(e=>`<div class="audit-item"><div class="audit-icon">${auditIcon(e.kind)}</div><div class="audit-main"><b>${esc(e.action)}</b>${e.detail?`<div class="meta">${esc(e.detail)}</div>`:""}<small>${new Intl.DateTimeFormat("fa-IR-u-ca-persian",{dateStyle:"short",timeStyle:"short"}).format(new Date(e.at))}</small></div></div>`).join("")||empty("هنوز گزارشی ثبت نشده است");
 }
 function clearAudit(){if(!data.audit?.length)return alert("گزارشی برای پاک کردن وجود ندارد");if(confirm("همه گزارش‌های فعالیت پاک شوند؟")){const old=data.audit.slice();data.audit=[];for(const e of old)markDirty("audit",e.id,true,{id:e.id},new Date().toISOString());save();logEvent("گزارش‌ها پاک شدند","سابقه فعالیت قبلی حذف شد","system")}}
-function save(){localStorage.setItem(KEY,JSON.stringify(data)); maybeAutoBackup("ذخیره زمان‌بندی‌شده"); render();syncSave()}
+function persistLocal(){try{localStorage.setItem(KEY,JSON.stringify(data));return true}catch(e){console.warn("localStorage save failed",e);return false}}
+const STORAGE_FULL_MSG="⚠️ حافظه ذخیره‌سازی دستگاه پر شده و تغییرات ذخیره نشد.\nبرای آزاد شدن فضا از تنظیمات، یک پشتیبان بگیر و چند عکس پیوست قدیمی (رسید/تراکنش) را حذف کن.";
+function save(){
+ if(!persistLocal()){alert(STORAGE_FULL_MSG);return}
+ maybeAutoBackup("ذخیره زمان‌بندی‌شده"); render();syncSave()
+}
+/* اگر رکورد تازه یک عکس پیوست دارد و فضای ذخیره‌سازی پر است، عکس را حذف و دوباره تلاش می‌کند
+   تا خود اطلاعات (مثلاً تراکنش) به‌جای شکست کامل، بدون عکس ذخیره شود. */
+function saveWithAttachments(records){
+ if(persistLocal()){maybeAutoBackup("ذخیره زمان‌بندی‌شده");render();syncSave();return true}
+ let stripped=false;
+ (Array.isArray(records)?records:[records]).forEach(r=>{if(r&&(r.image||r.receipt)){delete r.image;delete r.receipt;stripped=true}});
+ if(stripped&&persistLocal()){maybeAutoBackup("ذخیره زمان‌بندی‌شده");render();syncSave();alert("⚠️ حجم عکس پیوست بیش از فضای خالی دستگاه بود؛ اطلاعات بدون عکس ذخیره شد.");return true}
+ alert(STORAGE_FULL_MSG);return false
+}
 function hasMeaningfulData(d){
   if(!d||typeof d!=="object")return false;
   return ["accounts","transactions","people","reminders","notes","checks","invoices"].some(k=>Array.isArray(d[k])&&d[k].length>0);
@@ -864,20 +878,22 @@ async function saveTx(id){
  if(!amount)return alert("مبلغ را وارد کنید");if(!category)return alert("دسته را انتخاب کنید");
  const recur=$("txRecur")?.value||"none";
  let image=null; const file=$("txImage")?.files?.[0];
- if(file){try{image=await compressImage(file,1200,.72)}catch(e){console.warn(e)}}
+ if(file){try{image=await compressImage(file,1000,.6)}catch(e){console.warn(e)}}
+ let t;
  if(id){
-  const t=data.transactions.find(x=>x.id===id); if(!t)return;
+  t=data.transactions.find(x=>x.id===id); if(!t)return;
   Object.assign(t,{title:$("title").value.trim()||category,amount,type,category,accountID:$("acc").value});
   if(image)t.image=image;
   applyRecurSetting(t,recur);
   touch(t);markDirty("transactions",t.id,false,t,t.updatedAt);
  }else{
-  const nt=touch({id:uid(),title:$("title").value.trim()||category,amount,type,category,accountID:$("acc").value,date:new Date().toISOString(),source:"manual"});
-  if(image)nt.image=image;
-  applyRecurSetting(nt,recur);
-  data.transactions.unshift(nt);markDirty("transactions",nt.id,false,nt,nt.updatedAt);
+  t=touch({id:uid(),title:$("title").value.trim()||category,amount,type,category,accountID:$("acc").value,date:new Date().toISOString(),source:"manual"});
+  if(image)t.image=image;
+  applyRecurSetting(t,recur);
+  data.transactions.unshift(t);markDirty("transactions",t.id,false,t,t.updatedAt);
  }
- save();logEvent(id?"ویرایش تراکنش":"ایجاد تراکنش",`${$("title").value.trim()||category} • ${money(amount)}`,id?"edit":"create");closeModal()
+ if(!saveWithAttachments(t))return;
+ logEvent(id?"ویرایش تراکنش":"ایجاد تراکنش",`${$("title").value.trim()||category} • ${money(amount)}`,id?"edit":"create");closeModal()
 }
 function applyRecurSetting(t,recur){
   if(recur==="none"){delete t.recurring;delete t.recurNext;return}
@@ -1087,7 +1103,7 @@ async function confirmPersonPayment(id){
   if(receipt)nt.image=receipt;
   data.transactions.unshift(nt);markDirty("transactions",nt.id,false,nt,nt.updatedAt);
   syncInvoiceFromPerson(p);
-  save();
+  if(!saveWithAttachments(nt))return;
   logEvent("تسویه شخص",`${p.name} • ${money(n)} • ${data.accounts.find(a=>a.id===accountID)?.name||""}`,"payment");
   closeModal();
 }
@@ -1108,9 +1124,11 @@ function pickInstallmentReceipt(personId,instId){
     const p=data.people.find(x=>x.id===personId);if(!p?.installments)return;
     const it=p.installments.items.find(x=>x.id===instId);if(!it)return;
     try{
-      it.receipt=await compressImage(f,1200,.72);
-      if(it.txId){const t=data.transactions.find(x=>x.id===it.txId);if(t){t.image=it.receipt;touch(t);markDirty("transactions",t.id,false,t,t.updatedAt)}}
-      touch(p);markDirty("people",p.id,false,p,p.updatedAt);save();
+      it.receipt=await compressImage(f,1000,.6);
+      let linkedTx=null;
+      if(it.txId){linkedTx=data.transactions.find(x=>x.id===it.txId);if(linkedTx){linkedTx.image=it.receipt;touch(linkedTx);markDirty("transactions",linkedTx.id,false,linkedTx,linkedTx.updatedAt)}}
+      touch(p);markDirty("people",p.id,false,p,p.updatedAt);
+      if(!saveWithAttachments([it,linkedTx]))return;
       const box=$("installmentsBox");if(box)box.innerHTML=p.installments.items.map((x,i)=>installmentRowHTML(p,x,i)).join("");
       logEvent("عکس رسید قسط",`${p.name} • قسط ${fa(p.installments.items.indexOf(it)+1)}`,"payment");
     }catch(e){console.warn(e);alert("خطا در بارگذاری عکس رسید")}
@@ -1153,7 +1171,7 @@ async function confirmInstallmentPayment(personId,instId){
   const it=p.installments.items.find(x=>x.id===instId);if(!it)return;
   const accountID=$("instAccount")?.value;if(!accountID)return alert("حساب را انتخاب کنید");
   let receipt=it.receipt||null;const file=$("instImage")?.files?.[0];
-  if(file){try{receipt=await compressImage(file,1200,.72)}catch(e){console.warn(e)}}
+  if(file){try{receipt=await compressImage(file,1000,.6)}catch(e){console.warn(e)}}
   it.paid=true;it.paidAt=new Date().toISOString();
   if(receipt)it.receipt=receipt;
   const txType=p.type==="credit"?"income":"expense";
@@ -1165,7 +1183,8 @@ async function confirmInstallmentPayment(personId,instId){
   p.paid=p.installments.items.filter(x=>x.paid).reduce((s,x)=>s+(Number(x.amount)||0),0);
   touch(p);markDirty("people",p.id,false,p,p.updatedAt);
   const linkedInvoiceId=p.invoiceId;
-  syncInvoiceFromPerson(p);save();
+  syncInvoiceFromPerson(p);
+  if(!saveWithAttachments([it,nt]))return;
   logEvent("پرداخت قسط",`${p.name} • ${money(it.amount)} • ${data.accounts.find(a=>a.id===accountID)?.name||""}`,"payment");
   closeModal();
   if(!linkedInvoiceId||data.people.find(x=>x.id===personId))openInstallments(personId);
@@ -1511,6 +1530,7 @@ function openInvoice(id=null){
  const inv=id&&data.invoices.find(x=>x.id===id);
  const items=inv?.items?.length?inv.items:[{desc:"",qty:1,price:""}];
  const cust=inv?.customerId?data.customers.find(c=>c.id===inv.customerId):null;
+ const defAcc=inv?.settleAccountId||data.accounts.find(a=>a.default)?.id||data.accounts[0]?.id||"";
  openModal(`<h2>🧾 ${inv?"ویرایش فاکتور":"ساخت فاکتور جدید"}</h2><div class="form invoice-form">
  ${invField("عنوان فاکتور","برای پیدا کردن آسان‌تر در صندوق فاکتور، مثلاً: فاکتور فروش موبایل",`<input id="invName" placeholder="مثلاً: فاکتور فروش شهریور" value="${esc(inv?.name||"")}">`)}
  ${invField("نام فروشنده / فروشگاه","اسمی که بالای فاکتور چاپ می‌شود",`<input id="invSeller" placeholder="نام فروشگاه یا کسب‌وکار شما" value="${esc(inv?.seller||(inv?"":data.branding?.storeName||""))}">`)}
@@ -1526,6 +1546,7 @@ function openInvoice(id=null){
  ${invField("وضعیت پرداخت","بر اساس مبلغ دریافتی به‌صورت خودکار هم به‌روزرسانی می‌شود",`<select id="invStatus"><option value="unpaid" ${inv?.status!=="paid"&&inv?.status!=="partial"?"selected":""}>🔴 پرداخت نشده</option><option value="partial" ${inv?.status==="partial"?"selected":""}>🟡 پرداخت بخشی</option><option value="paid" ${inv?.status==="paid"?"selected":""}>🟢 پرداخت کامل</option></select>`)}
  ${invField("مبلغ دریافت‌شده","تا امروز از مشتری چقدر گرفته‌ای (تومان)",`<input id="invPaid" oninput="updateInvoiceLiveTotal()" type="number" min="0" placeholder="۰" value="${Number(inv?.paid)||0}">`)}
  </div>
+ ${invField("تسویه به حساب","این مبلغ دریافتی در این حساب ثبت می‌شود و به تراکنش‌ها اضافه می‌گردد",accountSelect("invSettleAccount",defAcc))}
  <div class="two-fields">
  ${invField("تخفیف مبلغی","مبلغ ثابتی که از جمع کل کم می‌شود (تومان)",`<input id="invDiscount" oninput="updateInvoiceLiveTotal()" type="number" min="0" placeholder="۰" value="${Number(inv?.discount)||0}">`)}
  ${invField("تخفیف درصدی","درصدی که بعد از تخفیف مبلغی کم می‌شود (٪)",`<input id="invDiscountPercent" oninput="updateInvoiceLiveTotal()" type="number" min="0" max="100" placeholder="۰" value="${Number(inv?.discountPercent)||0}">`)}
@@ -1555,11 +1576,34 @@ function saveInvoice(id){
  if(!items.length)return alert("حداقل یک ردیف فاکتور وارد کن");
  const discount=Math.max(0,Number($("invDiscount").value)||0),discountPercent=Math.min(100,Math.max(0,Number($("invDiscountPercent").value)||0)),taxRate=Math.max(0,Number($("invTax").value)||0);let paid=Math.max(0,Number($("invPaid").value)||0);
  const customerName=$("invCustomerName")?.value.trim()||"";
- const o={name,seller,date,number,items,customerId:$("invCustomer").value||"",customerName,address:$("invAddress").value.trim(),discount,discountPercent,taxRate,paid,status:$("invStatus").value,total:0};o.total=invoiceTotal(o);if(o.status==="paid")o.paid=o.total;if(o.paid>=o.total&&o.total>0)o.status="paid";else if(o.paid>0)o.status="partial";else o.status="unpaid";
+ const settleAccountId=$("invSettleAccount")?.value||"";
+ const o={name,seller,date,number,items,customerId:$("invCustomer").value||"",customerName,address:$("invAddress").value.trim(),discount,discountPercent,taxRate,paid,settleAccountId,status:$("invStatus").value,total:0};o.total=invoiceTotal(o);if(o.status==="paid")o.paid=o.total;if(o.paid>=o.total&&o.total>0)o.status="paid";else if(o.paid>0)o.status="partial";else o.status="unpaid";
  let x;
  if(id){x=data.invoices.find(v=>v.id===id);if(x){adjustStockForInvoice(x,+1);Object.assign(x,o);touch(x);markDirty("invoices",x.id,false,x,x.updatedAt);adjustStockForInvoice(x,-1)}}else{x=touch({id:uid(),...o});data.invoices.unshift(x);markDirty("invoices",x.id,false,x,x.updatedAt);adjustStockForInvoice(x,-1)}
- if(x)syncPersonForInvoice(x);
+ if(x){syncPersonForInvoice(x);syncTransactionForInvoice(x)}
  save();logEvent(id?"ویرایش فاکتور":"ساخت فاکتور",`${name} • ${money(o.total)}`,id?"edit":"create");closeModal()
+}
+/* --- ثبت خودکار تراکنش تسویه فاکتور در حساب انتخاب‌شده --- */
+function syncTransactionForInvoice(inv){
+ if(!inv)return;
+ const paid=Number(inv.paid)||0;
+ if(paid>0&&inv.settleAccountId){
+  let t=inv.settleTxId?data.transactions.find(x=>x.id===inv.settleTxId):null;
+  const title=`تسویه فاکتور: ${inv.name||"فاکتور"}`;
+  if(!t){
+   t=touch({id:uid(),title,amount:paid,type:"income",category:"تسویه فاکتور",accountID:inv.settleAccountId,date:new Date().toISOString(),source:"invoice-settle",invoiceId:inv.id});
+   data.transactions.unshift(t);
+   inv.settleTxId=t.id;
+  }else{
+   t.title=title;t.amount=paid;t.accountID=inv.settleAccountId;touch(t);
+  }
+  markDirty("transactions",t.id,false,t,t.updatedAt);
+  touch(inv);markDirty("invoices",inv.id,false,inv,inv.updatedAt);
+ }else if(inv.settleTxId){
+  removeRecordSilent("transactions",inv.settleTxId);
+  inv.settleTxId="";
+  touch(inv);markDirty("invoices",inv.id,false,inv,inv.updatedAt);
+ }
 }
 /* --- اتصال فاکتورهای مانده‌دار/تسویه‌نشده به بخش طلبکاران و همگام‌سازی برگشتی با تراکنش‌ها --- */
 function syncPersonForInvoice(inv){
@@ -1599,13 +1643,15 @@ function syncInvoiceFromPerson(p){
   touch(inv);markDirty("invoices",inv.id,false,inv,inv.updatedAt);
  }
 }
-function duplicateInvoice(id){const inv=data.invoices.find(x=>x.id===id);if(!inv)return;const x=touch({...JSON.parse(JSON.stringify(inv)),id:uid(),number:"",date:new Date().toISOString().slice(0,10),status:"unpaid",paid:0});data.invoices.unshift(x);markDirty("invoices",x.id,false,x,x.updatedAt);save();logEvent("تکرار فاکتور",x.name,"create")}
-function deleteInvoice(id){if(!confirm("این فاکتور حذف شود؟"))return;const x=data.invoices.find(v=>v.id===id);adjustStockForInvoice(x,+1);if(x?.personId)removeRecordSilent("people",x.personId);removeRecord("invoices",id);logEvent("حذف فاکتور",x?.name||id,"delete")}
+function duplicateInvoice(id){const inv=data.invoices.find(x=>x.id===id);if(!inv)return;const x=touch({...JSON.parse(JSON.stringify(inv)),id:uid(),number:"",date:new Date().toISOString().slice(0,10),status:"unpaid",paid:0,personId:"",settleTxId:""});data.invoices.unshift(x);markDirty("invoices",x.id,false,x,x.updatedAt);save();logEvent("تکرار فاکتور",x.name,"create")}
+function deleteInvoice(id){if(!confirm("این فاکتور حذف شود؟"))return;const x=data.invoices.find(v=>v.id===id);adjustStockForInvoice(x,+1);if(x?.personId)removeRecordSilent("people",x.personId);if(x?.settleTxId)removeRecordSilent("transactions",x.settleTxId);removeRecord("invoices",id);logEvent("حذف فاکتور",x?.name||id,"delete")}
 function invoiceCustomerLabel(inv){if(inv.customerName)return inv.customerName;const c=inv.customerId?data.customers.find(x=>x.id===inv.customerId):null;return c?.name||""}
 function invoiceHTML(inv){
  const total=invoiceTotal(inv);
  const custName=invoiceCustomerLabel(inv);
- return `<div class="item invoice-item"><div><b>🧾 ${esc(inv.name||"فاکتور")}</b><div class="meta">${esc(inv.seller||"فروشنده ثبت نشده")}${custName?" • مشتری: "+esc(custName):""} • ${invoiceDateLabel(inv.date)}${inv.number?" • شماره "+esc(inv.number):""}</div><div class="meta">جمع کل: ${money(total)} • ${inv.status==="paid"?"🟢 پرداخت کامل":inv.status==="partial"?"🟡 پرداخت بخشی":"🔴 پرداخت نشده"} • مانده: ${money(invoiceRemaining(inv))}</div></div><div class="actions"><button onclick="openInvoice('${inv.id}')">✏️</button><button onclick="previewInvoice('${inv.id}')">👁</button><button onclick="duplicateInvoice('${inv.id}')">📄</button><button onclick="shareInvoice('${inv.id}')">📤</button><button class="danger-icon" onclick="deleteInvoice('${inv.id}')">🗑</button></div></div>`
+ const accName=inv.settleAccountId?data.accounts.find(a=>a.id===inv.settleAccountId)?.name:"";
+ const settleMeta=(Number(inv.paid)>0&&accName)?` • واریز به: ${esc(accName)}`:"";
+ return `<div class="item invoice-item"><div><b>🧾 ${esc(inv.name||"فاکتور")}</b><div class="meta">${esc(inv.seller||"فروشنده ثبت نشده")}${custName?" • مشتری: "+esc(custName):""} • ${invoiceDateLabel(inv.date)}${inv.number?" • شماره "+esc(inv.number):""}</div><div class="meta">جمع کل: ${money(total)} • ${inv.status==="paid"?"🟢 پرداخت کامل":inv.status==="partial"?"🟡 پرداخت بخشی":"🔴 پرداخت نشده"} • مانده: ${money(invoiceRemaining(inv))}${settleMeta}</div></div><div class="actions"><button onclick="openInvoice('${inv.id}')">✏️</button><button onclick="previewInvoice('${inv.id}')">👁</button><button onclick="duplicateInvoice('${inv.id}')">📄</button><button onclick="shareInvoice('${inv.id}')">📤</button><button class="danger-icon" onclick="deleteInvoice('${inv.id}')">🗑</button></div></div>`
 }
 function previewInvoice(id){
  const inv=data.invoices.find(x=>x.id===id);if(!inv)return; const cust=inv.customerId?data.customers.find(c=>c.id===inv.customerId):null;
@@ -1613,7 +1659,9 @@ function previewInvoice(id){
  const rows=(inv.items||[]).map(x=>`<div class="preview-inv-row"><span>${esc(x.desc)}</span><span>${fa(x.qty)}</span><span>${money(x.price)}</span><span>${money((Number(x.qty)||0)*(Number(x.price)||0))}</span></div>`).join("");
  const signRow=(b.stamp||b.signature)?`<div class="invoice-sign-row">${b.stamp?`<div class="invoice-sign-box"><img class="invoice-brand-stamp" src="${b.stamp}" alt="مهر فروشگاه"><small>مهر</small></div>`:"<div></div>"}${b.signature?`<div class="invoice-sign-box"><img class="invoice-brand-signature" src="${b.signature}" alt="امضا"><small>امضا</small></div>`:""}</div>`:"";
  const custName=invoiceCustomerLabel(inv);
- openModal(`<div id="invoicePreview" class="invoice-preview"><div class="invoice-head"><div>${b.logo?`<img class="invoice-brand-logo" src="${b.logo}" alt="لوگو">`:""}<h2>فاکتور</h2><b>${esc(inv.seller||b.storeName||"")}</b></div><div>شماره: ${esc(inv.number||"—")}<br>تاریخ: ${invoiceDateLabel(inv.date)}</div></div><h3>${esc(inv.name||"فاکتور")}</h3>${custName?`<div class="meta">مشتری: ${esc(custName)}${cust?.phone?" • "+esc(cust.phone):""}</div>`:""}<div class="meta">وضعیت: ${inv.status==="paid"?"🟢 پرداخت کامل":inv.status==="partial"?"🟡 پرداخت بخشی":"🔴 پرداخت نشده"} • مانده: ${money(invoiceRemaining(inv))}</div><div class="preview-inv-row head"><b>توضیحات</b><b>تعداد</b><b>مبلغ واحد</b><b>مبلغ</b></div>${rows}<div class="preview-total">جمع کل: <strong>${money(invoiceTotal(inv))}</strong></div>${signRow}</div><div class="actions"><button class="primary" onclick="printInvoice('${inv.id}')">🖨 چاپ / PDF</button><button class="primary" onclick="shareInvoice('${inv.id}')">📤 ارسال فاکتور</button></div>`)
+ const accName=inv.settleAccountId?data.accounts.find(a=>a.id===inv.settleAccountId)?.name:"";
+ const settleLine=(Number(inv.paid)>0&&accName)?` • تسویه به حساب: ${esc(accName)}`:"";
+ openModal(`<div id="invoicePreview" class="invoice-preview"><div class="invoice-head"><div>${b.logo?`<img class="invoice-brand-logo" src="${b.logo}" alt="لوگو">`:""}<h2>فاکتور</h2><b>${esc(inv.seller||b.storeName||"")}</b></div><div>شماره: ${esc(inv.number||"—")}<br>تاریخ: ${invoiceDateLabel(inv.date)}</div></div><h3>${esc(inv.name||"فاکتور")}</h3>${custName?`<div class="meta">مشتری: ${esc(custName)}${cust?.phone?" • "+esc(cust.phone):""}</div>`:""}<div class="meta">وضعیت: ${inv.status==="paid"?"🟢 پرداخت کامل":inv.status==="partial"?"🟡 پرداخت بخشی":"🔴 پرداخت نشده"} • مانده: ${money(invoiceRemaining(inv))}${settleLine}</div><div class="preview-inv-row head"><b>توضیحات</b><b>تعداد</b><b>مبلغ واحد</b><b>مبلغ</b></div>${rows}<div class="preview-total">جمع کل: <strong>${money(invoiceTotal(inv))}</strong></div>${signRow}</div><div class="actions"><button class="primary" onclick="printInvoice('${inv.id}')">🖨 چاپ / PDF</button><button class="primary" onclick="shareInvoice('${inv.id}')">📤 ارسال فاکتور</button></div>`)
 }
 function loadImg(src){return new Promise(resolve=>{if(!src)return resolve(null);const im=new Image();im.onload=()=>resolve(im);im.onerror=()=>resolve(null);im.src=src})}
 async function drawInvoiceCanvas(inv){
