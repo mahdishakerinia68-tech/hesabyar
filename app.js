@@ -1578,31 +1578,41 @@ function saveInvoice(id){
  const customerName=$("invCustomerName")?.value.trim()||"";
  const settleAccountId=$("invSettleAccount")?.value||"";
  const o={name,seller,date,number,items,customerId:$("invCustomer").value||"",customerName,address:$("invAddress").value.trim(),discount,discountPercent,taxRate,paid,settleAccountId,status:$("invStatus").value,total:0};o.total=invoiceTotal(o);if(o.status==="paid")o.paid=o.total;if(o.paid>=o.total&&o.total>0)o.status="paid";else if(o.paid>0)o.status="partial";else o.status="unpaid";
- let x;
- if(id){x=data.invoices.find(v=>v.id===id);if(x){adjustStockForInvoice(x,+1);Object.assign(x,o);touch(x);markDirty("invoices",x.id,false,x,x.updatedAt);adjustStockForInvoice(x,-1)}}else{x=touch({id:uid(),...o});data.invoices.unshift(x);markDirty("invoices",x.id,false,x,x.updatedAt);adjustStockForInvoice(x,-1)}
- if(x){syncPersonForInvoice(x);syncTransactionForInvoice(x)}
+ let x,prevPaid=0;
+ if(id){x=data.invoices.find(v=>v.id===id);if(x){prevPaid=Number(x.paid)||0;adjustStockForInvoice(x,+1);Object.assign(x,o);touch(x);markDirty("invoices",x.id,false,x,x.updatedAt);adjustStockForInvoice(x,-1)}}else{x=touch({id:uid(),...o});data.invoices.unshift(x);markDirty("invoices",x.id,false,x,x.updatedAt);adjustStockForInvoice(x,-1)}
+ if(x){syncPersonForInvoice(x);syncTransactionForInvoice(x,prevPaid)}
  save();logEvent(id?"ویرایش فاکتور":"ساخت فاکتور",`${name} • ${money(o.total)}`,id?"edit":"create");closeModal()
 }
-/* --- ثبت خودکار تراکنش تسویه فاکتور در حساب انتخاب‌شده --- */
-function syncTransactionForInvoice(inv){
+/* --- ثبت خودکار تراکنش تسویه فاکتور در حساب انتخاب‌شده ---
+   نکته مهم: چون ممکن است بخشی از مبلغ فاکتور از بخش «بدهکار/بستانکار» (که تراکنش خودش را جداگانه می‌سازد)
+   تسویه شده باشد، این تابع هرگز کل مبلغ پرداخت‌شده فاکتور را دوباره به‌عنوان تراکنش نمی‌سازد؛ فقط به‌اندازه
+   «تغییر» (دلتا) مبلغ دریافتی نسبت به قبل از این ذخیره را ثبت می‌کند تا مبلغ در حساب دو بار حساب نشود. */
+function syncTransactionForInvoice(inv,prevPaid=0){
  if(!inv)return;
- const paid=Number(inv.paid)||0;
- if(paid>0&&inv.settleAccountId){
+ const paid=Number(inv.paid)||0,delta=paid-(Number(prevPaid)||0);
+ if(delta>0&&inv.settleAccountId){
   let t=inv.settleTxId?data.transactions.find(x=>x.id===inv.settleTxId):null;
   const title=`تسویه فاکتور: ${inv.name||"فاکتور"}`;
   if(!t){
-   t=touch({id:uid(),title,amount:paid,type:"income",category:"تسویه فاکتور",accountID:inv.settleAccountId,date:new Date().toISOString(),source:"invoice-settle",invoiceId:inv.id});
+   t=touch({id:uid(),title,amount:delta,type:"income",category:"تسویه فاکتور",accountID:inv.settleAccountId,date:new Date().toISOString(),source:"invoice-settle",invoiceId:inv.id});
    data.transactions.unshift(t);
    inv.settleTxId=t.id;
   }else{
-   t.title=title;t.amount=paid;t.accountID=inv.settleAccountId;touch(t);
+   t.amount=(Number(t.amount)||0)+delta;t.accountID=inv.settleAccountId;t.title=title;touch(t);
   }
   markDirty("transactions",t.id,false,t,t.updatedAt);
   touch(inv);markDirty("invoices",inv.id,false,inv,inv.updatedAt);
- }else if(inv.settleTxId){
-  removeRecordSilent("transactions",inv.settleTxId);
-  inv.settleTxId="";
-  touch(inv);markDirty("invoices",inv.id,false,inv,inv.updatedAt);
+ }else if(delta<0&&inv.settleTxId){
+  const t=data.transactions.find(x=>x.id===inv.settleTxId);
+  if(t){
+   t.amount=(Number(t.amount)||0)+delta;
+   if(t.amount<=0){removeRecordSilent("transactions",t.id);inv.settleTxId=""}
+   else{touch(t);markDirty("transactions",t.id,false,t,t.updatedAt)}
+   touch(inv);markDirty("invoices",inv.id,false,inv,inv.updatedAt);
+  }
+ }else if(delta===0&&inv.settleTxId&&inv.settleAccountId){
+  const t=data.transactions.find(x=>x.id===inv.settleTxId);
+  if(t&&t.accountID!==inv.settleAccountId){t.accountID=inv.settleAccountId;touch(t);markDirty("transactions",t.id,false,t,t.updatedAt)}
  }
 }
 /* --- اتصال فاکتورهای مانده‌دار/تسویه‌نشده به بخش طلبکاران و همگام‌سازی برگشتی با تراکنش‌ها --- */
