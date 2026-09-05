@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="2.4";
+const APP_VERSION="2.5";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
@@ -9,11 +9,71 @@ const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v1";
 const AUTO_BACKUP_MS=6*60*60*1000;
 const APP_MODE_KEY="hesabdar-app-mode-v1";
 function appMode(){return localStorage.getItem(APP_MODE_KEY)||"business"}
+/* --- رمز ادمین قفل حالت فروشگاه (v2.5) ---
+ * جدا از رمز ورود به برنامه (PIN/الگو) نگه‌داری می‌شود و در localStorage
+ * (نه data./پشتیبان) ذخیره می‌شود تا داخل فایل پشتیبان یا همگام‌سازی ابری
+ * قرار نگیرد. فقط برای خروج از حالت «فروشگاه» لازم است. */
+const ADMIN_PASS_KEY="hesabdar-admin-pass-v1";
+function getAdminPass(){try{return JSON.parse(localStorage.getItem(ADMIN_PASS_KEY)||"null")}catch(e){return null}}
+function hasAdminPass(){const a=getAdminPass();return !!(a&&a.hash&&a.salt)}
+async function verifyAdminPass(pass){const a=getAdminPass();if(!a)return false;const x=await hashPin(pass,a.salt);return x.hash===a.hash}
+async function setAdminPassValue(pass){const x=await hashPin(pass);localStorage.setItem(ADMIN_PASS_KEY,JSON.stringify({hash:x.hash,salt:x.salt}))}
+async function promptSetAdminPass(){
+ const p=prompt("برای ورود به حالت فروشگاه، یک رمز ادمین تعیین کن (حداقل ۴ کاراکتر). فقط با همین رمز می‌شود از حالت فروشگاه خارج شد:");
+ if(p==null)return false;
+ if(p.trim().length<4){alert("رمز ادمین تعیین نشد؛ حداقل ۴ کاراکتر لازم است.");return false}
+ const p2=prompt("رمز ادمین را دوباره وارد کن:");
+ if(p2!==p){alert("رمزها یکسان نبودند؛ دوباره تلاش کن.");return false}
+ await setAdminPassValue(p.trim());
+ alert("رمز ادمین ذخیره شد.");
+ return true
+}
+async function promptVerifyAdminPass(){
+ if(!hasAdminPass())return true;
+ const p=prompt("برای خروج از حالت فروشگاه، رمز ادمین را وارد کن:");
+ if(p==null)return false;
+ const ok=await verifyAdminPass(p);
+ if(!ok)alert("رمز ادمین اشتباه است.");
+ return ok
+}
+function changeAdminPass(){
+ (async()=>{
+  if(hasAdminPass()){
+   const old=prompt("رمز ادمین فعلی را وارد کن:");
+   if(old==null)return;
+   if(!(await verifyAdminPass(old))){alert("رمز فعلی اشتباه است.");return}
+  }
+  const p=prompt("رمز ادمین جدید (حداقل ۴ کاراکتر):");
+  if(p==null)return;
+  if(p.trim().length<4)return alert("رمز جدید نامعتبر است؛ حداقل ۴ کاراکتر لازم است.");
+  const p2=prompt("رمز جدید را دوباره وارد کن:");
+  if(p2!==p)return alert("رمزها یکسان نبودند.");
+  await setAdminPassValue(p.trim());
+  alert("رمز ادمین با موفقیت تغییر کرد.");
+  logEvent("تغییر رمز ادمین","رمز ادمین حالت فروشگاه تغییر کرد","settings");
+ })();
+}
 /* v2.3: added "store" as a third app mode (in addition to "personal"/"business").
-   Selecting it navigates away from notes/reminders/checks if the user happens to
-   be on one of those pages, since store-mode hides them (same guard already used
-   when switching to "personal"). */
-function setAppMode(v){localStorage.setItem(APP_MODE_KEY,v);applyAppMode();if(v==="personal"&&(pageActive("products")||pageActive("customers")||pageActive("invoices")))goToPage("home");if(v==="store"&&(pageActive("notes")||pageActive("reminders")||pageActive("checks")))goToPage("home")}
+   v2.5: "store" is now a locked-down kiosk mode — nothing but the invoice
+   box is reachable from it. Entering it for the first time requires setting
+   an admin password; leaving it (to personal or business) always requires
+   that same admin password, so a random employee can't switch out of it. */
+async function setAppMode(v){
+ const cur=appMode();
+ if(cur===v)return;
+ if(v==="store"&&!hasAdminPass()){
+  const created=await promptSetAdminPass();
+  if(!created)return;
+ }
+ if(cur==="store"&&v!=="store"){
+  const ok=await promptVerifyAdminPass();
+  if(!ok)return;
+ }
+ localStorage.setItem(APP_MODE_KEY,v);applyAppMode();
+ if(v==="personal"&&(pageActive("products")||pageActive("customers")||pageActive("invoices")))goToPage("home");
+ if(v==="store")goToPage("invoices");
+ if(cur==="store"&&v!=="store")goToPage("home");
+}
 function applyAppMode(){
   const m=appMode();
   document.body.classList.toggle("personal-mode",m==="personal");
@@ -22,6 +82,7 @@ function applyAppMode(){
   if(bp)bp.classList.toggle("primary",m==="personal");
   if(bb)bb.classList.toggle("primary",m==="business");
   if(bs)bs.classList.toggle("primary",m==="store");
+  if(m==="store")goToPage("invoices");
 }
 const ANTHROPIC_KEY_STORAGE="hesabdar-anthropic-key-v1";
 const DEVICE_ID_KEY="hesabdar-device-id-v1";
@@ -684,6 +745,8 @@ function showWhatsNewOnce(){
   <div class="whats-new-section">
    <h3>🛠 تغییرات این نسخه</h3>
    <ul>
+    <li>حالت «فروشگاه» تبدیل به یک حالت قفل‌شده شد: در این حالت فقط «صندوق فاکتور» در دسترس است و بقیه‌ی برنامه (حساب‌ها، تراکنش‌ها، گزارش‌ها، مشتری‌ها، تنظیمات و...) کاملاً مخفی می‌شود. بار اول ورود به این حالت یک رمز ادمین تعیین می‌شود؛ برای خروج از حالت فروشگاه (رفتن به حالت کسب‌وکار) همیشه همان رمز ادمین لازم است — از طریق دکمه‌ی «رفتن به حالت کسب‌وکار» بالای صفحه. تغییر رمز ادمین هم از تنظیمات ممکن است.</li>
+    <li>پیش‌فرض فاکتور جدید روی «فاکتور روزانه» تنظیم شد.</li>
     <li>در ساخت فاکتور، بالای فرم یک انتخاب اضافه شد: «فاکتور مشتری» یا «فاکتور روزانه». در حالت فاکتور روزانه فقط نام، شماره تماس و آدرس مشتری همراه ردیف‌های کالا نشان داده می‌شود و بقیه فیلدها (عنوان، فروشنده، تاریخ/شماره، وضعیت پرداخت و تخفیف/مالیات) مخفی می‌مانند تا ثبت فروش‌های روزانه سریع‌تر شود.</li>
     <li>رفع اشکال چاپ/ارسال فاکتور: حالا برای هر فاکتور یک فایل PDF واقعی ساخته می‌شود (نه فقط عکس)؛ روی گوشی از منوی اشتراک‌گذاری می‌توانی مستقیم چاپ یا ارسال کنی.</li>
     <li>رفع اشکال مهم: صفحه «کالا و انبار» هیچ‌وقت به‌روزرسانی نمی‌شد و همیشه خالی به نظر می‌رسید؛ الان درست نمایش داده می‌شود و بالای آن خلاصه تعداد کالا، ارزش انبار و کسری موجودی هم اضافه شده.</li>
@@ -761,6 +824,7 @@ function activatePage(name){
  return page;
 }
 function goToPage(name,fromNav){
+ if(appMode()==="store"&&name!=="invoices")name="invoices";
  if(!$(name))return;
  const page=activatePage(name);
  if(pageHistory[pageHistory.length-1]!==name)pageHistory.push(name);
@@ -1554,7 +1618,7 @@ function openInvoice(id=null){
  const items=inv?.items?.length?inv.items:[{desc:"",qty:1,price:""}];
  const cust=inv?.customerId?data.customers.find(c=>c.id===inv.customerId):null;
  const defAcc=inv?.settleAccountId||data.accounts.find(a=>a.default)?.id||data.accounts[0]?.id||"";
- const invType=inv?.type==="daily"?"daily":"customer";
+ const invType=inv?(inv.type==="daily"?"daily":"customer"):"daily";
  const hideDaily=invType==="daily"?"display:none":"";
  openModal(`<h2>🧾 ${inv?"ویرایش فاکتور":"ساخت فاکتور جدید"}</h2><div class="form invoice-form">
  <div class="tabs inv-type-tabs" id="invTypeTabs">

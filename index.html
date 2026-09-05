@@ -22,7 +22,7 @@
     <button id="menuBtn" class="menu-trigger" aria-label="باز کردن منو" aria-haspopup="true" aria-expanded="false" aria-controls="menuModal">⋯</button>
     <img class="app-logo" src="logo.png" alt="حساب‌یار">
     <div class="top-bar-titles">
-      <h1>حساب‌یار <span class="version-pill" id="versionPill">2.4</span></h1>
+      <h1>حساب‌یار <span class="version-pill" id="versionPill">2.5</span></h1>
       <div id="syncBadge" class="sync-badge">☁️ آفلاین</div>
     </div>
   </div>
@@ -31,6 +31,10 @@
     <button id="theme" aria-label="تغییر حالت روشن/تاریک">☾</button>
   </div>
 </header>
+
+<div id="storeExitBar" class="store-exit-bar">
+  <button class="store-exit-btn" onclick="setAppMode('business')">🔒 رفتن به حالت کسب‌وکار</button>
+</div>
 
 <main>
 
@@ -202,11 +206,14 @@
   <div class="settings settings-page">
 
     <div class="settings-group card" id="stgGroup-mode">
-      <div class="settings-group-head"><span>🧑‍💼</span><div><h3>حالت اپ</h3><p class="hint">«شخصی»: بخش‌های محصولات، مشتری‌ها و فاکتور مخفی می‌شوند. «کسب‌وکاری»: همه بخش‌ها فعال است. «فروشگاه»: انبار + فاکتور + مشتری با هم می‌مانند و یادداشت/یادآوری/چک مخفی می‌شوند. اطلاعات هیچ بخشی پاک نمی‌شود و هر وقت خواستی می‌تونی برگردونیشون.</p></div></div>
+      <div class="settings-group-head"><span>🧑‍💼</span><div><h3>حالت اپ</h3><p class="hint">«شخصی»: بخش‌های محصولات، مشتری‌ها و فاکتور مخفی می‌شوند. «کسب‌وکاری»: همه بخش‌ها فعال است. «فروشگاه»: فقط صندوق فاکتور در دسترس است و بقیه‌ی برنامه (حساب‌ها، تراکنش‌ها، گزارش‌ها، تنظیمات و...) مخفی می‌شود؛ برای ورود اول بار یک رمز ادمین تعیین می‌شود و برای خروج از این حالت همیشه همان رمز لازم است. اطلاعات هیچ بخشی پاک نمی‌شود و هر وقت خواستی می‌تونی برگردونیشون.</p></div></div>
       <div class="settings-actions">
         <button id="appModeBtnPersonal" onclick="setAppMode('personal')">👤 شخصی</button>
         <button id="appModeBtnBusiness" onclick="setAppMode('business')">🏪 کسب‌وکاری</button>
         <button id="appModeBtnStore" onclick="setAppMode('store')">🏬 فروشگاه</button>
+      </div>
+      <div class="settings-actions">
+        <button onclick="changeAdminPass()">🔑 تغییر رمز ادمین فروشگاه</button>
       </div>
     </div>
 
