@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="2.5";
+const APP_VERSION="2.5.1";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
@@ -745,6 +745,7 @@ function showWhatsNewOnce(){
   <div class="whats-new-section">
    <h3>🛠 تغییرات این نسخه</h3>
    <ul>
+    <li>رفع اشکال امنیتی مهم قفل حالت «فروشگاه»: برگشت با دکمه سخت‌افزاری گوشی یا سوایپ لبه صفحه (که خودش رمز ادمین نمی‌خواست) می‌توانست از قفل خارج شود و صفحه‌ای که قبل از ورود به فروشگاه باز بود (مثلاً حساب‌ها یا تنظیمات) را نشان بدهد؛ الان دکمه برگشت و سوایپ هم مثل بقیه راه‌های ناوبری کاملاً داخل حالت فروشگاه محدود به «صندوق فاکتور» می‌مانند.</li>
     <li>حالت «فروشگاه» تبدیل به یک حالت قفل‌شده شد: در این حالت فقط «صندوق فاکتور» در دسترس است و بقیه‌ی برنامه (حساب‌ها، تراکنش‌ها، گزارش‌ها، مشتری‌ها، تنظیمات و...) کاملاً مخفی می‌شود. بار اول ورود به این حالت یک رمز ادمین تعیین می‌شود؛ برای خروج از حالت فروشگاه (رفتن به حالت کسب‌وکار) همیشه همان رمز ادمین لازم است — از طریق دکمه‌ی «رفتن به حالت کسب‌وکار» بالای صفحه. تغییر رمز ادمین هم از تنظیمات ممکن است.</li>
     <li>پیش‌فرض فاکتور جدید روی «فاکتور روزانه» تنظیم شد.</li>
     <li>در ساخت فاکتور، بالای فرم یک انتخاب اضافه شد: «فاکتور مشتری» یا «فاکتور روزانه». در حالت فاکتور روزانه فقط نام، شماره تماس و آدرس مشتری همراه ردیف‌های کالا نشان داده می‌شود و بقیه فیلدها (عنوان، فروشنده، تاریخ/شماره، وضعیت پرداخت و تخفیف/مالیات) مخفی می‌مانند تا ثبت فروش‌های روزانه سریع‌تر شود.</li>
@@ -815,6 +816,14 @@ document.addEventListener("click",e=>{if(e.target.closest("button,.nav"))tapFeed
 /* ---- Page navigation with back-history (supports hardware/gesture back) ---- */
 let pageHistory=["home"];
 function activatePage(name){
+ /* v2.5.1: enforce the store-mode lock at this single choke point too —
+    goBackPage() (hardware back button / edge swipe-back) used to call
+    activatePage() directly with whatever page was earlier in pageHistory
+    (e.g. "home", "settings", "accounts" from before the store was
+    entered), completely bypassing the goToPage() guard below. That let
+    a swipe or the phone's back button reveal the full app from inside
+    the locked kiosk. Guarding here closes that regardless of caller. */
+ if(appMode()==="store"&&name!=="invoices")name="invoices";
  document.querySelectorAll(".nav").forEach(x=>x.classList.remove("active"));
  document.querySelectorAll(`.nav[data-page="${name}"]`).forEach(x=>x.classList.add("active"));
  document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));
@@ -832,6 +841,10 @@ function goToPage(name,fromNav){
  logEvent("ورود به بخش",page?.querySelector("h2")?.textContent||name,"nav");
 }
 function goBackPage(){
+ /* در حالت فروشگاه چیزی برای برگشتن وجود ندارد؛ فقط همان صندوق فاکتور
+    می‌ماند (فراتر از قفل activatePage، تا استک تاریخچه صفحات هم درگیر
+    صفحات قدیمی قبل از ورود به حالت فروشگاه نشود). */
+ if(appMode()==="store")return false;
  if(pageHistory.length>1){
   pageHistory.pop();
   activatePage(pageHistory[pageHistory.length-1]);
