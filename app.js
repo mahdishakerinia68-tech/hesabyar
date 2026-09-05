@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="3.2";
+const APP_VERSION="3.3";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
@@ -749,9 +749,10 @@ function showWhatsNewOnce(){
   <h2>🎉 به حساب‌یار خوش آمدی</h2>
   <p class="hint">این صفحه فقط یک‌بار در اولین اجرای این نسخه نمایش داده می‌شود.</p>
   <div class="whats-new-section">
-   <h3>🛠 تغییرات این نسخه (۳.۲)</h3>
+   <h3>🛠 تغییرات این نسخه (۳.۳)</h3>
    <ul>
-    <li>یک راه جدید برای ارسال فاکتور اضافه شد: «🖼 ارسال عکس». علاوه بر PDF، حالا می‌توانی همان فاکتور را به‌صورت یک فایل عکس (PNG) با کیفیت بالا (دو برابر وضوح حالت PDF) بسازی و از طریق پیامک، واتس‌اپ یا هر اپ دیگری ارسال کنی؛ دکمه‌ی آن هم در صفحه‌ی پیش‌نمایش فاکتور و هم کنار بقیه‌ی دکمه‌های هر فاکتور در «صندوق فاکتور» اضافه شده.</li>
+    <li>در ساخت فاکتور، فیلد «نام کالا/خدمت» حالا هرچی تایپ کنی زنده داخل کالاهای انبار سرچ می‌کند و پیشنهاد می‌دهد؛ با زدن روی پیشنهاد، قیمت واحد خودکار پر می‌شود و همان کالا برای کسر از موجودی انبار به فاکتور وصل می‌ماند.</li>
+    <li>در فاکتور مشتری، وقتی از «انتخاب از لیست مشتری‌ها» یک مشتری را انتخاب می‌کنی، نام/شماره تماس/آدرس فاکتور خودکار از روی همان پرونده‌ی مشتری پر می‌شود.</li>
    </ul>
   </div>
   <div class="whats-new-section">
@@ -1627,9 +1628,34 @@ function empty(s){return `<div class="card" style="text-align:center">${s}</div>
 
 function invoiceDateLabel(v){return jalaliLabel(v)}
 function invField(label,hint,inner){return `<div class="field"><span class="field-cap">${esc(label)}</span>${inner}${hint?`<small class="field-hint">${esc(hint)}</small>`:""}</div>`}
-function invoiceRowHTML(item,i){return `<div class="invoice-row"><select class="inv-product" onchange="invoiceProductPick(this)"><option value="">کالا / خدمت از انبار (اختیاری)</option>${data.products.map(p=>`<option value="${p.id}" ${p.id===item?.productId?"selected":""}>${esc(p.name)}</option>`).join("")}</select><input class="inv-desc" placeholder="مثلاً: نصب و راه‌اندازی سیستم" value="${esc(item?.desc||"")}"><input class="inv-qty" oninput="updateInvoiceLiveTotal()" type="number" min="0" step="any" placeholder="تعداد" value="${Number(item?.qty)||""}"><input class="inv-price" oninput="updateInvoiceLiveTotal()" type="number" min="0" step="any" placeholder="قیمت هر واحد" value="${Number(item?.price)||""}"><button type="button" class="danger-icon" title="حذف ردیف" onclick="this.parentElement.remove();updateInvoiceLiveTotal()">🗑</button></div>`}
+function invoiceRowHTML(item,i){return `<div class="invoice-row"><input type="hidden" class="inv-product" value="${esc(item?.productId||"")}"><input class="inv-desc" list="invProductsList" autocomplete="off" placeholder="نام کالا یا خدمت (تایپ کن تا از انبار پیشنهاد بیاید)" value="${esc(item?.desc||"")}" oninput="onInvDescInput(this)"><input class="inv-qty" oninput="updateInvoiceLiveTotal()" type="number" min="0" step="any" placeholder="تعداد" value="${Number(item?.qty)||""}"><input class="inv-price" oninput="this.dataset.userEdited='1';updateInvoiceLiveTotal()" type="number" min="0" step="any" placeholder="قیمت هر واحد" value="${Number(item?.price)||""}"><button type="button" class="danger-icon" title="حذف ردیف" onclick="this.parentElement.remove();updateInvoiceLiveTotal()">🗑</button></div>`}
 function addInvoiceRow(pref={}){const box=$("invoiceRows");if(!box)return;const div=document.createElement("div");div.innerHTML=invoiceRowHTML(pref,box.children.length);box.appendChild(div.firstElementChild)}
-function invoiceProductPick(sel){const p=data.products.find(x=>x.id===sel.value);const row=sel.closest(".invoice-row");if(!p||!row)return;row.querySelector(".inv-desc").value=p.name;row.querySelector(".inv-price").value=p.price||0;updateInvoiceLiveTotal()}
+/* v3.3: جایگزین select کالا شد با سرچ زنده روی همون فیلد «توضیحات» —
+ * هرچی تایپ کنی، لیست کالاهای انبار (از طریق <datalist>) فیلتر و پیشنهاد
+ * می‌شود؛ با زدن روی یک پیشنهاد، قیمت واحد و productId (برای کسر از
+ * موجودی انبار هنگام ذخیره) خودکار پر می‌شود. اگر متن تایپ‌شده دقیقاً با
+ * هیچ کالایی مطابق نباشد (مثلاً یک خدمت دلخواه)، فقط همان توضیح متنی ساده
+ * ذخیره می‌شود، بدون اتصال به انبار. */
+function onInvDescInput(input){
+ const row=input.closest(".invoice-row");if(!row)return;
+ const val=input.value.trim().toLowerCase();
+ const hidden=row.querySelector(".inv-product");
+ const p=val?data.products.find(x=>(x.name||"").trim().toLowerCase()===val):null;
+ if(p){hidden.value=p.id;const priceEl=row.querySelector(".inv-price");if(priceEl&&!priceEl.dataset.userEdited)priceEl.value=p.price||0}
+ else hidden.value="";
+ updateInvoiceLiveTotal();
+}
+/* v3.3: انتخاب مشتری از لیست پرونده‌ها → نام/تلفن/آدرس فاکتور خودکار از
+ * همان پرونده‌ی مشتری پر می‌شود تا لازم نباشد دوباره تایپ کنی. */
+function invoiceCustomerPick(sel){
+ const c=data.customers.find(x=>x.id===sel.value);
+ if(!c)return;
+ const nameEl=$("invCustomerName"),phoneEl=$("invPhone"),addrEl=$("invAddress");
+ if(nameEl)nameEl.value=c.name||"";
+ if(phoneEl)phoneEl.value=c.phone||"";
+ if(addrEl)addrEl.value=c.address||"";
+}
+
 function openInvoice(id=null){
  const inv=id&&data.invoices.find(x=>x.id===id);
  const items=inv?.items?.length?inv.items:[{desc:"",qty:1,price:""}];
@@ -1652,7 +1678,7 @@ function openInvoice(id=null){
  ${invField("شماره تماس","شماره تماس مشتری برای این فاکتور",`<input id="invPhone" inputmode="tel" placeholder="مثلاً: ۰۹۱۲xxxxxxx" value="${esc(inv?.phone||cust?.phone||"")}">`)}
  </div>
  <div class="inv-hide-daily" style="${hideDaily}">
- ${invField("انتخاب از لیست مشتری‌ها","اختیاری؛ برای اتصال فاکتور به پرونده مشتری",`<select id="invCustomer"><option value="">بدون اتصال به پرونده مشتری</option>${data.customers.map(c=>`<option value="${c.id}" ${c.id===inv?.customerId?"selected":""}>${esc(c.name)}${c.phone?" • "+esc(c.phone):""}</option>`).join("")}</select>`)}
+ ${invField("انتخاب از لیست مشتری‌ها","اختیاری؛ با انتخاب مشتری، نام/تلفن/آدرس از پرونده‌اش خودکار پر می‌شود",`<select id="invCustomer" onchange="invoiceCustomerPick(this)"><option value="">بدون اتصال به پرونده مشتری</option>${data.customers.map(c=>`<option value="${c.id}" ${c.id===inv?.customerId?"selected":""}>${esc(c.name)}${c.phone?" • "+esc(c.phone):""}</option>`).join("")}</select>`)}
  </div>
  <div class="inv-hide-daily" style="${hideDaily}">
  <div class="two-fields">
@@ -1673,7 +1699,8 @@ function openInvoice(id=null){
  ${invField("مالیات بر ارزش‌افزوده","درصدی که بعد از کسر تخفیف به قیمت اضافه می‌شود (٪)",`<input id="invTax" oninput="updateInvoiceLiveTotal()" type="number" min="0" placeholder="۰" value="${Number(inv?.taxRate)||0}">`)}
  </div>
  ${invField("آدرس","اختیاری؛ آدرس مشتری",`<textarea id="invAddress" placeholder="مثلاً: تهران، خیابان ...">${esc(inv?.address||cust?.address||"")}</textarea>`)}
- <div class="invoice-table-head"><span>کالا</span><span>توضیحات</span><span>تعداد</span><span>مبلغ واحد</span><span></span></div>
+ <div class="invoice-table-head"><span>توضیحات / نام کالا</span><span>تعداد</span><span>مبلغ واحد</span><span></span></div>
+ <datalist id="invProductsList">${data.products.map(p=>`<option value="${esc(p.name)}">`).join("")}</datalist>
  <div id="invoiceRows">${items.map(invoiceRowHTML).join("")}</div>
  <button type="button" class="ghost-btn" onclick="addInvoiceRow()">＋ افزودن ردیف کالا یا خدمت</button>
  <div class="invoice-total-box"><div class="inv-total-row"><span>جمع اقلام</span><strong id="invLiveSubtotal">۰ تومان</strong></div><div class="inv-total-row"><span>تخفیف و مالیات</span><strong id="invLiveAdjust">۰ تومان</strong></div><div class="inv-total-row inv-total-final"><span>مبلغ نهایی فاکتور</span><strong id="invLiveTotal">۰ تومان</strong></div></div>

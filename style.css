@@ -282,8 +282,8 @@ body:not(.dark) .sheet .close{background:#E5E5EA}
 .brand-preview-img{max-width:100%;max-height:90px;border-radius:10px;margin:4px 0}
 
 /* invoice builder */
-.invoice-table-head{display:grid;grid-template-columns:1.1fr 1.6fr .7fr .9fr .3fr;gap:6px;font-size:10.5px;color:var(--label2);padding:0 4px;font-weight:700}
-.invoice-row{display:grid;grid-template-columns:1.1fr 1.6fr .7fr .9fr .3fr;gap:6px;align-items:center}
+.invoice-table-head{display:grid;grid-template-columns:2.2fr .7fr .9fr .3fr;gap:6px;font-size:10.5px;color:var(--label2);padding:0 4px;font-weight:700}
+.invoice-row{display:grid;grid-template-columns:2.2fr .7fr .9fr .3fr;gap:6px;align-items:center}
 .invoice-row select,.invoice-row input{padding:9px 8px;font-size:12.5px;border-radius:9px;border:.5px solid var(--sep);background:var(--card);color:var(--label);width:100%;min-width:0}
 .invoice-row button{border:none;background:color-mix(in srgb, var(--red) 12%, transparent);color:var(--red);border-radius:8px;height:32px}
 /* On narrow phones, five squeezed columns get unreadable — stack each row
@@ -292,11 +292,10 @@ body:not(.dark) .sheet .close{background:#E5E5EA}
   .invoice-table-head{display:none}
   .invoice-row{
     grid-template-columns:1fr 1fr;
-    grid-template-areas:"product product" "desc desc" "qty price" "del del";
+    grid-template-areas:"desc desc" "qty price" "del del";
     background:var(--card);border:.5px solid var(--sep);border-radius:var(--radius-sm);
     padding:8px;margin-bottom:8px;
   }
-  .invoice-row .inv-product{grid-area:product}
   .invoice-row .inv-desc{grid-area:desc}
   .invoice-row .inv-qty{grid-area:qty}
   .invoice-row .inv-price{grid-area:price}
