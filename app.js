@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="2.5.1";
+const APP_VERSION="3.0";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
@@ -57,32 +57,41 @@ function changeAdminPass(){
    v2.5: "store" is now a locked-down kiosk mode — nothing but the invoice
    box is reachable from it. Entering it for the first time requires setting
    an admin password; leaving it (to personal or business) always requires
-   that same admin password, so a random employee can't switch out of it. */
+   that same admin password, so a random employee can't switch out of it.
+   v3: added "warehouse" — the same locked-kiosk idea as "store", but the
+   only reachable page is «کالا و انبار» (products) instead of the invoice
+   box. Meant for handing the phone/tablet to someone who should only be
+   able to see/manage inventory. Uses the same shared admin password as
+   store mode to enter/exit. */
+const LOCKED_MODES=["store","warehouse"];
+const LOCKED_MODE_PAGE={store:"invoices",warehouse:"products"};
 async function setAppMode(v){
  const cur=appMode();
  if(cur===v)return;
- if(v==="store"&&!hasAdminPass()){
+ if(LOCKED_MODES.includes(v)&&!hasAdminPass()){
   const created=await promptSetAdminPass();
   if(!created)return;
  }
- if(cur==="store"&&v!=="store"){
+ if(LOCKED_MODES.includes(cur)&&!LOCKED_MODES.includes(v)){
   const ok=await promptVerifyAdminPass();
   if(!ok)return;
  }
  localStorage.setItem(APP_MODE_KEY,v);applyAppMode();
  if(v==="personal"&&(pageActive("products")||pageActive("customers")||pageActive("invoices")))goToPage("home");
- if(v==="store")goToPage("invoices");
- if(cur==="store"&&v!=="store")goToPage("home");
+ if(LOCKED_MODES.includes(v))goToPage(LOCKED_MODE_PAGE[v]);
+ if(LOCKED_MODES.includes(cur)&&!LOCKED_MODES.includes(v))goToPage("home");
 }
 function applyAppMode(){
   const m=appMode();
   document.body.classList.toggle("personal-mode",m==="personal");
   document.body.classList.toggle("store-mode",m==="store");
-  const bp=$("appModeBtnPersonal"),bb=$("appModeBtnBusiness"),bs=$("appModeBtnStore");
+  document.body.classList.toggle("warehouse-mode",m==="warehouse");
+  const bp=$("appModeBtnPersonal"),bb=$("appModeBtnBusiness"),bs=$("appModeBtnStore"),bw=$("appModeBtnWarehouse");
   if(bp)bp.classList.toggle("primary",m==="personal");
   if(bb)bb.classList.toggle("primary",m==="business");
   if(bs)bs.classList.toggle("primary",m==="store");
-  if(m==="store")goToPage("invoices");
+  if(bw)bw.classList.toggle("primary",m==="warehouse");
+  if(LOCKED_MODES.includes(m))goToPage(LOCKED_MODE_PAGE[m]);
 }
 const ANTHROPIC_KEY_STORAGE="hesabdar-anthropic-key-v1";
 const DEVICE_ID_KEY="hesabdar-device-id-v1";
@@ -743,15 +752,10 @@ function showWhatsNewOnce(){
   <h2>🎉 به حساب‌یار خوش آمدی</h2>
   <p class="hint">این صفحه فقط یک‌بار در اولین اجرای این نسخه نمایش داده می‌شود.</p>
   <div class="whats-new-section">
-   <h3>🛠 تغییرات این نسخه</h3>
+   <h3>🛠 تغییرات این نسخه (۳.۰)</h3>
    <ul>
-    <li>رفع اشکال امنیتی مهم قفل حالت «فروشگاه»: برگشت با دکمه سخت‌افزاری گوشی یا سوایپ لبه صفحه (که خودش رمز ادمین نمی‌خواست) می‌توانست از قفل خارج شود و صفحه‌ای که قبل از ورود به فروشگاه باز بود (مثلاً حساب‌ها یا تنظیمات) را نشان بدهد؛ الان دکمه برگشت و سوایپ هم مثل بقیه راه‌های ناوبری کاملاً داخل حالت فروشگاه محدود به «صندوق فاکتور» می‌مانند.</li>
-    <li>حالت «فروشگاه» تبدیل به یک حالت قفل‌شده شد: در این حالت فقط «صندوق فاکتور» در دسترس است و بقیه‌ی برنامه (حساب‌ها، تراکنش‌ها، گزارش‌ها، مشتری‌ها، تنظیمات و...) کاملاً مخفی می‌شود. بار اول ورود به این حالت یک رمز ادمین تعیین می‌شود؛ برای خروج از حالت فروشگاه (رفتن به حالت کسب‌وکار) همیشه همان رمز ادمین لازم است — از طریق دکمه‌ی «رفتن به حالت کسب‌وکار» بالای صفحه. تغییر رمز ادمین هم از تنظیمات ممکن است.</li>
-    <li>پیش‌فرض فاکتور جدید روی «فاکتور روزانه» تنظیم شد.</li>
-    <li>در ساخت فاکتور، بالای فرم یک انتخاب اضافه شد: «فاکتور مشتری» یا «فاکتور روزانه». در حالت فاکتور روزانه فقط نام، شماره تماس و آدرس مشتری همراه ردیف‌های کالا نشان داده می‌شود و بقیه فیلدها (عنوان، فروشنده، تاریخ/شماره، وضعیت پرداخت و تخفیف/مالیات) مخفی می‌مانند تا ثبت فروش‌های روزانه سریع‌تر شود.</li>
-    <li>رفع اشکال چاپ/ارسال فاکتور: حالا برای هر فاکتور یک فایل PDF واقعی ساخته می‌شود (نه فقط عکس)؛ روی گوشی از منوی اشتراک‌گذاری می‌توانی مستقیم چاپ یا ارسال کنی.</li>
-    <li>رفع اشکال مهم: صفحه «کالا و انبار» هیچ‌وقت به‌روزرسانی نمی‌شد و همیشه خالی به نظر می‌رسید؛ الان درست نمایش داده می‌شود و بالای آن خلاصه تعداد کالا، ارزش انبار و کسری موجودی هم اضافه شده.</li>
-    <li>یک حالت اپ جدید اضافه شد: «فروشگاه» — در این حالت انبار، فاکتور و مشتری‌ها با هم می‌مانند و یادداشت/یادآوری/چک مخفی می‌شوند.</li>
+    <li>یک حالت اپ جدید اضافه شد: «📦 انبار». این حالت هم مثل «فروشگاه» یک حالت قفل‌شده (کیوسک) است، با این تفاوت که فقط صفحه‌ی «کالا و انبار» در دسترس می‌ماند و بقیه‌ی برنامه (حساب‌ها، تراکنش‌ها، فاکتور، مشتری‌ها، گزارش‌ها، تنظیمات و...) کاملاً مخفی می‌شود. مناسب زمانی که می‌خواهی فقط دسترسی به موجودی انبار را به کسی بدهی. رمز ادمین همان رمز مشترک با حالت «فروشگاه» است؛ برای خروج از حالت انبار (رفتن به حالت کسب‌وکار) همیشه همان رمز لازم است.</li>
+    <li>در فاکتور روزانه (ساده) فیلد «تسویه به حساب» اضافه شد: حالا در فاکتور روزانه هم می‌توانی انتخاب کنی مبلغ فاکتور در کدام حساب ثبت شود؛ چون فاکتور روزانه برای فروش نقدی همان‌لحظه است، کل مبلغ به‌صورت خودکار تسویه‌شده در نظر گرفته می‌شود و یک تراکنش دریافتی در همان حساب ثبت می‌گردد.</li>
    </ul>
   </div>
   <div class="whats-new-section">
@@ -823,7 +827,7 @@ function activatePage(name){
     entered), completely bypassing the goToPage() guard below. That let
     a swipe or the phone's back button reveal the full app from inside
     the locked kiosk. Guarding here closes that regardless of caller. */
- if(appMode()==="store"&&name!=="invoices")name="invoices";
+ if(LOCKED_MODES.includes(appMode())&&name!==LOCKED_MODE_PAGE[appMode()])name=LOCKED_MODE_PAGE[appMode()];
  document.querySelectorAll(".nav").forEach(x=>x.classList.remove("active"));
  document.querySelectorAll(`.nav[data-page="${name}"]`).forEach(x=>x.classList.add("active"));
  document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));
@@ -833,7 +837,7 @@ function activatePage(name){
  return page;
 }
 function goToPage(name,fromNav){
- if(appMode()==="store"&&name!=="invoices")name="invoices";
+ if(LOCKED_MODES.includes(appMode())&&name!==LOCKED_MODE_PAGE[appMode()])name=LOCKED_MODE_PAGE[appMode()];
  if(!$(name))return;
  const page=activatePage(name);
  if(pageHistory[pageHistory.length-1]!==name)pageHistory.push(name);
@@ -841,10 +845,10 @@ function goToPage(name,fromNav){
  logEvent("ورود به بخش",page?.querySelector("h2")?.textContent||name,"nav");
 }
 function goBackPage(){
- /* در حالت فروشگاه چیزی برای برگشتن وجود ندارد؛ فقط همان صندوق فاکتور
-    می‌ماند (فراتر از قفل activatePage، تا استک تاریخچه صفحات هم درگیر
-    صفحات قدیمی قبل از ورود به حالت فروشگاه نشود). */
- if(appMode()==="store")return false;
+ /* در حالت‌های قفل‌شده (فروشگاه/انبار) چیزی برای برگشتن وجود ندارد؛ فقط
+    همان صفحه‌ی مجاز می‌ماند (فراتر از قفل activatePage، تا استک تاریخچه
+    صفحات هم درگیر صفحات قدیمی قبل از ورود به این حالت‌ها نشود). */
+ if(LOCKED_MODES.includes(appMode()))return false;
  if(pageHistory.length>1){
   pageHistory.pop();
   activatePage(pageHistory[pageHistory.length-1]);
@@ -1659,7 +1663,9 @@ function openInvoice(id=null){
  ${invField("وضعیت پرداخت","بر اساس مبلغ دریافتی به‌صورت خودکار هم به‌روزرسانی می‌شود",`<select id="invStatus"><option value="unpaid" ${inv?.status!=="paid"&&inv?.status!=="partial"?"selected":""}>🔴 پرداخت نشده</option><option value="partial" ${inv?.status==="partial"?"selected":""}>🟡 پرداخت بخشی</option><option value="paid" ${inv?.status==="paid"?"selected":""}>🟢 پرداخت کامل</option></select>`)}
  ${invField("مبلغ دریافت‌شده","تا امروز از مشتری چقدر گرفته‌ای (تومان)",`<input id="invPaid" oninput="updateInvoiceLiveTotal()" type="number" min="0" placeholder="۰" value="${Number(inv?.paid)||0}">`)}
  </div>
- ${invField("تسویه به حساب","این مبلغ دریافتی در این حساب ثبت می‌شود و به تراکنش‌ها اضافه می‌گردد",accountSelect("invSettleAccount",defAcc))}
+ </div>
+ ${invField("تسویه به حساب",invType==="daily"?"مبلغ فاکتور تسویه‌شده در نظر گرفته می‌شود و در این حساب ثبت می‌شود":"این مبلغ دریافتی در این حساب ثبت می‌شود و به تراکنش‌ها اضافه می‌گردد",accountSelect("invSettleAccount",defAcc))}
+ <div class="inv-hide-daily" style="${hideDaily}">
  <div class="two-fields">
  ${invField("تخفیف مبلغی","مبلغ ثابتی که از جمع کل کم می‌شود (تومان)",`<input id="invDiscount" oninput="updateInvoiceLiveTotal()" type="number" min="0" placeholder="۰" value="${Number(inv?.discount)||0}">`)}
  ${invField("تخفیف درصدی","درصدی که بعد از تخفیف مبلغی کم می‌شود (٪)",`<input id="invDiscountPercent" oninput="updateInvoiceLiveTotal()" type="number" min="0" max="100" placeholder="۰" value="${Number(inv?.discountPercent)||0}">`)}
@@ -1704,7 +1710,13 @@ function saveInvoice(id){
  const customerName=$("invCustomerName")?.value.trim()||"";
  const phone=$("invPhone")?.value.trim()||"";
  const settleAccountId=$("invSettleAccount")?.value||"";
- const o={type,name,seller,date,number,items,customerId:$("invCustomer")?.value||"",customerName,phone,address:$("invAddress").value.trim(),discount,discountPercent,taxRate,paid,settleAccountId,status:$("invStatus").value,total:0};o.total=invoiceTotal(o);if(o.status==="paid")o.paid=o.total;if(o.paid>=o.total&&o.total>0)o.status="paid";else if(o.paid>0)o.status="partial";else o.status="unpaid";
+ const o={type,name,seller,date,number,items,customerId:$("invCustomer")?.value||"",customerName,phone,address:$("invAddress").value.trim(),discount,discountPercent,taxRate,paid,settleAccountId,status:$("invStatus").value,total:0};o.total=invoiceTotal(o);
+ /* فاکتور روزانه (ساده) فیلد جدا برای وضعیت پرداخت/مبلغ دریافتی ندارد؛
+    چون این نوع فاکتور برای فروش نقدی و همان‌لحظه است، کل مبلغ به‌صورت
+    خودکار «تسویه‌شده» در نظر گرفته می‌شود تا انتخاب «تسویه به حساب» واقعاً
+    یک تراکنش در همان حساب ثبت کند. */
+ if(type==="daily")o.paid=o.total;
+ if(o.status==="paid")o.paid=o.total;if(o.paid>=o.total&&o.total>0)o.status="paid";else if(o.paid>0)o.status="partial";else o.status="unpaid";
  let x;
  if(id){x=data.invoices.find(v=>v.id===id);if(x){adjustStockForInvoice(x,+1);Object.assign(x,o);touch(x);markDirty("invoices",x.id,false,x,x.updatedAt);adjustStockForInvoice(x,-1)}}else{x=touch({id:uid(),...o});data.invoices.unshift(x);markDirty("invoices",x.id,false,x,x.updatedAt);adjustStockForInvoice(x,-1)}
  if(x){syncPersonForInvoice(x);syncTransactionForInvoice(x)}

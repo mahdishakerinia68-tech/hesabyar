@@ -584,6 +584,25 @@ body.store-mode #menuBtn{display:none!important}
 body.store-mode .store-exit-bar{display:flex;justify-content:center;padding:8px 12px;background:var(--card);border-bottom:.5px solid var(--sep)}
 .store-exit-btn{border:none;border-radius:999px;padding:10px 18px;font-weight:700;font-size:13px;background:var(--blue);color:#fff}
 .store-exit-btn:active{transform:scale(.97)}
+/* v3: "warehouse" app mode — locked kiosk mode limited to صفحه‌ی «کالا و
+   انبار» (products) only; same idea/markup as store-mode above, reusing
+   .store-exit-btn styling for its own exit bar. */
+body.warehouse-mode [data-page="home"],
+body.warehouse-mode [data-page="transactions"],
+body.warehouse-mode [data-page="reports"],
+body.warehouse-mode [data-page="accounts"],
+body.warehouse-mode [data-page="people"],
+body.warehouse-mode [data-page="customers"],
+body.warehouse-mode [data-page="invoices"],
+body.warehouse-mode [data-page="checks"],
+body.warehouse-mode [data-page="reminders"],
+body.warehouse-mode [data-page="notes"],
+body.warehouse-mode [data-page="categories"],
+body.warehouse-mode [data-page="settings"],
+body.warehouse-mode #menuBtn{display:none!important}
+.warehouse-exit-bar{display:none}
+body.warehouse-mode .warehouse-exit-bar{display:flex;justify-content:center;padding:8px 12px;background:var(--card);border-bottom:.5px solid var(--sep)}
+#appModeBtnStore.primary,#appModeBtnWarehouse.primary{background:var(--blue);color:#fff}
 .inventory-summary{display:flex;gap:8px;margin:10px 0;flex-wrap:wrap}
 .inventory-summary .inv-stat{flex:1;min-width:100px;background:var(--card);border:1px solid var(--sep);border-radius:12px;padding:10px 12px;text-align:center}
 .inventory-summary .inv-stat b{display:block;font-size:17px;margin-top:2px}
