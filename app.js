@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="3.0";
+const APP_VERSION="3.1";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
@@ -58,13 +58,12 @@ function changeAdminPass(){
    box is reachable from it. Entering it for the first time requires setting
    an admin password; leaving it (to personal or business) always requires
    that same admin password, so a random employee can't switch out of it.
-   v3: added "warehouse" — the same locked-kiosk idea as "store", but the
-   only reachable page is «کالا و انبار» (products) instead of the invoice
-   box. Meant for handing the phone/tablet to someone who should only be
-   able to see/manage inventory. Uses the same shared admin password as
-   store mode to enter/exit. */
-const LOCKED_MODES=["store","warehouse"];
-const LOCKED_MODE_PAGE={store:"invoices",warehouse:"products"};
+   v3.1: "store" now also allows reaching «کالا و انبار» (products) from
+   inside the kiosk — not just the invoice box — via the hamburger menu
+   (kept visible in store mode, with every other menu item still hidden).
+   No separate mode; store mode itself just has two reachable pages now. */
+const LOCKED_MODES=["store"];
+const STORE_ALLOWED_PAGES=["invoices","products"];
 async function setAppMode(v){
  const cur=appMode();
  if(cur===v)return;
@@ -78,20 +77,18 @@ async function setAppMode(v){
  }
  localStorage.setItem(APP_MODE_KEY,v);applyAppMode();
  if(v==="personal"&&(pageActive("products")||pageActive("customers")||pageActive("invoices")))goToPage("home");
- if(LOCKED_MODES.includes(v))goToPage(LOCKED_MODE_PAGE[v]);
- if(LOCKED_MODES.includes(cur)&&!LOCKED_MODES.includes(v))goToPage("home");
+ if(v==="store")goToPage("invoices");
+ if(cur==="store"&&v!=="store")goToPage("home");
 }
 function applyAppMode(){
   const m=appMode();
   document.body.classList.toggle("personal-mode",m==="personal");
   document.body.classList.toggle("store-mode",m==="store");
-  document.body.classList.toggle("warehouse-mode",m==="warehouse");
-  const bp=$("appModeBtnPersonal"),bb=$("appModeBtnBusiness"),bs=$("appModeBtnStore"),bw=$("appModeBtnWarehouse");
+  const bp=$("appModeBtnPersonal"),bb=$("appModeBtnBusiness"),bs=$("appModeBtnStore");
   if(bp)bp.classList.toggle("primary",m==="personal");
   if(bb)bb.classList.toggle("primary",m==="business");
   if(bs)bs.classList.toggle("primary",m==="store");
-  if(bw)bw.classList.toggle("primary",m==="warehouse");
-  if(LOCKED_MODES.includes(m))goToPage(LOCKED_MODE_PAGE[m]);
+  if(m==="store"&&!STORE_ALLOWED_PAGES.some(pageActive))goToPage("invoices");
 }
 const ANTHROPIC_KEY_STORAGE="hesabdar-anthropic-key-v1";
 const DEVICE_ID_KEY="hesabdar-device-id-v1";
@@ -752,9 +749,9 @@ function showWhatsNewOnce(){
   <h2>🎉 به حساب‌یار خوش آمدی</h2>
   <p class="hint">این صفحه فقط یک‌بار در اولین اجرای این نسخه نمایش داده می‌شود.</p>
   <div class="whats-new-section">
-   <h3>🛠 تغییرات این نسخه (۳.۰)</h3>
+   <h3>🛠 تغییرات این نسخه (۳.۱)</h3>
    <ul>
-    <li>یک حالت اپ جدید اضافه شد: «📦 انبار». این حالت هم مثل «فروشگاه» یک حالت قفل‌شده (کیوسک) است، با این تفاوت که فقط صفحه‌ی «کالا و انبار» در دسترس می‌ماند و بقیه‌ی برنامه (حساب‌ها، تراکنش‌ها، فاکتور، مشتری‌ها، گزارش‌ها، تنظیمات و...) کاملاً مخفی می‌شود. مناسب زمانی که می‌خواهی فقط دسترسی به موجودی انبار را به کسی بدهی. رمز ادمین همان رمز مشترک با حالت «فروشگاه» است؛ برای خروج از حالت انبار (رفتن به حالت کسب‌وکار) همیشه همان رمز لازم است.</li>
+    <li>حالت «فروشگاه» به‌جای اینکه فقط «صندوق فاکتور» را نشان دهد، حالا «کالا و انبار» را هم در دسترس می‌گذارد؛ از داخل منو (که در این حالت فقط همین دو گزینه را نشان می‌دهد) می‌شود بین این دو صفحه جابه‌جا شد. گزینه‌ی جدا برای «انبار» از «حالت اپ» حذف شد؛ همه‌چیز حالا زیر همان «فروشگاه» است. بقیه‌ی برنامه (حساب‌ها، تراکنش‌ها، گزارش‌ها، تنظیمات و...) همچنان کاملاً مخفی می‌ماند و خروج از حالت فروشگاه همیشه با همان رمز ادمین انجام می‌شود.</li>
     <li>در فاکتور روزانه (ساده) فیلد «تسویه به حساب» اضافه شد: حالا در فاکتور روزانه هم می‌توانی انتخاب کنی مبلغ فاکتور در کدام حساب ثبت شود؛ چون فاکتور روزانه برای فروش نقدی همان‌لحظه است، کل مبلغ به‌صورت خودکار تسویه‌شده در نظر گرفته می‌شود و یک تراکنش دریافتی در همان حساب ثبت می‌گردد.</li>
    </ul>
   </div>
@@ -827,7 +824,7 @@ function activatePage(name){
     entered), completely bypassing the goToPage() guard below. That let
     a swipe or the phone's back button reveal the full app from inside
     the locked kiosk. Guarding here closes that regardless of caller. */
- if(LOCKED_MODES.includes(appMode())&&name!==LOCKED_MODE_PAGE[appMode()])name=LOCKED_MODE_PAGE[appMode()];
+ if(appMode()==="store"&&!STORE_ALLOWED_PAGES.includes(name))name="invoices";
  document.querySelectorAll(".nav").forEach(x=>x.classList.remove("active"));
  document.querySelectorAll(`.nav[data-page="${name}"]`).forEach(x=>x.classList.add("active"));
  document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));
@@ -837,7 +834,7 @@ function activatePage(name){
  return page;
 }
 function goToPage(name,fromNav){
- if(LOCKED_MODES.includes(appMode())&&name!==LOCKED_MODE_PAGE[appMode()])name=LOCKED_MODE_PAGE[appMode()];
+ if(appMode()==="store"&&!STORE_ALLOWED_PAGES.includes(name))name="invoices";
  if(!$(name))return;
  const page=activatePage(name);
  if(pageHistory[pageHistory.length-1]!==name)pageHistory.push(name);
@@ -845,10 +842,14 @@ function goToPage(name,fromNav){
  logEvent("ورود به بخش",page?.querySelector("h2")?.textContent||name,"nav");
 }
 function goBackPage(){
- /* در حالت‌های قفل‌شده (فروشگاه/انبار) چیزی برای برگشتن وجود ندارد؛ فقط
-    همان صفحه‌ی مجاز می‌ماند (فراتر از قفل activatePage، تا استک تاریخچه
-    صفحات هم درگیر صفحات قدیمی قبل از ورود به این حالت‌ها نشود). */
- if(LOCKED_MODES.includes(appMode()))return false;
+ /* در حالت فروشگاه به بیرون از دو صفحه‌ی مجاز (صندوق فاکتور/کالا و انبار)
+    برنمی‌گردیم؛ فراتر از قفل activatePage، خود استک تاریخچه هم درگیر
+    صفحات قدیمی قبل از ورود به حالت فروشگاه نمی‌شود. */
+ if(appMode()==="store"){
+  while(pageHistory.length>1&&!STORE_ALLOWED_PAGES.includes(pageHistory[pageHistory.length-2]))pageHistory.splice(pageHistory.length-2,1);
+  if(pageHistory.length>1){pageHistory.pop();activatePage(pageHistory[pageHistory.length-1]);return true}
+  return false;
+ }
  if(pageHistory.length>1){
   pageHistory.pop();
   activatePage(pageHistory[pageHistory.length-1]);

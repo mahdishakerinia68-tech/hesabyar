@@ -22,7 +22,7 @@
     <button id="menuBtn" class="menu-trigger" aria-label="باز کردن منو" aria-haspopup="true" aria-expanded="false" aria-controls="menuModal">⋯</button>
     <img class="app-logo" src="logo.png" alt="حساب‌یار">
     <div class="top-bar-titles">
-      <h1>حساب‌یار <span class="version-pill" id="versionPill">3.0</span></h1>
+      <h1>حساب‌یار <span class="version-pill" id="versionPill">3.1</span></h1>
       <div id="syncBadge" class="sync-badge">☁️ آفلاین</div>
     </div>
   </div>
@@ -33,10 +33,6 @@
 </header>
 
 <div id="storeExitBar" class="store-exit-bar">
-  <button class="store-exit-btn" onclick="setAppMode('business')">🔒 رفتن به حالت کسب‌وکار</button>
-</div>
-
-<div id="warehouseExitBar" class="warehouse-exit-bar">
   <button class="store-exit-btn" onclick="setAppMode('business')">🔒 رفتن به حالت کسب‌وکار</button>
 </div>
 
@@ -210,12 +206,11 @@
   <div class="settings settings-page">
 
     <div class="settings-group card" id="stgGroup-mode">
-      <div class="settings-group-head"><span>🧑‍💼</span><div><h3>حالت اپ</h3><p class="hint">«شخصی»: بخش‌های محصولات، مشتری‌ها و فاکتور مخفی می‌شوند. «کسب‌وکاری»: همه بخش‌ها فعال است. «فروشگاه»: فقط صندوق فاکتور در دسترس است و بقیه‌ی برنامه مخفی می‌شود. «انبار»: فقط بخش «کالا و انبار» در دسترس است و بقیه‌ی برنامه (حساب‌ها، تراکنش‌ها، فاکتور، گزارش‌ها، تنظیمات و...) کاملاً مخفی می‌شود؛ مناسب زمانی که فقط می‌خواهی کسی به موجودی کالا دسترسی داشته باشد. برای ورود اول بار به «فروشگاه» یا «انبار» یک رمز ادمین تعیین می‌شود (مشترک بین این دو حالت) و برای خروج از هرکدام همیشه همان رمز لازم است. اطلاعات هیچ بخشی پاک نمی‌شود و هر وقت خواستی می‌تونی برگردونیشون.</p></div></div>
+      <div class="settings-group-head"><span>🧑‍💼</span><div><h3>حالت اپ</h3><p class="hint">«شخصی»: بخش‌های محصولات، مشتری‌ها و فاکتور مخفی می‌شوند. «کسب‌وکاری»: همه بخش‌ها فعال است. «فروشگاه»: یک حالت قفل‌شده (کیوسک) است که فقط «صندوق فاکتور» و «کالا و انبار» در آن در دسترس‌اند (از طریق منو) و بقیه‌ی برنامه (حساب‌ها، تراکنش‌ها، گزارش‌ها، تنظیمات و...) کاملاً مخفی می‌شود. بار اول ورود به این حالت یک رمز ادمین تعیین می‌شود؛ برای خروج از حالت فروشگاه (رفتن به حالت کسب‌وکار) همیشه همان رمز ادمین لازم است — از طریق دکمه‌ی «رفتن به حالت کسب‌وکار» بالای صفحه. تغییر رمز ادمین هم از تنظیمات ممکن است. اطلاعات هیچ بخشی پاک نمی‌شود و هر وقت خواستی می‌تونی برگردونیشون.</p></div></div>
       <div class="settings-actions">
         <button id="appModeBtnPersonal" onclick="setAppMode('personal')">👤 شخصی</button>
         <button id="appModeBtnBusiness" onclick="setAppMode('business')">🏪 کسب‌وکاری</button>
         <button id="appModeBtnStore" onclick="setAppMode('store')">🏬 فروشگاه</button>
-        <button id="appModeBtnWarehouse" onclick="setAppMode('warehouse')">📦 انبار</button>
       </div>
       <div class="settings-actions">
         <button onclick="changeAdminPass()">🔑 تغییر رمز ادمین فروشگاه</button>
@@ -309,7 +304,7 @@
     </div>
 
   </div>
-  <p class="hint settings-footer">نسخه <span id="appVersionText">3.0</span> • بکاپ خودکار • بروزرسانی • اتصال دو گوشی • تقویم شمسی کامل</p>
+  <p class="hint settings-footer">نسخه <span id="appVersionText">3.1</span> • بکاپ خودکار • بروزرسانی • اتصال دو گوشی • تقویم شمسی کامل</p>
   <p class="hint">تغییرات روی این گوشی ذخیره می‌شود و در صورت اتصال به Firebase با گوشی دوم ادغام می‌گردد.</p>
 </section>
 
