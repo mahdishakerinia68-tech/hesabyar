@@ -310,6 +310,11 @@ body:not(.dark) .sheet .close{background:#E5E5EA}
 
 /* invoice preview / print */
 .invoice-preview{background:#fff;color:#111;border-radius:16px;padding:16px}
+/* v3.2: preview modal now has 3 action buttons (چاپ/PDF، ارسال PDF، ارسال
+   عکس) instead of 2 — let them wrap on narrow screens instead of
+   overflowing/squishing the generic .actions flex row. */
+.invoice-preview-actions{flex-wrap:wrap}
+.invoice-preview-actions button{flex:1 1 30%;min-width:104px}
 .invoice-head{display:flex;justify-content:space-between;align-items:flex-start;font-size:12px;border-bottom:2px solid #eee;padding-bottom:12px}
 .invoice-brand-logo{max-width:70px;max-height:70px;border-radius:8px;margin-bottom:6px}
 .preview-inv-row{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:6px;padding:8px 4px;font-size:12.5px;border-bottom:1px solid #f0f0f0}

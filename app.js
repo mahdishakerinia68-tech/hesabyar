@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="3.1";
+const APP_VERSION="3.2";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
@@ -749,10 +749,9 @@ function showWhatsNewOnce(){
   <h2>🎉 به حساب‌یار خوش آمدی</h2>
   <p class="hint">این صفحه فقط یک‌بار در اولین اجرای این نسخه نمایش داده می‌شود.</p>
   <div class="whats-new-section">
-   <h3>🛠 تغییرات این نسخه (۳.۱)</h3>
+   <h3>🛠 تغییرات این نسخه (۳.۲)</h3>
    <ul>
-    <li>حالت «فروشگاه» به‌جای اینکه فقط «صندوق فاکتور» را نشان دهد، حالا «کالا و انبار» را هم در دسترس می‌گذارد؛ از داخل منو (که در این حالت فقط همین دو گزینه را نشان می‌دهد) می‌شود بین این دو صفحه جابه‌جا شد. گزینه‌ی جدا برای «انبار» از «حالت اپ» حذف شد؛ همه‌چیز حالا زیر همان «فروشگاه» است. بقیه‌ی برنامه (حساب‌ها، تراکنش‌ها، گزارش‌ها، تنظیمات و...) همچنان کاملاً مخفی می‌ماند و خروج از حالت فروشگاه همیشه با همان رمز ادمین انجام می‌شود.</li>
-    <li>در فاکتور روزانه (ساده) فیلد «تسویه به حساب» اضافه شد: حالا در فاکتور روزانه هم می‌توانی انتخاب کنی مبلغ فاکتور در کدام حساب ثبت شود؛ چون فاکتور روزانه برای فروش نقدی همان‌لحظه است، کل مبلغ به‌صورت خودکار تسویه‌شده در نظر گرفته می‌شود و یک تراکنش دریافتی در همان حساب ثبت می‌گردد.</li>
+    <li>یک راه جدید برای ارسال فاکتور اضافه شد: «🖼 ارسال عکس». علاوه بر PDF، حالا می‌توانی همان فاکتور را به‌صورت یک فایل عکس (PNG) با کیفیت بالا (دو برابر وضوح حالت PDF) بسازی و از طریق پیامک، واتس‌اپ یا هر اپ دیگری ارسال کنی؛ دکمه‌ی آن هم در صفحه‌ی پیش‌نمایش فاکتور و هم کنار بقیه‌ی دکمه‌های هر فاکتور در «صندوق فاکتور» اضافه شده.</li>
    </ul>
   </div>
   <div class="whats-new-section">
@@ -1792,7 +1791,7 @@ function invoiceHTML(inv){
  const accName=inv.settleAccountId?data.accounts.find(a=>a.id===inv.settleAccountId)?.name:"";
  const settleMeta=(Number(inv.paid)>0&&accName)?` • واریز به: ${esc(accName)}`:"";
  const dailyBadge=inv.type==="daily"?`<span class="daily-badge">روزانه</span>`:"";
- return `<div class="item invoice-item"><div><b>🧾 ${esc(inv.name||"فاکتور")}</b>${dailyBadge}<div class="meta">${esc(inv.seller||"فروشنده ثبت نشده")}${custName?" • مشتری: "+esc(custName):""} • ${invoiceDateLabel(inv.date)}${inv.number?" • شماره "+esc(inv.number):""}</div><div class="meta">جمع کل: ${money(total)} • ${inv.status==="paid"?"🟢 پرداخت کامل":inv.status==="partial"?"🟡 پرداخت بخشی":"🔴 پرداخت نشده"} • مانده: ${money(invoiceRemaining(inv))}${settleMeta}</div></div><div class="actions"><button onclick="openInvoice('${inv.id}')">✏️</button><button onclick="previewInvoice('${inv.id}')">👁</button><button onclick="duplicateInvoice('${inv.id}')">📄</button><button onclick="shareInvoice('${inv.id}')">📤</button><button class="danger-icon" onclick="deleteInvoice('${inv.id}')">🗑</button></div></div>`
+ return `<div class="item invoice-item"><div><b>🧾 ${esc(inv.name||"فاکتور")}</b>${dailyBadge}<div class="meta">${esc(inv.seller||"فروشنده ثبت نشده")}${custName?" • مشتری: "+esc(custName):""} • ${invoiceDateLabel(inv.date)}${inv.number?" • شماره "+esc(inv.number):""}</div><div class="meta">جمع کل: ${money(total)} • ${inv.status==="paid"?"🟢 پرداخت کامل":inv.status==="partial"?"🟡 پرداخت بخشی":"🔴 پرداخت نشده"} • مانده: ${money(invoiceRemaining(inv))}${settleMeta}</div></div><div class="actions"><button onclick="openInvoice('${inv.id}')">✏️</button><button onclick="previewInvoice('${inv.id}')">👁</button><button onclick="duplicateInvoice('${inv.id}')">📄</button><button onclick="shareInvoice('${inv.id}')">📤</button><button onclick="shareInvoiceImage('${inv.id}')">🖼</button><button class="danger-icon" onclick="deleteInvoice('${inv.id}')">🗑</button></div></div>`
 }
 function previewInvoice(id){
  const inv=data.invoices.find(x=>x.id===id);if(!inv)return; const cust=inv.customerId?data.customers.find(c=>c.id===inv.customerId):null;
@@ -1803,14 +1802,15 @@ function previewInvoice(id){
  const accName=inv.settleAccountId?data.accounts.find(a=>a.id===inv.settleAccountId)?.name:"";
  const settleLine=(Number(inv.paid)>0&&accName)?` • تسویه به حساب: ${esc(accName)}`:"";
  const phoneVal=inv.phone||cust?.phone||"";
- openModal(`<div id="invoicePreview" class="invoice-preview"><div class="invoice-head"><div>${b.logo?`<img class="invoice-brand-logo" src="${b.logo}" alt="لوگو">`:""}<h2>${inv.type==="daily"?"فاکتور روزانه":"فاکتور"}</h2><b>${esc(inv.seller||b.storeName||"")}</b></div><div>شماره: ${esc(inv.number||"—")}<br>تاریخ: ${invoiceDateLabel(inv.date)}</div></div><h3>${esc(inv.name||"فاکتور")}</h3>${custName?`<div class="meta">مشتری: ${esc(custName)}${phoneVal?" • "+esc(phoneVal):""}</div>`:""}${inv.address?`<div class="meta">آدرس: ${esc(inv.address)}</div>`:""}<div class="meta">وضعیت: ${inv.status==="paid"?"🟢 پرداخت کامل":inv.status==="partial"?"🟡 پرداخت بخشی":"🔴 پرداخت نشده"} • مانده: ${money(invoiceRemaining(inv))}${settleLine}</div><div class="preview-inv-row head"><b>توضیحات</b><b>تعداد</b><b>مبلغ واحد</b><b>مبلغ</b></div>${rows}<div class="preview-total">جمع کل: <strong>${money(invoiceTotal(inv))}</strong></div>${signRow}</div><div class="actions"><button class="primary" onclick="printInvoice('${inv.id}')">🖨 چاپ / PDF</button><button class="primary" onclick="shareInvoice('${inv.id}')">📤 ارسال فاکتور</button></div>`)
+ openModal(`<div id="invoicePreview" class="invoice-preview"><div class="invoice-head"><div>${b.logo?`<img class="invoice-brand-logo" src="${b.logo}" alt="لوگو">`:""}<h2>${inv.type==="daily"?"فاکتور روزانه":"فاکتور"}</h2><b>${esc(inv.seller||b.storeName||"")}</b></div><div>شماره: ${esc(inv.number||"—")}<br>تاریخ: ${invoiceDateLabel(inv.date)}</div></div><h3>${esc(inv.name||"فاکتور")}</h3>${custName?`<div class="meta">مشتری: ${esc(custName)}${phoneVal?" • "+esc(phoneVal):""}</div>`:""}${inv.address?`<div class="meta">آدرس: ${esc(inv.address)}</div>`:""}<div class="meta">وضعیت: ${inv.status==="paid"?"🟢 پرداخت کامل":inv.status==="partial"?"🟡 پرداخت بخشی":"🔴 پرداخت نشده"} • مانده: ${money(invoiceRemaining(inv))}${settleLine}</div><div class="preview-inv-row head"><b>توضیحات</b><b>تعداد</b><b>مبلغ واحد</b><b>مبلغ</b></div>${rows}<div class="preview-total">جمع کل: <strong>${money(invoiceTotal(inv))}</strong></div>${signRow}</div><div class="actions invoice-preview-actions"><button class="primary" onclick="printInvoice('${inv.id}')">🖨 چاپ / PDF</button><button class="primary" onclick="shareInvoice('${inv.id}')">📤 ارسال PDF</button><button class="primary" onclick="shareInvoiceImage('${inv.id}')">🖼 ارسال عکس</button></div>`)
 }
 function loadImg(src){return new Promise(resolve=>{if(!src)return resolve(null);const im=new Image();im.onload=()=>resolve(im);im.onerror=()=>resolve(null);im.src=src})}
-async function drawInvoiceCanvas(inv){
+async function drawInvoiceCanvas(inv,scale=1){
  const b=data.branding||{};
  const W=794, rowH=58, H=Math.max(1123,560+(inv.items||[]).length*rowH);
  const [logoImg,stampImg,signImg]=await Promise.all([loadImg(b.logo),loadImg(b.stamp),loadImg(b.signature)]);
- const c=document.createElement("canvas");c.width=W;c.height=H;const x=c.getContext("2d");
+ const c=document.createElement("canvas");c.width=W*scale;c.height=H*scale;const x=c.getContext("2d");
+ x.scale(scale,scale);
  x.fillStyle="#fff";x.fillRect(0,0,W,H);x.fillStyle="#17352b";x.textAlign="right";x.direction="rtl";
  if(logoImg)try{x.drawImage(logoImg,55,25,90,70)}catch(e){}
  x.font="bold 34px sans-serif";x.fillText(inv.type==="daily"?"فاکتور روزانه":"فاکتور",W-45,55);
@@ -1891,6 +1891,44 @@ async function buildInvoicePdf(inv){
  const bytes=canvasToPdfBytes(c);
  const filename=`${(inv.name||"فاکتور").replace(/[\\/:*?"<>|]/g,"_")}.pdf`;
  return {bytes,filename,blob:new Blob([bytes],{type:"application/pdf"})};
+}
+/* v3.2: ارسال فاکتور به‌صورت عکس (علاوه بر PDF) — همان طرح فاکتور که برای
+ * PDF رسم می‌شود این‌بار با کیفیت دو برابر (drawInvoiceCanvas(inv,2)) به
+ * فایل PNG بدون افت کیفیت تبدیل می‌شود تا متن و لوگو/مهر/امضا تیز و
+ * خوانا بمانند؛ کاملاً آفلاین، بدون کتابخانه یا سرویس خارجی. */
+async function buildInvoiceImage(inv){
+ const c=await drawInvoiceCanvas(inv,2);
+ const filename=`${(inv.name||"فاکتور").replace(/[\\/:*?"<>|]/g,"_")}.png`;
+ const blob=await new Promise(resolve=>c.toBlob(resolve,"image/png"));
+ return {filename,blob};
+}
+async function shareOrSaveInvoiceImage(inv,{announceAs="فاکتور"}={}){
+ const {blob,filename}=await buildInvoiceImage(inv);
+ const file=new File([blob],filename,{type:"image/png"});
+ try{
+  if(navigator.share&&(!navigator.canShare||navigator.canShare({files:[file]}))){
+   await navigator.share({title:inv.name||"فاکتور",text:`${inv.name||"فاکتور"} • ${money(invoiceTotal(inv))}`,files:[file]});
+   return true;
+  }
+ }catch(e){if(e?.name==="AbortError")return false}
+ const fs=filesystemPlugin();
+ if(fs){
+  try{
+   const buf=await blob.arrayBuffer();
+   await fs.writeFile({path:`${INVOICE_PDF_FOLDER}/${filename}`,data:uint8ToBase64(new Uint8Array(buf)),directory:AUTO_BACKUP_DIRECTORY,recursive:true});
+   alert(`${announceAs} به‌صورت عکس ذخیره شد:\nDownload/حسابداری/فاکتورها/${filename}\nاز اپ فایل‌های گوشی می‌توانی آن را باز، ارسال یا چاپ کنی.`);
+   return true;
+  }catch(e){console.warn("invoice image native save failed",e)}
+ }
+ try{
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+  alert(`فایل عکس ${announceAs} آماده دانلود شد.`);
+  return true;
+ }catch(e){console.warn("invoice image download failed",e);alert("ساخت فایل عکس فاکتور با خطا مواجه شد.");return false}
+}
+async function shareInvoiceImage(id){
+ const inv=data.invoices.find(x=>x.id===id);if(!inv)return;
+ await shareOrSaveInvoiceImage(inv,{announceAs:"فاکتور"});
 }
 /* Tries, in order: native share sheet (works for both "print" via the
  * system Print service and sending to another app) -> native Filesystem
