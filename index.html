@@ -381,13 +381,16 @@
   </div>
 </div>
 
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<!-- v2.2 fix: these 3 Firebase scripts (app/auth/firestore, ~ hundreds of KB) used to be
+     loaded here unconditionally on EVERY launch, for every user, before app.js even ran —
+     that's what made the app feel heavy/slow to open. app.js already lazy-loads the exact
+     same files itself (see FIREBASE_SDK_URLS / ensureFirebaseLoaded) only when the cloud
+     sync feature actually needs them, and only after the UI is already rendered. So the
+     static tags here were pure dead weight and have been removed. -->
 <script src="capacitor-local-notifications-bridge.js"></script>
 <script src="capacitor-filesystem-bridge.js"></script>
 <script src="capacitor-biometric-bridge.js"></script>
 <script src="app.js"></script>
-<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js?v=2").catch(console.error)}</script>
+<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js?v=3").catch(console.error)}</script>
 </body>
 </html>

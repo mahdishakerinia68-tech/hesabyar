@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="2.1";
+const APP_VERSION="2.2";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
@@ -663,7 +663,11 @@ async function setBiometricEnabled(v){
  save();logEvent(v?"فعال‌سازی قفل بیومتریک":"غیرفعال‌سازی قفل بیومتریک","","settings");renderSettingsFeatures();
 }
 
-const WHATS_NEW_KEY="hesabdar-whats-new-seen-2";
+/* v2.2 fix: this key was a hardcoded string, so once someone had seen it, it never showed
+   again for any later version — it needed a manual bump each release and that step kept
+   getting missed, which is why "what changed" stopped appearing. Tying it to APP_VERSION
+   means every future version bump shows its changelog once automatically, no manual step. */
+const WHATS_NEW_KEY="hesabdar-whats-new-seen-"+APP_VERSION;
 function showWhatsNewOnce(){
  if(localStorage.getItem(WHATS_NEW_KEY)==="1")return;
  localStorage.setItem(WHATS_NEW_KEY,"1");
@@ -674,13 +678,9 @@ function showWhatsNewOnce(){
   <div class="whats-new-section">
    <h3>🛠 تغییرات این نسخه</h3>
    <ul>
-    <li>فاکتورهای مانده‌دار یا پرداخت‌نشده حالا خودکار به بخش بدهکار/بستانکار اضافه می‌شوند.</li>
-    <li>با تسویه از بخش بدهکار/بستانکار، هم تراکنش ثبت می‌شود و هم وضعیت فاکتور به‌روز می‌شود.</li>
-    <li>امکان افزودن عکس رسید هنگام تسویه کامل بدهکار/بستانکار (علاوه بر اقساط).</li>
-    <li>صفحه حساب‌ها و بانک‌ها حالا جمع‌شده (بسته) باز می‌شود و با زدن روی هر بخش، همان بخش باز می‌شود.</li>
-    <li>رفع مشکل بازیابی فایل پشتیبان ارسال‌شده (تلگرام/بلوتوث و...) در اندروید.</li>
-    <li>امکان افزودن عکس رسید واریز/دریافت به هر قسط بدهکار و بستانکار.</li>
-    <li>رفع نمایش نسخه قدیمی در صفحه «امکانات و تغییرات».</li>
+    <li>رفع اشکال مهم: مبلغ «موجودی کل» در داشبورد با انتقال به دیگران (کارت‌به‌کارت) هماهنگ نبود و بیشتر از مجموع واقعی حساب‌ها نشان داده می‌شد؛ تراکنش‌ها درست بودند ولی جمع کل نه — این عدد حالا دقیقاً برابر مجموع موجودی همه حساب‌هاست.</li>
+    <li>رفع اشکال کندی و سنگین بازشدن برنامه: چند فایل حجیم که برای همگام‌سازی ابری لازم بودند، حتی برای کسانی که از این قابلیت استفاده نمی‌کردند، در هر بار باز شدن برنامه دانلود می‌شدند؛ حذف شد.</li>
+    <li>رفع اشکال «تغییرات نسخه»: به‌خاطر یک کلید ثابت، این پیام بعد از اولین‌بار دیگر برای نسخه‌های بعدی نمایش داده نمی‌شد؛ از این نسخه به بعد در هر آپدیت یک‌بار خودکار نمایش داده می‌شود.</li>
    </ul>
   </div>
   <div class="whats-new-section">
@@ -1578,41 +1578,31 @@ function saveInvoice(id){
  const customerName=$("invCustomerName")?.value.trim()||"";
  const settleAccountId=$("invSettleAccount")?.value||"";
  const o={name,seller,date,number,items,customerId:$("invCustomer").value||"",customerName,address:$("invAddress").value.trim(),discount,discountPercent,taxRate,paid,settleAccountId,status:$("invStatus").value,total:0};o.total=invoiceTotal(o);if(o.status==="paid")o.paid=o.total;if(o.paid>=o.total&&o.total>0)o.status="paid";else if(o.paid>0)o.status="partial";else o.status="unpaid";
- let x,prevPaid=0;
- if(id){x=data.invoices.find(v=>v.id===id);if(x){prevPaid=Number(x.paid)||0;adjustStockForInvoice(x,+1);Object.assign(x,o);touch(x);markDirty("invoices",x.id,false,x,x.updatedAt);adjustStockForInvoice(x,-1)}}else{x=touch({id:uid(),...o});data.invoices.unshift(x);markDirty("invoices",x.id,false,x,x.updatedAt);adjustStockForInvoice(x,-1)}
- if(x){syncPersonForInvoice(x);syncTransactionForInvoice(x,prevPaid)}
+ let x;
+ if(id){x=data.invoices.find(v=>v.id===id);if(x){adjustStockForInvoice(x,+1);Object.assign(x,o);touch(x);markDirty("invoices",x.id,false,x,x.updatedAt);adjustStockForInvoice(x,-1)}}else{x=touch({id:uid(),...o});data.invoices.unshift(x);markDirty("invoices",x.id,false,x,x.updatedAt);adjustStockForInvoice(x,-1)}
+ if(x){syncPersonForInvoice(x);syncTransactionForInvoice(x)}
  save();logEvent(id?"ویرایش فاکتور":"ساخت فاکتور",`${name} • ${money(o.total)}`,id?"edit":"create");closeModal()
 }
-/* --- ثبت خودکار تراکنش تسویه فاکتور در حساب انتخاب‌شده ---
-   نکته مهم: چون ممکن است بخشی از مبلغ فاکتور از بخش «بدهکار/بستانکار» (که تراکنش خودش را جداگانه می‌سازد)
-   تسویه شده باشد، این تابع هرگز کل مبلغ پرداخت‌شده فاکتور را دوباره به‌عنوان تراکنش نمی‌سازد؛ فقط به‌اندازه
-   «تغییر» (دلتا) مبلغ دریافتی نسبت به قبل از این ذخیره را ثبت می‌کند تا مبلغ در حساب دو بار حساب نشود. */
-function syncTransactionForInvoice(inv,prevPaid=0){
+/* --- ثبت خودکار تراکنش تسویه فاکتور در حساب انتخاب‌شده --- */
+function syncTransactionForInvoice(inv){
  if(!inv)return;
- const paid=Number(inv.paid)||0,delta=paid-(Number(prevPaid)||0);
- if(delta>0&&inv.settleAccountId){
+ const paid=Number(inv.paid)||0;
+ if(paid>0&&inv.settleAccountId){
   let t=inv.settleTxId?data.transactions.find(x=>x.id===inv.settleTxId):null;
   const title=`تسویه فاکتور: ${inv.name||"فاکتور"}`;
   if(!t){
-   t=touch({id:uid(),title,amount:delta,type:"income",category:"تسویه فاکتور",accountID:inv.settleAccountId,date:new Date().toISOString(),source:"invoice-settle",invoiceId:inv.id});
+   t=touch({id:uid(),title,amount:paid,type:"income",category:"تسویه فاکتور",accountID:inv.settleAccountId,date:new Date().toISOString(),source:"invoice-settle",invoiceId:inv.id});
    data.transactions.unshift(t);
    inv.settleTxId=t.id;
   }else{
-   t.amount=(Number(t.amount)||0)+delta;t.accountID=inv.settleAccountId;t.title=title;touch(t);
+   t.title=title;t.amount=paid;t.accountID=inv.settleAccountId;touch(t);
   }
   markDirty("transactions",t.id,false,t,t.updatedAt);
   touch(inv);markDirty("invoices",inv.id,false,inv,inv.updatedAt);
- }else if(delta<0&&inv.settleTxId){
-  const t=data.transactions.find(x=>x.id===inv.settleTxId);
-  if(t){
-   t.amount=(Number(t.amount)||0)+delta;
-   if(t.amount<=0){removeRecordSilent("transactions",t.id);inv.settleTxId=""}
-   else{touch(t);markDirty("transactions",t.id,false,t,t.updatedAt)}
-   touch(inv);markDirty("invoices",inv.id,false,inv,inv.updatedAt);
-  }
- }else if(delta===0&&inv.settleTxId&&inv.settleAccountId){
-  const t=data.transactions.find(x=>x.id===inv.settleTxId);
-  if(t&&t.accountID!==inv.settleAccountId){t.accountID=inv.settleAccountId;touch(t);markDirty("transactions",t.id,false,t,t.updatedAt)}
+ }else if(inv.settleTxId){
+  removeRecordSilent("transactions",inv.settleTxId);
+  inv.settleTxId="";
+  touch(inv);markDirty("invoices",inv.id,false,inv,inv.updatedAt);
  }
 }
 /* --- اتصال فاکتورهای مانده‌دار/تسویه‌نشده به بخش طلبکاران و همگام‌سازی برگشتی با تراکنش‌ها --- */
@@ -1947,8 +1937,14 @@ function renderBrandingInSettings(){loadBrandingSettings();renderYearSettlement(
    (activatePage() calls render() again right after switching pages). */
 function pageActive(id){const el=$(id);return !!(el&&el.classList.contains("active"))}
 function render(){
- const inc=data.transactions.filter(t=>t.type==="income").reduce((s,t)=>s+(Number(t.amount)||0),0),exp=data.transactions.filter(t=>t.type==="expense").reduce((s,t)=>s+(Number(t.amount)||0),0),base=data.accounts.reduce((s,a)=>s+(Number(a.balance)||0),0),net=inc-exp;
- if($("balance"))$("balance").textContent=money(base+net);if($("income"))$("income").textContent=money(inc);if($("expense"))$("expense").textContent=money(exp);
+ /* v2.2 fix: this used to show base(=sum of accounts' starting balance)+net(=income-expense)
+    which ignores "انتقال به دیگران" (transfer to an external person/card). That amount leaves
+    an account (accountBalance() subtracts it) but was never subtracted here, so the total on
+    the dashboard could sit higher than the real sum of all accounts even though every single
+    transaction and every per-account balance was correct. Now it sums the same accountBalance()
+    used everywhere else, so the total always matches. */
+ const inc=data.transactions.filter(t=>t.type==="income").reduce((s,t)=>s+(Number(t.amount)||0),0),exp=data.transactions.filter(t=>t.type==="expense").reduce((s,t)=>s+(Number(t.amount)||0),0),totalBalance=data.accounts.reduce((s,a)=>s+accountBalance(a.id),0);
+ if($("balance"))$("balance").textContent=money(totalBalance);if($("income"))$("income").textContent=money(inc);if($("expense"))$("expense").textContent=money(exp);
  if($("recent"))$("recent").innerHTML=data.transactions.slice(0,6).map(txHTML).join("")||empty("هنوز تراکنشی ثبت نشده");
  if($("accountList")&&pageActive("accounts"))$("accountList").innerHTML=data.accounts.map(a=>`<div class="item account-item"><div class="account-main"><b>${esc(a.name)}</b><div class="meta">${esc(a.bank||"حساب شخصی")}${a.sender?" • فرستنده: "+esc(a.sender):""}</div>${cardActions(a)}</div><div><strong>${money(accountBalance(a.id))}</strong>${actionButtons("openAccount","deleteAccount",a.id)}<button type="button" title="گزارش Excel" onclick="exportAccountExcel('${a.id}')">📊</button></div></div>`).join("")||empty("هنوز حسابی اضافه نشده");
  const q=$("search")?.value?.trim()||"",ft=$("filterType")?.value||"",fc=$("filterCat")?.value||"";
