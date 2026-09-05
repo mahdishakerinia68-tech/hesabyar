@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="2.2";
+const APP_VERSION="2.4";
 const GITHUB_KEY="hesabdar-github-repo-v1";
 const UPDATE_CHECK_MS=6*60*60*1000;
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
@@ -9,13 +9,19 @@ const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v1";
 const AUTO_BACKUP_MS=6*60*60*1000;
 const APP_MODE_KEY="hesabdar-app-mode-v1";
 function appMode(){return localStorage.getItem(APP_MODE_KEY)||"business"}
-function setAppMode(v){localStorage.setItem(APP_MODE_KEY,v);applyAppMode();if(v==="personal"&&(pageActive("products")||pageActive("customers")||pageActive("invoices")))goToPage("home")}
+/* v2.3: added "store" as a third app mode (in addition to "personal"/"business").
+   Selecting it navigates away from notes/reminders/checks if the user happens to
+   be on one of those pages, since store-mode hides them (same guard already used
+   when switching to "personal"). */
+function setAppMode(v){localStorage.setItem(APP_MODE_KEY,v);applyAppMode();if(v==="personal"&&(pageActive("products")||pageActive("customers")||pageActive("invoices")))goToPage("home");if(v==="store"&&(pageActive("notes")||pageActive("reminders")||pageActive("checks")))goToPage("home")}
 function applyAppMode(){
   const m=appMode();
   document.body.classList.toggle("personal-mode",m==="personal");
-  const bp=$("appModeBtnPersonal"),bb=$("appModeBtnBusiness");
+  document.body.classList.toggle("store-mode",m==="store");
+  const bp=$("appModeBtnPersonal"),bb=$("appModeBtnBusiness"),bs=$("appModeBtnStore");
   if(bp)bp.classList.toggle("primary",m==="personal");
   if(bb)bb.classList.toggle("primary",m==="business");
+  if(bs)bs.classList.toggle("primary",m==="store");
 }
 const ANTHROPIC_KEY_STORAGE="hesabdar-anthropic-key-v1";
 const DEVICE_ID_KEY="hesabdar-device-id-v1";
@@ -678,9 +684,10 @@ function showWhatsNewOnce(){
   <div class="whats-new-section">
    <h3>🛠 تغییرات این نسخه</h3>
    <ul>
-    <li>رفع اشکال مهم: مبلغ «موجودی کل» در داشبورد با انتقال به دیگران (کارت‌به‌کارت) هماهنگ نبود و بیشتر از مجموع واقعی حساب‌ها نشان داده می‌شد؛ تراکنش‌ها درست بودند ولی جمع کل نه — این عدد حالا دقیقاً برابر مجموع موجودی همه حساب‌هاست.</li>
-    <li>رفع اشکال کندی و سنگین بازشدن برنامه: چند فایل حجیم که برای همگام‌سازی ابری لازم بودند، حتی برای کسانی که از این قابلیت استفاده نمی‌کردند، در هر بار باز شدن برنامه دانلود می‌شدند؛ حذف شد.</li>
-    <li>رفع اشکال «تغییرات نسخه»: به‌خاطر یک کلید ثابت، این پیام بعد از اولین‌بار دیگر برای نسخه‌های بعدی نمایش داده نمی‌شد؛ از این نسخه به بعد در هر آپدیت یک‌بار خودکار نمایش داده می‌شود.</li>
+    <li>در ساخت فاکتور، بالای فرم یک انتخاب اضافه شد: «فاکتور مشتری» یا «فاکتور روزانه». در حالت فاکتور روزانه فقط نام، شماره تماس و آدرس مشتری همراه ردیف‌های کالا نشان داده می‌شود و بقیه فیلدها (عنوان، فروشنده، تاریخ/شماره، وضعیت پرداخت و تخفیف/مالیات) مخفی می‌مانند تا ثبت فروش‌های روزانه سریع‌تر شود.</li>
+    <li>رفع اشکال چاپ/ارسال فاکتور: حالا برای هر فاکتور یک فایل PDF واقعی ساخته می‌شود (نه فقط عکس)؛ روی گوشی از منوی اشتراک‌گذاری می‌توانی مستقیم چاپ یا ارسال کنی.</li>
+    <li>رفع اشکال مهم: صفحه «کالا و انبار» هیچ‌وقت به‌روزرسانی نمی‌شد و همیشه خالی به نظر می‌رسید؛ الان درست نمایش داده می‌شود و بالای آن خلاصه تعداد کالا، ارزش انبار و کسری موجودی هم اضافه شده.</li>
+    <li>یک حالت اپ جدید اضافه شد: «فروشگاه» — در این حالت انبار، فاکتور و مشتری‌ها با هم می‌مانند و یادداشت/یادآوری/چک مخفی می‌شوند.</li>
    </ul>
   </div>
   <div class="whats-new-section">
@@ -1026,7 +1033,23 @@ function openProduct(id=null){const p=id&&data.products.find(x=>x.id===id);openM
  <button class="primary" onclick="saveProduct('${p?.id||""}')">💾 ذخیره</button></div>`)}
 function saveProduct(id){const name=$("prdName").value.trim();if(!name)return alert("نام کالا را وارد کن");const o={name,code:$("prdCode").value.trim(),buyPrice:Number($("prdBuy").value)||0,price:Number($("prdPrice").value)||0,stock:Number($("prdStock").value)||0,minStock:Number($("prdMin").value)||0};if(id){const p=data.products.find(x=>x.id===id);Object.assign(p,o);touch(p);markDirty("products",p.id,false,p,p.updatedAt)}else{const p=touch({id:uid(),...o});data.products.unshift(p);markDirty("products",p.id,false,p,p.updatedAt)}save();logEvent(id?"ویرایش کالا":"افزودن کالا",name,id?"edit":"create");closeModal()}
 function deleteProduct(id){if(!confirm("این کالا حذف شود؟"))return;const p=data.products.find(x=>x.id===id);removeRecord("products",id);logEvent("حذف کالا",p?.name||id,"delete")}
-function renderProducts(){const box=$("productList");if(!box)return;box.innerHTML=data.products.map(p=>`<div class="item"><div><b>📦 ${esc(p.name)}</b><div class="meta">${p.code?"کد: "+esc(p.code)+" • ":""}خرید: ${money(p.buyPrice||0)} • فروش: ${money(p.price)}</div><div class="meta">موجودی: ${fa(p.stock)} ${Number(p.stock)<=Number(p.minStock)&&Number(p.minStock)>0?" • ⚠️ موجودی کم":""}</div></div><div class="actions"><button onclick="openProduct('${p.id}')">✏️</button><button onclick="deleteProduct('${p.id}')" class="danger-icon">🗑</button></div></div>`).join("")||empty("هنوز کالایی ثبت نشده است")}
+/* v2.3 fix: renderProducts() existed but was never wired into render()'s
+   per-page dispatch (every other page — customers, invoices, checks... —
+   has a "pageActive" line like this one; products was missing it), so the
+   کالا و انبار page never actually filled in and always looked empty no
+   matter how many products existed. Also now shows a small summary
+   (count / inventory value / low-stock count) and sorts low-stock items
+   to the top, so shortages are the first thing seen. */
+function renderProducts(){
+ const box=$("productList");if(!box)return;
+ const isLow=p=>Number(p.minStock)>0&&Number(p.stock)<=Number(p.minStock);
+ const list=[...data.products].sort((a,b)=>(isLow(a)?0:1)-(isLow(b)?0:1));
+ const lowCount=list.filter(isLow).length;
+ const invValue=list.reduce((s,p)=>s+(Number(p.stock)||0)*(Number(p.buyPrice)||0),0);
+ const sumBox=$("productSummary");
+ if(sumBox)sumBox.innerHTML=list.length?`<div class="inventory-summary"><div class="inv-stat"><span>تعداد کالا</span><b>${fa(list.length)}</b></div><div class="inv-stat"><span>ارزش انبار (قیمت خرید)</span><b>${money(invValue)}</b></div><div class="inv-stat${lowCount?" warn":""}"><span>کسری موجودی</span><b>${lowCount?"⚠️ "+fa(lowCount):"۰"}</b></div></div>`:"";
+ box.innerHTML=list.map(p=>`<div class="item"><div><b>📦 ${esc(p.name)}</b><div class="meta">${p.code?"کد: "+esc(p.code)+" • ":""}خرید: ${money(p.buyPrice||0)} • فروش: ${money(p.price)}</div><div class="meta">موجودی: ${fa(p.stock)} ${isLow(p)?" • ⚠️ موجودی کم":""}</div></div><div class="actions"><button onclick="openProduct('${p.id}')">✏️</button><button onclick="deleteProduct('${p.id}')" class="danger-icon">🗑</button></div></div>`).join("")||empty("هنوز کالایی ثبت نشده است")
+}
 function adjustStockForInvoice(inv,dir){for(const it of inv?.items||[]){if(!it.productId)continue;const p=data.products.find(x=>x.id===it.productId);if(p){p.stock=Math.max(0,Number(p.stock||0)+(dir*Number(it.qty||0)));touch(p);markDirty("products",p.id,false,p,p.updatedAt)}}}
 
 function openCustomer(id=null){const c=id&&data.customers.find(x=>x.id===id);openModal(`<h2>${c?"ویرایش مشتری":"مشتری جدید"}</h2><div class="form"><input id="cname" placeholder="نام مشتری" value="${esc(c?.name||"")}"><input id="cphone" inputmode="tel" placeholder="شماره تماس" value="${esc(c?.phone||"")}"><textarea id="caddress" placeholder="آدرس">${esc(c?.address||"")}</textarea><textarea id="cnote" placeholder="توضیحات">${esc(c?.note||"")}</textarea><button class="primary" onclick="saveCustomer('${c?.id||""}')">💾 ذخیره</button></div>`)}
@@ -1531,13 +1554,26 @@ function openInvoice(id=null){
  const items=inv?.items?.length?inv.items:[{desc:"",qty:1,price:""}];
  const cust=inv?.customerId?data.customers.find(c=>c.id===inv.customerId):null;
  const defAcc=inv?.settleAccountId||data.accounts.find(a=>a.default)?.id||data.accounts[0]?.id||"";
+ const invType=inv?.type==="daily"?"daily":"customer";
+ const hideDaily=invType==="daily"?"display:none":"";
  openModal(`<h2>🧾 ${inv?"ویرایش فاکتور":"ساخت فاکتور جدید"}</h2><div class="form invoice-form">
+ <div class="tabs inv-type-tabs" id="invTypeTabs">
+ <button type="button" data-type="customer" class="${invType==="customer"?"active":""}" onclick="setInvoiceType('customer')">🧾 فاکتور مشتری</button>
+ <button type="button" data-type="daily" class="${invType==="daily"?"active":""}" onclick="setInvoiceType('daily')">🗓 فاکتور روزانه</button>
+ </div>
+ <input type="hidden" id="invType" value="${invType}">
+ <div class="inv-hide-daily" style="${hideDaily}">
  ${invField("عنوان فاکتور","برای پیدا کردن آسان‌تر در صندوق فاکتور، مثلاً: فاکتور فروش موبایل",`<input id="invName" placeholder="مثلاً: فاکتور فروش شهریور" value="${esc(inv?.name||"")}">`)}
  ${invField("نام فروشنده / فروشگاه","اسمی که بالای فاکتور چاپ می‌شود",`<input id="invSeller" placeholder="نام فروشگاه یا کسب‌وکار شما" value="${esc(inv?.seller||(inv?"":data.branding?.storeName||""))}">`)}
+ </div>
  <div class="two-fields">
  ${invField("نام مشتری","اسم کسی که فاکتور برایش صادر می‌شود",`<input id="invCustomerName" placeholder="نام و نام خانوادگی مشتری" value="${esc(inv?.customerName||cust?.name||"")}">`)}
+ ${invField("شماره تماس","شماره تماس مشتری برای این فاکتور",`<input id="invPhone" inputmode="tel" placeholder="مثلاً: ۰۹۱۲xxxxxxx" value="${esc(inv?.phone||cust?.phone||"")}">`)}
+ </div>
+ <div class="inv-hide-daily" style="${hideDaily}">
  ${invField("انتخاب از لیست مشتری‌ها","اختیاری؛ برای اتصال فاکتور به پرونده مشتری",`<select id="invCustomer"><option value="">بدون اتصال به پرونده مشتری</option>${data.customers.map(c=>`<option value="${c.id}" ${c.id===inv?.customerId?"selected":""}>${esc(c.name)}${c.phone?" • "+esc(c.phone):""}</option>`).join("")}</select>`)}
  </div>
+ <div class="inv-hide-daily" style="${hideDaily}">
  <div class="two-fields">
  ${invField("تاریخ فاکتور","تاریخ صدور به تقویم شمسی",simpleDateField("invDate",jalaliInputValue(inv?.date)||todayJalali()))}
  ${invField("شماره فاکتور","اختیاری؛ برای پیگیری و مرتب کردن فاکتورها",`<input id="invNo" placeholder="مثلاً: ۱۰۰۱" value="${esc(inv?.number||"")}">`)}
@@ -1552,7 +1588,8 @@ function openInvoice(id=null){
  ${invField("تخفیف درصدی","درصدی که بعد از تخفیف مبلغی کم می‌شود (٪)",`<input id="invDiscountPercent" oninput="updateInvoiceLiveTotal()" type="number" min="0" max="100" placeholder="۰" value="${Number(inv?.discountPercent)||0}">`)}
  </div>
  ${invField("مالیات بر ارزش‌افزوده","درصدی که بعد از کسر تخفیف به قیمت اضافه می‌شود (٪)",`<input id="invTax" oninput="updateInvoiceLiveTotal()" type="number" min="0" placeholder="۰" value="${Number(inv?.taxRate)||0}">`)}
- ${invField("آدرس یا توضیحات مشتری","اختیاری؛ آدرس، شماره تماس یا هر توضیح دیگر",`<textarea id="invAddress" placeholder="مثلاً: تهران، خیابان ... - ۰۹۱۲xxxxxxx">${esc(inv?.address||cust?.address||"")}</textarea>`)}
+ </div>
+ ${invField("آدرس","اختیاری؛ آدرس مشتری",`<textarea id="invAddress" placeholder="مثلاً: تهران، خیابان ...">${esc(inv?.address||cust?.address||"")}</textarea>`)}
  <div class="invoice-table-head"><span>کالا</span><span>توضیحات</span><span>تعداد</span><span>مبلغ واحد</span><span></span></div>
  <div id="invoiceRows">${items.map(invoiceRowHTML).join("")}</div>
  <button type="button" class="ghost-btn" onclick="addInvoiceRow()">＋ افزودن ردیف کالا یا خدمت</button>
@@ -1570,14 +1607,27 @@ function updateInvoiceLiveTotal(){
  const da=Math.min(sub,Math.max(0,Number($("invDiscount")?.value)||0)),dp=Math.min(100,Math.max(0,Number($("invDiscountPercent")?.value)||0)),dpAmt=Math.min(sub-da,Math.round((sub-da)*dp/100)),dis=da+dpAmt,tax=Math.max(0,Math.round((sub-dis)*(Number($("invTax")?.value)||0)/100)),total=Math.max(0,sub-dis+tax);
  if($("invLiveSubtotal"))$("invLiveSubtotal").textContent=money(sub);if($("invLiveAdjust"))$("invLiveAdjust").textContent=money(tax-dis);if($("invLiveTotal"))$("invLiveTotal").textContent=money(total)
 }
+/* --- تغییر نوع فاکتور بین «فاکتور مشتری» و «فاکتور روزانه» ---
+ * در حالت فاکتور روزانه فقط نام، شماره تماس و آدرس مشتری به‌همراه
+ * ردیف‌های کالا و جمع کل نمایش داده می‌شود؛ بقیه‌ی فیلدها (عنوان،
+ * فروشنده، تاریخ/شماره، وضعیت پرداخت، تسویه حساب، تخفیف و مالیات)
+ * با مقادیر پیش‌فرضشان در فرم می‌مانند ولی مخفی می‌شوند. */
+function setInvoiceType(type){
+ const t=type==="daily"?"daily":"customer";
+ if($("invType"))$("invType").value=t;
+ document.querySelectorAll("#invTypeTabs button").forEach(b=>b.classList.toggle("active",b.dataset.type===t));
+ document.querySelectorAll(".inv-hide-daily").forEach(el=>el.style.display=t==="daily"?"none":"");
+}
 function saveInvoice(id){
- const name=$("invName").value.trim()||"فاکتور جدید", seller=$("invSeller").value.trim(),date=jalaliToISO($("invDate").value)||new Date().toISOString().slice(0,10),number=$("invNo").value.trim();
+ const type=$("invType")?.value==="daily"?"daily":"customer";
+ const name=$("invName").value.trim()||(type==="daily"?"فاکتور روزانه":"فاکتور جدید"), seller=$("invSeller").value.trim(),date=jalaliToISO($("invDate").value)||new Date().toISOString().slice(0,10),number=$("invNo").value.trim();
  const items=[...document.querySelectorAll("#invoiceRows .invoice-row")].map(r=>({productId:r.querySelector(".inv-product")?.value||"",desc:r.querySelector(".inv-desc")?.value.trim()||"",qty:Number(r.querySelector(".inv-qty")?.value)||0,price:Number(r.querySelector(".inv-price")?.value)||0})).filter(x=>x.desc||x.qty||x.price);
  if(!items.length)return alert("حداقل یک ردیف فاکتور وارد کن");
  const discount=Math.max(0,Number($("invDiscount").value)||0),discountPercent=Math.min(100,Math.max(0,Number($("invDiscountPercent").value)||0)),taxRate=Math.max(0,Number($("invTax").value)||0);let paid=Math.max(0,Number($("invPaid").value)||0);
  const customerName=$("invCustomerName")?.value.trim()||"";
+ const phone=$("invPhone")?.value.trim()||"";
  const settleAccountId=$("invSettleAccount")?.value||"";
- const o={name,seller,date,number,items,customerId:$("invCustomer").value||"",customerName,address:$("invAddress").value.trim(),discount,discountPercent,taxRate,paid,settleAccountId,status:$("invStatus").value,total:0};o.total=invoiceTotal(o);if(o.status==="paid")o.paid=o.total;if(o.paid>=o.total&&o.total>0)o.status="paid";else if(o.paid>0)o.status="partial";else o.status="unpaid";
+ const o={type,name,seller,date,number,items,customerId:$("invCustomer")?.value||"",customerName,phone,address:$("invAddress").value.trim(),discount,discountPercent,taxRate,paid,settleAccountId,status:$("invStatus").value,total:0};o.total=invoiceTotal(o);if(o.status==="paid")o.paid=o.total;if(o.paid>=o.total&&o.total>0)o.status="paid";else if(o.paid>0)o.status="partial";else o.status="unpaid";
  let x;
  if(id){x=data.invoices.find(v=>v.id===id);if(x){adjustStockForInvoice(x,+1);Object.assign(x,o);touch(x);markDirty("invoices",x.id,false,x,x.updatedAt);adjustStockForInvoice(x,-1)}}else{x=touch({id:uid(),...o});data.invoices.unshift(x);markDirty("invoices",x.id,false,x,x.updatedAt);adjustStockForInvoice(x,-1)}
  if(x){syncPersonForInvoice(x);syncTransactionForInvoice(x)}
@@ -1651,7 +1701,8 @@ function invoiceHTML(inv){
  const custName=invoiceCustomerLabel(inv);
  const accName=inv.settleAccountId?data.accounts.find(a=>a.id===inv.settleAccountId)?.name:"";
  const settleMeta=(Number(inv.paid)>0&&accName)?` • واریز به: ${esc(accName)}`:"";
- return `<div class="item invoice-item"><div><b>🧾 ${esc(inv.name||"فاکتور")}</b><div class="meta">${esc(inv.seller||"فروشنده ثبت نشده")}${custName?" • مشتری: "+esc(custName):""} • ${invoiceDateLabel(inv.date)}${inv.number?" • شماره "+esc(inv.number):""}</div><div class="meta">جمع کل: ${money(total)} • ${inv.status==="paid"?"🟢 پرداخت کامل":inv.status==="partial"?"🟡 پرداخت بخشی":"🔴 پرداخت نشده"} • مانده: ${money(invoiceRemaining(inv))}${settleMeta}</div></div><div class="actions"><button onclick="openInvoice('${inv.id}')">✏️</button><button onclick="previewInvoice('${inv.id}')">👁</button><button onclick="duplicateInvoice('${inv.id}')">📄</button><button onclick="shareInvoice('${inv.id}')">📤</button><button class="danger-icon" onclick="deleteInvoice('${inv.id}')">🗑</button></div></div>`
+ const dailyBadge=inv.type==="daily"?`<span class="daily-badge">روزانه</span>`:"";
+ return `<div class="item invoice-item"><div><b>🧾 ${esc(inv.name||"فاکتور")}</b>${dailyBadge}<div class="meta">${esc(inv.seller||"فروشنده ثبت نشده")}${custName?" • مشتری: "+esc(custName):""} • ${invoiceDateLabel(inv.date)}${inv.number?" • شماره "+esc(inv.number):""}</div><div class="meta">جمع کل: ${money(total)} • ${inv.status==="paid"?"🟢 پرداخت کامل":inv.status==="partial"?"🟡 پرداخت بخشی":"🔴 پرداخت نشده"} • مانده: ${money(invoiceRemaining(inv))}${settleMeta}</div></div><div class="actions"><button onclick="openInvoice('${inv.id}')">✏️</button><button onclick="previewInvoice('${inv.id}')">👁</button><button onclick="duplicateInvoice('${inv.id}')">📄</button><button onclick="shareInvoice('${inv.id}')">📤</button><button class="danger-icon" onclick="deleteInvoice('${inv.id}')">🗑</button></div></div>`
 }
 function previewInvoice(id){
  const inv=data.invoices.find(x=>x.id===id);if(!inv)return; const cust=inv.customerId?data.customers.find(c=>c.id===inv.customerId):null;
@@ -1661,7 +1712,8 @@ function previewInvoice(id){
  const custName=invoiceCustomerLabel(inv);
  const accName=inv.settleAccountId?data.accounts.find(a=>a.id===inv.settleAccountId)?.name:"";
  const settleLine=(Number(inv.paid)>0&&accName)?` • تسویه به حساب: ${esc(accName)}`:"";
- openModal(`<div id="invoicePreview" class="invoice-preview"><div class="invoice-head"><div>${b.logo?`<img class="invoice-brand-logo" src="${b.logo}" alt="لوگو">`:""}<h2>فاکتور</h2><b>${esc(inv.seller||b.storeName||"")}</b></div><div>شماره: ${esc(inv.number||"—")}<br>تاریخ: ${invoiceDateLabel(inv.date)}</div></div><h3>${esc(inv.name||"فاکتور")}</h3>${custName?`<div class="meta">مشتری: ${esc(custName)}${cust?.phone?" • "+esc(cust.phone):""}</div>`:""}<div class="meta">وضعیت: ${inv.status==="paid"?"🟢 پرداخت کامل":inv.status==="partial"?"🟡 پرداخت بخشی":"🔴 پرداخت نشده"} • مانده: ${money(invoiceRemaining(inv))}${settleLine}</div><div class="preview-inv-row head"><b>توضیحات</b><b>تعداد</b><b>مبلغ واحد</b><b>مبلغ</b></div>${rows}<div class="preview-total">جمع کل: <strong>${money(invoiceTotal(inv))}</strong></div>${signRow}</div><div class="actions"><button class="primary" onclick="printInvoice('${inv.id}')">🖨 چاپ / PDF</button><button class="primary" onclick="shareInvoice('${inv.id}')">📤 ارسال فاکتور</button></div>`)
+ const phoneVal=inv.phone||cust?.phone||"";
+ openModal(`<div id="invoicePreview" class="invoice-preview"><div class="invoice-head"><div>${b.logo?`<img class="invoice-brand-logo" src="${b.logo}" alt="لوگو">`:""}<h2>${inv.type==="daily"?"فاکتور روزانه":"فاکتور"}</h2><b>${esc(inv.seller||b.storeName||"")}</b></div><div>شماره: ${esc(inv.number||"—")}<br>تاریخ: ${invoiceDateLabel(inv.date)}</div></div><h3>${esc(inv.name||"فاکتور")}</h3>${custName?`<div class="meta">مشتری: ${esc(custName)}${phoneVal?" • "+esc(phoneVal):""}</div>`:""}${inv.address?`<div class="meta">آدرس: ${esc(inv.address)}</div>`:""}<div class="meta">وضعیت: ${inv.status==="paid"?"🟢 پرداخت کامل":inv.status==="partial"?"🟡 پرداخت بخشی":"🔴 پرداخت نشده"} • مانده: ${money(invoiceRemaining(inv))}${settleLine}</div><div class="preview-inv-row head"><b>توضیحات</b><b>تعداد</b><b>مبلغ واحد</b><b>مبلغ</b></div>${rows}<div class="preview-total">جمع کل: <strong>${money(invoiceTotal(inv))}</strong></div>${signRow}</div><div class="actions"><button class="primary" onclick="printInvoice('${inv.id}')">🖨 چاپ / PDF</button><button class="primary" onclick="shareInvoice('${inv.id}')">📤 ارسال فاکتور</button></div>`)
 }
 function loadImg(src){return new Promise(resolve=>{if(!src)return resolve(null);const im=new Image();im.onload=()=>resolve(im);im.onerror=()=>resolve(null);im.src=src})}
 async function drawInvoiceCanvas(inv){
@@ -1671,12 +1723,13 @@ async function drawInvoiceCanvas(inv){
  const c=document.createElement("canvas");c.width=W;c.height=H;const x=c.getContext("2d");
  x.fillStyle="#fff";x.fillRect(0,0,W,H);x.fillStyle="#17352b";x.textAlign="right";x.direction="rtl";
  if(logoImg)try{x.drawImage(logoImg,55,25,90,70)}catch(e){}
- x.font="bold 34px sans-serif";x.fillText("فاکتور",W-45,55);
+ x.font="bold 34px sans-serif";x.fillText(inv.type==="daily"?"فاکتور روزانه":"فاکتور",W-45,55);
  x.font="bold 22px sans-serif";x.fillText(inv.seller||b.storeName||"فروشگاه / فروشنده",W-45,95);
  x.font="17px sans-serif";x.fillStyle="#56645f";x.fillText("شماره: "+(inv.number||"—"),W-45,130);x.fillText("تاریخ: "+invoiceDateLabel(inv.date),W-245,130);
  x.fillStyle="#17352b";x.font="bold 21px sans-serif";x.fillText(inv.name||"فاکتور",W-45,180);
  const custLabel=invoiceCustomerLabel(inv);
- if(custLabel){x.font="16px sans-serif";x.fillStyle="#56645f";x.fillText("مشتری: "+custLabel,W-45,208)}
+ const custPhone=inv.phone||(inv.customerId?data.customers.find(c=>c.id===inv.customerId)?.phone:"")||"";
+ if(custLabel){x.font="16px sans-serif";x.fillStyle="#56645f";x.fillText("مشتری: "+custLabel+(custPhone?" • "+custPhone:""),W-45,208)}
  let y=245;x.fillStyle="#eaf2ee";x.fillRect(28,y-32,W-56,45);x.fillStyle="#17352b";x.font="bold 14px sans-serif";
  x.fillText("مبلغ",W-38,y-8);x.fillText("مبلغ واحد",W-230,y-8);x.fillText("تعداد",W-400,y-8);x.fillText("توضیحات",W-490,y-8);
  x.font="15px sans-serif";
@@ -1691,16 +1744,103 @@ async function drawInvoiceCanvas(inv){
  }
  return c
 }
+/* ---- v2.3 fix: real PDF generation for invoice print/share -----------
+ * Previously "چاپ / PDF" called window.print(), which has no effect
+ * inside the native Capacitor app (no print bridge is registered, and
+ * there was no @media print rule anyway so it would have printed the
+ * whole app UI, not just the invoice). And "ارسال فاکتور" only ever
+ * shared a JPEG photo of the invoice, never an actual PDF; if
+ * navigator.share failed for any non-cancel reason it silently fell
+ * back to an <a download> blob link, which does not reliably trigger a
+ * download inside the native WebView (same reason the auto-backup
+ * feature needed its own native Filesystem fallback, see above).
+ *
+ * canvasToPdfBytes() below builds a real, spec-valid one-page PDF by
+ * embedding the already-rendered invoice canvas as a JPEG image inside
+ * a minimal hand-written PDF structure. No external library or network
+ * request is needed (kept fully offline, and avoids depending on a CDN
+ * that may be filtered — see the gstatic/Firebase note above), and all
+ * the Persian text is already rasterized into the image so there is no
+ * font-embedding problem. */
+function uint8ToBase64(bytes){
+ let binary="";const chunk=0x8000;
+ for(let i=0;i<bytes.length;i+=chunk)binary+=String.fromCharCode.apply(null,bytes.subarray(i,i+chunk));
+ return btoa(binary)
+}
+function canvasToPdfBytes(canvas,quality=0.92){
+ const dataUrl=canvas.toDataURL("image/jpeg",quality);
+ const bin=atob(dataUrl.split(",")[1]);
+ const jpeg=new Uint8Array(bin.length);
+ for(let i=0;i<bin.length;i++)jpeg[i]=bin.charCodeAt(i);
+ const W=+(canvas.width*0.75).toFixed(2), H=+(canvas.height*0.75).toFixed(2);
+ const enc=s=>{const a=new Uint8Array(s.length);for(let i=0;i<s.length;i++)a[i]=s.charCodeAt(i)&0xff;return a};
+ const parts=[];let offset=0;const off=[0];
+ const push=b=>{parts.push(b);offset+=b.length};
+ push(enc("%PDF-1.3\n"));
+ off[1]=offset;push(enc("1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"));
+ off[2]=offset;push(enc("2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n"));
+ off[3]=offset;push(enc(`3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /XObject << /Im0 5 0 R >> >> /Contents 4 0 R >>\nendobj\n`));
+ const content=`q ${W} 0 0 ${H} 0 0 cm /Im0 Do Q`;
+ off[4]=offset;push(enc(`4 0 obj\n<< /Length ${content.length} >>\nstream\n${content}\nendstream\nendobj\n`));
+ off[5]=offset;push(enc(`5 0 obj\n<< /Type /XObject /Subtype /Image /Width ${canvas.width} /Height ${canvas.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpeg.length} >>\nstream\n`));
+ push(jpeg);
+ push(enc("\nendstream\nendobj\n"));
+ const xrefOffset=offset;
+ let xref="xref\n0 6\n0000000000 65535 f \n";
+ for(let i=1;i<=5;i++)xref+=String(off[i]).padStart(10,"0")+" 00000 n \n";
+ push(enc(xref));
+ push(enc(`trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`));
+ const total=parts.reduce((s,p)=>s+p.length,0),out=new Uint8Array(total);let p=0;
+ for(const part of parts){out.set(part,p);p+=part.length}
+ return out;
+}
+function isNativeApp(){try{return !!(window.Capacitor&&typeof window.Capacitor.isNativePlatform==="function"&&window.Capacitor.isNativePlatform())}catch(e){return false}}
+const INVOICE_PDF_FOLDER="Download/حسابداری/فاکتورها";
+async function buildInvoicePdf(inv){
+ const c=await drawInvoiceCanvas(inv);
+ const bytes=canvasToPdfBytes(c);
+ const filename=`${(inv.name||"فاکتور").replace(/[\\/:*?"<>|]/g,"_")}.pdf`;
+ return {bytes,filename,blob:new Blob([bytes],{type:"application/pdf"})};
+}
+/* Tries, in order: native share sheet (works for both "print" via the
+ * system Print service and sending to another app) -> native Filesystem
+ * save (Capacitor build without share support) -> plain browser download
+ * (normal browser/PWA). */
+async function shareOrSaveInvoicePdf(inv,{announceAs="فاکتور"}={}){
+ const {bytes,filename,blob}=await buildInvoicePdf(inv);
+ const file=new File([blob],filename,{type:"application/pdf"});
+ try{
+  if(navigator.share&&(!navigator.canShare||navigator.canShare({files:[file]}))){
+   await navigator.share({title:inv.name||"فاکتور",text:`${inv.name||"فاکتور"} • ${money(invoiceTotal(inv))}`,files:[file]});
+   return true;
+  }
+ }catch(e){if(e?.name==="AbortError")return false}
+ const fs=filesystemPlugin();
+ if(fs){
+  try{
+   await fs.writeFile({path:`${INVOICE_PDF_FOLDER}/${filename}`,data:uint8ToBase64(bytes),directory:AUTO_BACKUP_DIRECTORY,recursive:true});
+   alert(`${announceAs} به‌صورت PDF ذخیره شد:\nDownload/حسابداری/فاکتورها/${filename}\nاز اپ فایل‌های گوشی می‌توانی آن را باز، ارسال یا چاپ کنی.`);
+   return true;
+  }catch(e){console.warn("invoice pdf native save failed",e)}
+ }
+ try{
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+  alert(`فایل PDF ${announceAs} آماده دانلود شد.`);
+  return true;
+ }catch(e){console.warn("invoice pdf download failed",e);alert("ساخت فایل PDF فاکتور با خطا مواجه شد.");return false}
+}
 async function shareInvoice(id){
  const inv=data.invoices.find(x=>x.id===id);if(!inv)return;
- const c=await drawInvoiceCanvas(inv);
- const blob=await new Promise(r=>c.toBlob(r,"image/jpeg",.9));const file=new File([blob],`${(inv.name||"فاکتور").replace(/[\\/:*?"<>|]/g,"_")}.jpg`,{type:"image/jpeg"});
- try{
-  if(navigator.share&&(!navigator.canShare||navigator.canShare({files:[file]}))){await navigator.share({title:inv.name||"فاکتور",text:`${inv.name||"فاکتور"} • ${money(invoiceTotal(inv))}`,files:[file]});return}
- }catch(e){if(e?.name==="AbortError")return}
- const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=file.name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);alert("عکس فاکتور آماده شد؛ از گزینه اشتراک گوشی می‌توانی ارسالش کنی.")
+ await shareOrSaveInvoicePdf(inv,{announceAs:"فاکتور"});
 }
-function printInvoice(id){const inv=data.invoices.find(x=>x.id===id);if(!inv)return;previewInvoice(id);setTimeout(()=>window.print(),250)}
+async function printInvoice(id){
+ const inv=data.invoices.find(x=>x.id===id);if(!inv)return;
+ if(isNativeApp()){
+  await shareOrSaveInvoicePdf(inv,{announceAs:"فاکتور"});
+  return;
+ }
+ previewInvoice(id);setTimeout(()=>window.print(),250);
+}
 function previewBrandFile(input,type){const f=input?.files?.[0];if(!f)return;openFramer(f,type,input)}
 
 /* ===== Image framer: Telegram/Instagram-style fixed frame for logo/stamp/signature ===== */
@@ -1947,6 +2087,7 @@ function render(){
  if($("balance"))$("balance").textContent=money(totalBalance);if($("income"))$("income").textContent=money(inc);if($("expense"))$("expense").textContent=money(exp);
  if($("recent"))$("recent").innerHTML=data.transactions.slice(0,6).map(txHTML).join("")||empty("هنوز تراکنشی ثبت نشده");
  if($("accountList")&&pageActive("accounts"))$("accountList").innerHTML=data.accounts.map(a=>`<div class="item account-item"><div class="account-main"><b>${esc(a.name)}</b><div class="meta">${esc(a.bank||"حساب شخصی")}${a.sender?" • فرستنده: "+esc(a.sender):""}</div>${cardActions(a)}</div><div><strong>${money(accountBalance(a.id))}</strong>${actionButtons("openAccount","deleteAccount",a.id)}<button type="button" title="گزارش Excel" onclick="exportAccountExcel('${a.id}')">📊</button></div></div>`).join("")||empty("هنوز حسابی اضافه نشده");
+ if($("productList")&&pageActive("products"))renderProducts();
  const q=$("search")?.value?.trim()||"",ft=$("filterType")?.value||"",fc=$("filterCat")?.value||"";
  if($("reportAccount")&&pageActive("reports")){const rv=$("reportAccount").value;$("reportAccount").innerHTML='<option value="">همه حساب‌ها</option>'+data.accounts.map(a=>`<option value="${esc(a.id)}">${esc(a.name)}</option>`).join("");$("reportAccount").value=rv;}
  if($("filterCat")&&pageActive("transactions")){let opts='<option value="">همه دسته‌ها</option>'+[...data.expenseCats,...data.incomeCats].map(c=>`<option value="${esc(c.name)}">${esc(c.name)}</option>`).join("");$("filterCat").innerHTML=opts;$("filterCat").value=fc}

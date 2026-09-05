@@ -166,6 +166,8 @@ body:not(.dark) .actions button{background:var(--bg3)}
 body:not(.dark) .tabs{background:#E5E5EA}
 .tabs button{flex:1;border:none;background:transparent;padding:9px;border-radius:9px;font-weight:600;font-size:13.5px;color:var(--label)}
 .tabs button:active{background:var(--card)}
+.inv-type-tabs button.active{background:var(--card);color:var(--blue)}
+.daily-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;background:color-mix(in srgb, var(--orange) 18%, transparent);color:var(--orange);margin-inline-start:6px;vertical-align:middle}
 
 .empty{color:var(--label2);font-size:13px;padding:26px 10px!important}
 
@@ -558,6 +560,15 @@ body.personal-mode [data-page="products"],
 body.personal-mode [data-page="customers"],
 body.personal-mode [data-page="invoices"],
 body.personal-mode [data-widget="invoiceBtn"]{display:none!important}
+/* v2.3: "store" app mode keeps انبار(products)/فاکتور(invoices)/مشتری(customers)
+   together and hides the personal note-taking pages, per the chosen setup. */
+body.store-mode [data-page="notes"],
+body.store-mode [data-page="reminders"],
+body.store-mode [data-page="checks"]{display:none!important}
+.inventory-summary{display:flex;gap:8px;margin:10px 0;flex-wrap:wrap}
+.inventory-summary .inv-stat{flex:1;min-width:100px;background:var(--card);border:1px solid var(--sep);border-radius:12px;padding:10px 12px;text-align:center}
+.inventory-summary .inv-stat b{display:block;font-size:17px;margin-top:2px}
+.inventory-summary .inv-stat.warn{border-color:#e0a12e;background:rgba(224,161,46,.08)}
 #appModeBtnPersonal.primary,#appModeBtnBusiness.primary{background:var(--blue);color:#fff}
 
 /* v6.8.1 — Android WebView: one dedicated native scroll surface
@@ -579,3 +590,10 @@ button,.nav,a,input,select,textarea{touch-action:manipulation}
 .whats-new-section h3{font-size:14px;margin-bottom:6px}
 .whats-new-section ul{margin:0;padding-inline-start:20px}
 .whats-new-section li{margin:4px 0;font-size:13px}
+/* v2.3: print only the invoice preview (browser/desktop fallback path),
+   not the whole app shell — there was no @media print rule at all before. */
+@media print{
+ body *{visibility:hidden}
+ #invoicePreview,#invoicePreview *{visibility:visible}
+ #invoicePreview{position:absolute;inset:0;margin:0;box-shadow:none;border:none}
+}

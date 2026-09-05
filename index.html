@@ -22,7 +22,7 @@
     <button id="menuBtn" class="menu-trigger" aria-label="باز کردن منو" aria-haspopup="true" aria-expanded="false" aria-controls="menuModal">⋯</button>
     <img class="app-logo" src="logo.png" alt="حساب‌یار">
     <div class="top-bar-titles">
-      <h1>حساب‌یار <span class="version-pill" id="versionPill">2.1</span></h1>
+      <h1>حساب‌یار <span class="version-pill" id="versionPill">2.4</span></h1>
       <div id="syncBadge" class="sync-badge">☁️ آفلاین</div>
     </div>
   </div>
@@ -117,6 +117,7 @@
 <section id="products" class="page">
   <div class="section-head"><h2 data-i18n="page.products">📦 کالا و انبار</h2><button onclick="openProduct()">＋</button></div>
   <div class="card hint">موجودی کالا، قیمت فروش و هشدار موجودی کم. فاکتورهای فروش موجودی را خودکار کم می‌کنند.</div>
+  <div id="productSummary"></div>
   <div id="productList"></div>
 </section>
 
@@ -201,10 +202,11 @@
   <div class="settings settings-page">
 
     <div class="settings-group card" id="stgGroup-mode">
-      <div class="settings-group-head"><span>🧑‍💼</span><div><h3>حالت اپ</h3><p class="hint">در حالت «شخصی»، بخش‌های محصولات، مشتری‌ها و فاکتور از منو و صفحه خانه مخفی می‌شوند تا اپ ساده‌تر بشه. اطلاعات این بخش‌ها پاک نمی‌شود و هر وقت خواستی می‌تونی برگردونیشون.</p></div></div>
+      <div class="settings-group-head"><span>🧑‍💼</span><div><h3>حالت اپ</h3><p class="hint">«شخصی»: بخش‌های محصولات، مشتری‌ها و فاکتور مخفی می‌شوند. «کسب‌وکاری»: همه بخش‌ها فعال است. «فروشگاه»: انبار + فاکتور + مشتری با هم می‌مانند و یادداشت/یادآوری/چک مخفی می‌شوند. اطلاعات هیچ بخشی پاک نمی‌شود و هر وقت خواستی می‌تونی برگردونیشون.</p></div></div>
       <div class="settings-actions">
         <button id="appModeBtnPersonal" onclick="setAppMode('personal')">👤 شخصی</button>
         <button id="appModeBtnBusiness" onclick="setAppMode('business')">🏪 کسب‌وکاری</button>
+        <button id="appModeBtnStore" onclick="setAppMode('store')">🏬 فروشگاه</button>
       </div>
     </div>
 
@@ -391,6 +393,6 @@
 <script src="capacitor-filesystem-bridge.js"></script>
 <script src="capacitor-biometric-bridge.js"></script>
 <script src="app.js"></script>
-<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js?v=3").catch(console.error)}</script>
+<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js?v=4").catch(console.error)}</script>
 </body>
 </html>
