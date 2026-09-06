@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="3.6";
+const APP_VERSION="3.7";
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v1";
 const AUTO_BACKUP_MS=6*60*60*1000;
@@ -1754,7 +1754,7 @@ function onInvDescInput(input){
  const box=row.querySelector(".inv-suggest");
  if(box){
   const matches=val?data.products.filter(x=>(x.name||"").toLowerCase().includes(val)).slice(0,8):[];
-  box.innerHTML=matches.map(m=>`<button type="button" onmousedown="event.preventDefault()" ontouchstart="event.preventDefault()" onclick="pickInvSuggestion(this,'${m.id}')">${esc(m.name)} <small>موجودی ${fa(m.stock||0)}</small></button>`).join("");
+  box.innerHTML=matches.map(m=>`<button type="button" onmousedown="event.preventDefault()" onclick="pickInvSuggestion(this,'${m.id}')">${esc(m.name)} <small>موجودی ${fa(m.stock||0)}</small></button>`).join("");
  }
  updateInvoiceLiveTotal();
 }
