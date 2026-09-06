@@ -1,9 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="3.3";
-const GITHUB_KEY="hesabdar-github-repo-v1";
-const UPDATE_CHECK_MS=6*60*60*1000;
+const APP_VERSION="3.4";
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v1";
 const AUTO_BACKUP_MS=6*60*60*1000;
@@ -89,6 +87,21 @@ function applyAppMode(){
   if(bb)bb.classList.toggle("primary",m==="business");
   if(bs)bs.classList.toggle("primary",m==="store");
   if(m==="store"&&!STORE_ALLOWED_PAGES.some(pageActive))goToPage("invoices");
+}
+/* v3.4: «حالت اپ» از تنظیمات (که خیلی شلوغ شده بود) درآمد و شد یک دکمه
+ * کنار دارک‌مود/تغییر زبان در نوار بالا؛ همان محتوای قبلی، فقط داخل یک
+ * شیت کوچک به‌جای بخشی از صفحه تنظیمات. */
+function openAppModeSheet(){
+  openModal(`<h2>🧑‍💼 حالت اپ</h2><p class="hint">«شخصی»: بخش‌های محصولات، مشتری‌ها و فاکتور مخفی می‌شوند. «کسب‌وکاری»: همه بخش‌ها فعال است. «فروشگاه»: یک حالت قفل‌شده (کیوسک) است که فقط «صندوق فاکتور» و «کالا و انبار» در آن در دسترس‌اند (از طریق منو) و بقیه‌ی برنامه (حساب‌ها، تراکنش‌ها، گزارش‌ها، تنظیمات و...) کاملاً مخفی می‌شود. بار اول ورود به این حالت یک رمز ادمین تعیین می‌شود؛ برای خروج از حالت فروشگاه (رفتن به حالت کسب‌وکار) همیشه همان رمز ادمین لازم است. تغییر رمز ادمین هم از همینجا ممکن است. اطلاعات هیچ بخشی پاک نمی‌شود و هر وقت خواستی می‌تونی برگردونیشون.</p>
+  <div class="settings-actions">
+    <button id="appModeBtnPersonal" onclick="setAppMode('personal')">👤 شخصی</button>
+    <button id="appModeBtnBusiness" onclick="setAppMode('business')">🏪 کسب‌وکاری</button>
+    <button id="appModeBtnStore" onclick="setAppMode('store')">🏬 فروشگاه</button>
+  </div>
+  <div class="settings-actions">
+    <button onclick="changeAdminPass()">🔑 تغییر رمز ادمین فروشگاه</button>
+  </div>`);
+  applyAppMode();
 }
 const ANTHROPIC_KEY_STORAGE="hesabdar-anthropic-key-v1";
 const DEVICE_ID_KEY="hesabdar-device-id-v1";
@@ -357,7 +370,7 @@ function renderDueSoon(){
 const blankData=()=>({accounts:[],transactions:[],people:[],reminders:[],notes:[],checks:[],invoices:[],customers:[],products:[],audit:[],expenseCats:defaultsExpense.map((name,i)=>({id:"e"+i,name,children:[]})),incomeCats:defaultsIncome.map((name,i)=>({id:"i"+i,name,children:[]})),pin:"",patternHash:"",patternSalt:"",lockMethod:"pin",biometricEnabled:false,webauthnCredId:"",lang:"fa",branding:{storeName:"",logo:"",stamp:"",signature:""},yearSettlements:{}});
 window.addEventListener("error",e=>{console.error(e.error||e.message)});
 window.addEventListener("unhandledrejection",e=>{console.error(e.reason)});
-window.addEventListener("online",async()=>{if(sync.db)sync.db.enableNetwork().catch(console.error);setSyncStatus("🌐 اینترنت برقرار شد؛ در حال بررسی اتصال دو گوشی..."); if(!sync.auth)await initSync(); if(sync.dirty&&sync.dirty.size)syncSave(); await verifyTwoPhoneConnection(true); checkForUpdates(false);});
+window.addEventListener("online",async()=>{if(sync.db)sync.db.enableNetwork().catch(console.error);setSyncStatus("🌐 اینترنت برقرار شد؛ در حال بررسی اتصال دو گوشی..."); if(!sync.auth)await initSync(); if(sync.dirty&&sync.dirty.size)syncSave(); await verifyTwoPhoneConnection(true);});
 window.addEventListener("offline",()=>setSyncStatus("⚠️ اینترنت دستگاه قطع است"));
 
 let data;
@@ -896,15 +909,31 @@ armBackTrap();
 window.addEventListener("popstate",()=>{performBack();armBackTrap()});
 (function initSwipeBack(){
  const EDGE=28,THRESH=65,MAXV_RATIO=.55;
- let sx=0,sy=0,active=false;
+ let sx=0,sy=0,active=false,confirmedHorizontal=false;
  document.addEventListener("touchstart",e=>{
   if(e.touches.length!==1)return;
   const t=e.touches[0]; sx=t.clientX; sy=t.clientY;
   active=(sx<=EDGE||sx>=window.innerWidth-EDGE);
+  confirmedHorizontal=false;
  },{passive:true});
+ /* v3.4 fix: without a touchmove handler here, once a gesture started at
+  * the edge, the WebView's own native "swipe from edge = go back" gesture
+  * could still fire at the same time as ours (each one racing the other),
+  * which is what produced the white-flash-then-slow-return-to-home bug on
+  * pages like کالا و انبار. Once we can tell the drag is clearly
+  * horizontal, we call preventDefault() so only our own performBack() (via
+  * touchend below) ever runs — never the WebView's. */
+ document.addEventListener("touchmove",e=>{
+  if(!active||e.touches.length!==1)return;
+  const t=e.touches[0],dx=t.clientX-sx,dy=Math.abs(t.clientY-sy);
+  if(!confirmedHorizontal&&Math.abs(dx)>12&&dy<Math.abs(dx)*MAXV_RATIO)confirmedHorizontal=true;
+  if(confirmedHorizontal&&e.cancelable)e.preventDefault();
+ },{passive:false});
  document.addEventListener("touchend",e=>{
-  if(!active)return; active=false;
+  if(!active){confirmedHorizontal=false;return}
+  active=false;
   const t=e.changedTouches[0],dx=t.clientX-sx,dy=Math.abs(t.clientY-sy);
+  confirmedHorizontal=false;
   if(Math.abs(dx)>THRESH&&dy<Math.abs(dx)*MAXV_RATIO)performBack();
  },{passive:true});
 })();
@@ -949,18 +978,81 @@ function categoryButtons(type,selected=""){
       <button type="button" class="cat-btn ${isParentSel?"selected-cat":""}" onclick="pickCategory('${type}','${c.id}')">${esc(c.name)}${kids.length?'<span class="cat-caret">›</span>':""}</button>
       ${kids.length?`<div class="cat-children">${kids.map(ch=>{const full=c.name+" - "+ch.name;return `<button type="button" class="cat-chip ${selected===full?"selected-cat":""}" onclick="pickSubCategory('${type}','${c.id}','${ch.id}')">${esc(ch.name)}</button>`}).join("")}</div>`:""}
     </div>`;
-  }).join("")}</div>`;
+  }).join("")}</div><button type="button" class="cat-manage-link" onclick="openCategory()">⚙ مدیریت کامل دسته‌ها و زیرمجموعه‌ها</button>`;
 }
-function openTx(id=null){if(!data.accounts.length)return alert("اول از بخش حساب‌ها یک حساب اضافه کنید");const t=id&&data.transactions.find(x=>x.id===id);if(t?.type==="transfer")return openTransfer(id);const typ=t?.type||"expense";openModal(`<h2>${t?"ویرایش تراکنش":"ثبت تراکنش"}</h2><div class="form"><div class="type-switch"><button type="button" id="expBtn" class="${typ==="expense"?"chosen":""}" onclick="txType('expense')">💸 هزینه</button><button type="button" id="incBtn" class="${typ==="income"?"chosen":""}" onclick="txType('income')">💰 دریافت</button></div><input id="txKind" type="hidden" value="${typ}"><input id="title" placeholder="عنوان" value="${esc(t?.title||"")}"><input id="amount" type="number" placeholder="مبلغ" value="${Number(t?.amount)||""}"><div id="expensePanel" style="display:${typ==="expense"?"block":"none"}"><b id="catLabel">${t?.category?"دسته: "+esc(t.category):"دسته را انتخاب کنید"}</b>${categoryButtons("expense",typ==="expense"?t?.category:"")}<input id="cat" type="hidden" value="${esc(typ==="expense"?t?.category||"":"")}"></div><div id="incomePanel" style="display:${typ==="income"?"block":"none"}"><b id="incatLabel">${t?.category?"دسته: "+esc(t.category):"دسته را انتخاب کنید"}</b>${categoryButtons("income",typ==="income"?t?.category:"")}<input id="incat" type="hidden" value="${esc(typ==="income"?t?.category||"":"")}"></div>${accountSelect("acc",t?.accountID||"")}<label class="hint" style="display:block;margin-top:8px">🔁 تکرار خودکار</label><select id="txRecur"><option value="none" ${!t?.recurring||t?.recurring==="none"?"selected":""}>بدون تکرار</option><option value="weekly" ${t?.recurring==="weekly"?"selected":""}>هفتگی</option><option value="monthly" ${t?.recurring==="monthly"?"selected":""}>ماهانه</option></select><label class="file-label">📎 تصویر پیوست (اختیاری)<input id="txImage" type="file" accept="image/*" onchange="previewTxImage(this)"></label>${t?.image?`<div class="attachment-preview"><img src="${t.image}" alt="پیوست"></div>`:""}<div id="txImagePreview"></div><button class="primary" onclick="saveTx('${t?.id||""}')">${t?"ذخیره تغییرات":"ثبت تراکنش"}</button></div>`)}
+function openTx(id=null){if(!data.accounts.length)return alert("اول از بخش حساب‌ها یک حساب اضافه کنید");const t=id&&data.transactions.find(x=>x.id===id);if(t?.type==="transfer")return openTransfer(id);const typ=t?.type||"expense";openModal(`<h2>${t?"ویرایش تراکنش":"ثبت تراکنش"}</h2><div class="form"><div class="type-switch"><button type="button" id="expBtn" class="${typ==="expense"?"chosen":""}" onclick="txType('expense')">💸 هزینه</button><button type="button" id="incBtn" class="${typ==="income"?"chosen":""}" onclick="txType('income')">💰 دریافت</button></div><input id="txKind" type="hidden" value="${typ}"><input id="title" placeholder="عنوان" value="${esc(t?.title||"")}"><input id="amount" type="number" placeholder="مبلغ" value="${Number(t?.amount)||""}"><div id="expensePanel" style="display:${typ==="expense"?"block":"none"}"><div class="cat-head-row"><b id="catLabel">${t?.category?"دسته: "+esc(t.category):"دسته را انتخاب کنید"}</b><div class="cat-toolbar"><button type="button" title="افزودن دسته" onclick="quickAddCategory('expense')">＋</button><button type="button" title="ویرایش دسته انتخاب‌شده" onclick="quickEditCategory('expense')">✏️</button><button type="button" title="حذف دسته انتخاب‌شده" class="danger-icon" onclick="quickDeleteCategory('expense')">🗑</button></div></div><div id="expenseCatButtons">${categoryButtons("expense",typ==="expense"?t?.category:"")}</div><input id="cat" type="hidden" value="${esc(typ==="expense"?t?.category||"":"")}"></div><div id="incomePanel" style="display:${typ==="income"?"block":"none"}"><div class="cat-head-row"><b id="incatLabel">${t?.category?"دسته: "+esc(t.category):"دسته را انتخاب کنید"}</b><div class="cat-toolbar"><button type="button" title="افزودن دسته" onclick="quickAddCategory('income')">＋</button><button type="button" title="ویرایش دسته انتخاب‌شده" onclick="quickEditCategory('income')">✏️</button><button type="button" title="حذف دسته انتخاب‌شده" class="danger-icon" onclick="quickDeleteCategory('income')">🗑</button></div></div><div id="incomeCatButtons">${categoryButtons("income",typ==="income"?t?.category:"")}</div><input id="incat" type="hidden" value="${esc(typ==="income"?t?.category||"":"")}"></div>${accountSelect("acc",t?.accountID||"")}<label class="hint" style="display:block;margin-top:8px">🔁 تکرار خودکار</label><select id="txRecur"><option value="none" ${!t?.recurring||t?.recurring==="none"?"selected":""}>بدون تکرار</option><option value="weekly" ${t?.recurring==="weekly"?"selected":""}>هفتگی</option><option value="monthly" ${t?.recurring==="monthly"?"selected":""}>ماهانه</option></select><label class="file-label">📎 تصویر پیوست (اختیاری)<input id="txImage" type="file" accept="image/*" onchange="previewTxImage(this)"></label>${t?.image?`<div class="attachment-preview"><img src="${t.image}" alt="پیوست"></div>`:""}<div id="txImagePreview"></div><button class="primary" onclick="saveTx('${t?.id||""}')">${t?"ذخیره تغییرات":"ثبت تراکنش"}</button></div>`)}
 function txType(t){$("txKind").value=t;$("expBtn").classList.toggle("chosen",t==="expense");$("incBtn").classList.toggle("chosen",t==="income");$("expensePanel").style.display=t==="expense"?"block":"none";$("incomePanel").style.display=t==="income"?"block":"none"}
 function pickCategory(type,id){const c=(type==="expense"?data.expenseCats:data.incomeCats).find(x=>x.id===id);if(!c)return;setCategoryValue(type,c.name)}
 function pickSubCategory(type,catId,childId){const c=(type==="expense"?data.expenseCats:data.incomeCats).find(x=>x.id===catId);const ch=c?.children?.find(x=>x.id===childId);if(!c||!ch)return;setCategoryValue(type,c.name+" - "+ch.name)}
 function setCategoryValue(type,name){
   const valEl=$(type==="expense"?"cat":"incat"), labelEl=$(type==="expense"?"catLabel":"incatLabel");
   if(valEl)valEl.value=name; if(labelEl)labelEl.textContent="دسته: "+name;
-  const panel=$(type==="expense"?"expensePanel":"incomePanel");
-  const win=panel?.querySelector(".category-window");
-  if(win)win.outerHTML=categoryButtons(type,name);
+  refreshCategoryButtonsInTxForm(type);
+}
+/* v3.4: «دسته‌ها» از منوی کناری حذف و به همین‌جا (داخل فرم ثبت تراکنش)
+ * منتقل شد — با یک دکمه ＋ برای افزودن دسته، ✏️ برای ویرایش دسته‌ی
+ * انتخاب‌شده و 🗑 برای حذفش، درست روبه‌روی انتخاب دسته. مدیریت کامل‌تر
+ * (زیرمجموعه‌ها) هنوز از طریق openCategory() ممکن است. */
+function refreshCategoryButtonsInTxForm(type){
+  const wrap=$(type==="expense"?"expenseCatButtons":"incomeCatButtons");
+  const valEl=$(type==="expense"?"cat":"incat");
+  if(wrap)wrap.innerHTML=categoryButtons(type,valEl?.value||"");
+}
+function findCategoryBySelectedName(type,name){
+  if(!name)return null;
+  const arr=type==="expense"?data.expenseCats:data.incomeCats;
+  const parts=name.split(" - ");
+  const cat=arr.find(c=>c.name===parts[0]);
+  if(!cat)return null;
+  if(parts.length>1){const child=(cat.children||[]).find(ch=>ch.name===parts[1]);return child?{cat,child}:null}
+  return {cat,child:null};
+}
+function quickAddCategory(type){
+  const n=prompt("نام دسته جدید:");if(!n?.trim())return;
+  const arr=type==="expense"?data.expenseCats:data.incomeCats;
+  const nc=touch({id:uid(),name:n.trim(),children:[]});
+  arr.push(nc);markDirty(type==="expense"?"expenseCats":"incomeCats",nc.id,false,nc,nc.updatedAt);save();
+  logEvent("ایجاد دسته",n.trim(),"create");
+  refreshCategoryButtonsInTxForm(type);
+}
+function quickEditCategory(type){
+  const valEl=$(type==="expense"?"cat":"incat");
+  const found=findCategoryBySelectedName(type,valEl?.value||"");
+  if(!found)return alert("اول یک دسته را از لیست انتخاب کن");
+  if(found.child){
+    const n=prompt("نام جدید:",found.child.name);if(!n?.trim())return;
+    const oldFull=found.cat.name+" - "+found.child.name;found.child.name=n.trim();const newFull=found.cat.name+" - "+found.child.name;
+    touch(found.cat);markDirty(type==="expense"?"expenseCats":"incomeCats",found.cat.id,false,found.cat,found.cat.updatedAt);
+    data.transactions.forEach(t=>{if(t.category===oldFull){t.category=newFull;touch(t);markDirty("transactions",t.id,false,t,t.updatedAt)}});
+    save();
+    if(valEl&&valEl.value===oldFull)setCategoryValue(type,newFull);else refreshCategoryButtonsInTxForm(type);
+  }else{
+    const n=prompt("نام جدید:",found.cat.name);if(!n?.trim())return;
+    const old=found.cat.name;found.cat.name=n.trim();
+    touch(found.cat);markDirty(type==="expense"?"expenseCats":"incomeCats",found.cat.id,false,found.cat,found.cat.updatedAt);
+    data.transactions.forEach(t=>{
+      if(t.category===old){t.category=found.cat.name;touch(t);markDirty("transactions",t.id,false,t,t.updatedAt)}
+      else if(String(t.category||"").startsWith(old+" - ")){t.category=found.cat.name+t.category.slice(old.length);touch(t);markDirty("transactions",t.id,false,t,t.updatedAt)}
+    });
+    save();
+    if(valEl&&valEl.value===old)setCategoryValue(type,found.cat.name);else refreshCategoryButtonsInTxForm(type);
+  }
+}
+function quickDeleteCategory(type){
+  const valEl=$(type==="expense"?"cat":"incat");
+  const found=findCategoryBySelectedName(type,valEl?.value||"");
+  if(!found)return alert("اول یک دسته را از لیست انتخاب کن");
+  if(found.child){
+    if(!confirm("این زیرمجموعه حذف شود؟"))return;
+    found.cat.children=(found.cat.children||[]).filter(x=>x.id!==found.child.id);
+    touch(found.cat);markDirty(type==="expense"?"expenseCats":"incomeCats",found.cat.id,false,found.cat,found.cat.updatedAt);save();
+  }else{
+    if(!confirm("این دسته و همه زیرمجموعه‌های آن حذف شود؟"))return;
+    removeRecord(type==="expense"?"expenseCats":"incomeCats",found.cat.id);
+  }
+  if(valEl)valEl.value="";
+  const labelEl=$(type==="expense"?"catLabel":"incatLabel");if(labelEl)labelEl.textContent="دسته را انتخاب کنید";
+  refreshCategoryButtonsInTxForm(type);
 }
 async function saveTx(id){
  const amount=parseMoney($("amount").value),type=$("txKind").value,category=type==="expense"?$("cat").value:$("incat").value;
@@ -1416,14 +1508,28 @@ function moveNote(id,dir){
  touch(a);touch(b); markDirty("notes",a.id,false,a,a.updatedAt); markDirty("notes",b.id,false,b,b.updatedAt);
  save();
 }
+/* v3.4 fix: this used to just toggle an "open" class while CSS animated
+ * max-height from 0 to a fixed, oversized cap (600px, or 3000px for
+ * page-accordion). For a note with only one or two short items, the browser
+ * still has to lay out and paint that whole oversized box on every open —
+ * on a slower Android WebView that shows up as a visible stutter/lag right
+ * as the item list appears, which is «با لگ باز میشه». Measuring the
+ * section's real height and animating to that instead removes the wasted
+ * layout work, so it opens smoothly regardless of how short or long the
+ * content is. */
 function toggleAccordion(btn,event){
  if(event)event.stopPropagation();
  const card=btn?.closest(".accordion-card");if(!card)return;
+ const body=card.querySelector(".accordion-body");
  const open=!card.classList.contains("open");
  card.classList.toggle("open",open);
  btn.setAttribute("aria-expanded",String(open));
  const accId=card.dataset.accId;
  if(accId){if(open)openAccordions.add(accId);else openAccordions.delete(accId)}
+ if(body){
+  body.style.maxHeight=(open?body.scrollHeight:0)+"px";
+  if(open)setTimeout(()=>{if(card.classList.contains("open"))body.style.maxHeight="none"},260);
+ }
 }
 
 
@@ -1439,11 +1545,10 @@ function moveReminder(id,dir){
 async function saveReminder(id){if(!$("rt").value||!$("rdPicker").value)return alert("عنوان و تاریخ لازم است");const o={title:$("rt").value.trim(),amount:parseMoney($("ra").value),date:pickerToISO("rdPicker","rtPicker"),repeat:$("rr").value,type:$("rb").value};if(id){const r=data.reminders.find(x=>x.id===id);Object.assign(r,o);touch(r);markDirty("reminders",r.id,false,r,r.updatedAt);save();await cancelNativeReminder(r.id);await scheduleNativeReminder(r);if((r.type||"")==="note" && (r.repeat||"once")==="once") await addToAndroidClock(r)}else{const maxOrder=data.reminders.length?Math.max(...data.reminders.map(x=>x.order??0)):-1;const nr=touch({id:uid(),order:maxOrder+1,...o});data.reminders.push(nr);markDirty("reminders",nr.id,false,nr,nr.updatedAt);save();await scheduleNativeReminder(nr);if((nr.type||"")==="note" && (nr.repeat||"once")==="once") await addToAndroidClock(nr)}logEvent(id?"ویرایش یادآوری":"ایجاد یادآوری",o.title,id?"edit":"create");closeModal()}
 async function deleteReminder(id){if(confirm("این یادآوری حذف شود؟")){const r=data.reminders.find(x=>x.id===id);await cancelNativeReminder(id);removeRecord("reminders",id);logEvent("حذف یادآوری",r?.title||id,"delete")}}
 
-function openCheck(id=null){const c=id&&data.checks.find(x=>x.id===id);openModal(`<h2>${c?"ویرایش چک":"ثبت چک"}</h2><div class="form"><select id="ct"><option value="receive" ${c?.type==="receive"?"selected":""}>چک دریافتی</option><option value="pay" ${c?.type==="pay"?"selected":""}>چک پرداختی</option></select><input id="cn" placeholder="نام شخص" value="${esc(c?.name||"")}"><input id="camount" type="number" placeholder="مبلغ" value="${Number(c?.amount)||""}">${simpleDateField("cdate",jalaliInputValue(c?.date||""))}<input id="cnum" placeholder="شماره چک" value="${esc(c?.number||"")}"><input id="cbank" placeholder="بانک" value="${esc(c?.bank||"")}"><textarea id="cnote" placeholder="توضیحات">${esc(c?.note||"")}</textarea><button class="primary" onclick="saveCheck('${c?.id||""}')">${c?"ذخیره تغییرات":"ذخیره"}</button></div>`)}
-function saveCheck(id){if(!$("cn").value.trim()||!parseMoney($("camount").value)||!$("cdate").value)return alert("نام، مبلغ و تاریخ لازم است");const o={type:$("ct").value,name:$("cn").value.trim(),amount:parseMoney($("camount").value),date:jalaliToISO($("cdate").value),number:$("cnum").value.trim(),bank:$("cbank").value.trim(),note:$("cnote").value};if(id){const c=data.checks.find(x=>x.id===id);Object.assign(c,o);touch(c);markDirty("checks",c.id,false,c,c.updatedAt)}else{const nc=touch({id:uid(),done:false,...o});data.checks.push(nc);markDirty("checks",nc.id,false,nc,nc.updatedAt)}save();logEvent(id?"ویرایش چک":"ثبت چک",`${o.name} • ${money(o.amount)}`,id?"edit":"create");closeModal()}
+function openCheck(id=null){const c=id&&data.checks.find(x=>x.id===id);openModal(`<h2>${c?"ویرایش چک":"ثبت چک"}</h2><div class="form"><select id="ct"><option value="receive" ${c?.type==="receive"?"selected":""}>چک دریافتی</option><option value="pay" ${c?.type==="pay"?"selected":""}>چک پرداختی</option></select><input id="cn" placeholder="نام شخص" value="${esc(c?.name||"")}"><input id="cnid" inputmode="numeric" maxlength="10" placeholder="کد ملی (اختیاری)" value="${esc(c?.nationalCode||"")}"><input id="camount" type="number" placeholder="مبلغ" value="${Number(c?.amount)||""}">${simpleDateField("cdate",jalaliInputValue(c?.date||""))}<input id="cnum" placeholder="شماره چک" value="${esc(c?.number||"")}"><input id="cbank" placeholder="بانک" value="${esc(c?.bank||"")}"><textarea id="cnote" placeholder="توضیحات">${esc(c?.note||"")}</textarea><button class="primary" onclick="saveCheck('${c?.id||""}')">${c?"ذخیره تغییرات":"ذخیره"}</button></div>`)}
+function saveCheck(id){if(!$("cn").value.trim()||!parseMoney($("camount").value)||!$("cdate").value)return alert("نام، مبلغ و تاریخ لازم است");const o={type:$("ct").value,name:$("cn").value.trim(),nationalCode:$("cnid").value.trim(),amount:parseMoney($("camount").value),date:jalaliToISO($("cdate").value),number:$("cnum").value.trim(),bank:$("cbank").value.trim(),note:$("cnote").value};if(id){const c=data.checks.find(x=>x.id===id);Object.assign(c,o);touch(c);markDirty("checks",c.id,false,c,c.updatedAt)}else{const nc=touch({id:uid(),done:false,...o});data.checks.push(nc);markDirty("checks",nc.id,false,nc,nc.updatedAt)}save();logEvent(id?"ویرایش چک":"ثبت چک",`${o.name} • ${money(o.amount)}`,id?"edit":"create");closeModal()}
 function deleteCheck(id){if(confirm("این چک حذف شود؟")){const c=data.checks.find(x=>x.id===id);removeRecord("checks",id);logEvent("حذف چک",c?.name||id,"delete")}}
-function githubRepo(){return (localStorage.getItem(GITHUB_KEY)||"").trim().replace(/^https?:\/\/github\.com\//i,"").replace(/\.git$/i,"").replace(/\/$/,"")}
-function saveGithubRepo(){const v=$("githubRepo")?.value.trim().replace(/^https?:\/\/github\.com\//i,"").replace(/\.git$/i,"").replace(/\/$/,"");if(!/^[^/\s]+\/[^/\s]+$/.test(v))return alert("مخزن را به شکل username/repository وارد کن");localStorage.setItem(GITHUB_KEY,v);setUpdateStatus("مخزن GitHub ذخیره شد: "+v);checkForUpdates(true)}
+
 
 /* ============================================================
  * یادداشت هوشمند (Smart Note) — تحلیل متن آزاد با Claude (Anthropic)
@@ -1571,13 +1676,12 @@ function addSmartNoteSelected(){
   alert(`${fa(chosen.length)} مورد اضافه شد.`);
   closeModal();
 }
-function setUpdateStatus(t){const e=$("updateStatus");if(e)e.textContent=t||""}
-function versionParts(v){return String(v||"").replace(/^v/i,"").split(".").map(x=>parseInt(x,10)||0)}
-function isNewerVersion(remote,local){const a=versionParts(remote),b=versionParts(local);for(let i=0;i<Math.max(a.length,b.length);i++){if((a[i]||0)>(b[i]||0))return true;if((a[i]||0)<(b[i]||0))return false}return false}
-async function notifyUpdate(remote,url){const msg="نسخه جدید حسابدار "+remote+" منتشر شده است";try{if("Notification" in window && Notification.permission==="granted")new Notification("بروزرسانی حسابدار",{body:msg});else if("Notification" in window && Notification.permission!=="denied")await Notification.requestPermission().then(p=>{if(p==="granted")new Notification("بروزرسانی حسابدار",{body:msg})})}catch(e){} if(url && confirm(msg+"\n\nبرای مشاهده صفحه انتشار باز شود؟"))window.open(url,"_blank","noopener,noreferrer")}
-async function checkForUpdates(manual=false){const repo=githubRepo();if($("githubRepo"))$("githubRepo").value=repo;if(!repo){setUpdateStatus("ابتدا مخزن GitHub را در تنظیمات وارد کن.");return false}if(manual)setUpdateStatus("در حال بررسی نسخه جدید...");try{const r=await fetch("https://api.github.com/repos/"+repo+"/releases/latest",{headers:{Accept:"application/vnd.github+json"},cache:"no-store"});if(!r.ok)throw new Error("GitHub "+r.status);const rel=await r.json(),remote=rel.tag_name||rel.name||"";if(isNewerVersion(remote,APP_VERSION)){setUpdateStatus("⚠️ نسخه جدید "+remote+" موجود است");localStorage.setItem("hesabdar-last-update",remote);await notifyUpdate(remote,rel.html_url)}else{setUpdateStatus("✅ برنامه به‌روز است؛ نسخه فعلی "+APP_VERSION);localStorage.setItem("hesabdar-last-update",remote)}return true}catch(e){setUpdateStatus("❌ بررسی GitHub انجام نشد؛ اینترنت و نام مخزن را بررسی کن.");return false}}
+
+/* v3.4: قابلیت «بروزرسانی از GitHub» به‌طور کامل حذف شد (چک‌کردن مخزن،
+ * ورودی نام مخزن و اعلان نسخه جدید). به‌روزرسانی سرویس‌ورکر (فایل‌های خود
+ * همین گوشی) و پشتیبان خودکار هر ۶ ساعت هنوز کار می‌کنند. */
 async function updateServiceWorkerNow(){try{if(!('serviceWorker' in navigator))return; const reg=await navigator.serviceWorker.getRegistration(); if(reg){await reg.update();}}catch(e){console.warn("service worker update",e)}}
-function startUpdateChecker(){setTimeout(()=>{checkForUpdates(false);updateServiceWorkerNow()},2500);setInterval(()=>{checkForUpdates(false);updateServiceWorkerNow()},UPDATE_CHECK_MS);setInterval(()=>{maybeAutoBackup("هر ۶ ساعت")},AUTO_BACKUP_MS)}
+function startUpdateChecker(){setTimeout(()=>{updateServiceWorkerNow()},2500);setInterval(()=>{updateServiceWorkerNow()},AUTO_BACKUP_MS);setInterval(()=>{maybeAutoBackup("هر ۶ ساعت")},AUTO_BACKUP_MS)}
 async function testNotifications(){
   const ok=await requestNativeNotifications();
   if(!ok)return alert("اجازه اعلان داده نشد. از تنظیمات گوشی/مرورگر اجازه اعلان را برای حساب‌یار فعال کن.");
@@ -1628,7 +1732,7 @@ function empty(s){return `<div class="card" style="text-align:center">${s}</div>
 
 function invoiceDateLabel(v){return jalaliLabel(v)}
 function invField(label,hint,inner){return `<div class="field"><span class="field-cap">${esc(label)}</span>${inner}${hint?`<small class="field-hint">${esc(hint)}</small>`:""}</div>`}
-function invoiceRowHTML(item,i){return `<div class="invoice-row"><input type="hidden" class="inv-product" value="${esc(item?.productId||"")}"><input class="inv-desc" list="invProductsList" autocomplete="off" placeholder="نام کالا یا خدمت (تایپ کن تا از انبار پیشنهاد بیاید)" value="${esc(item?.desc||"")}" oninput="onInvDescInput(this)"><input class="inv-qty" oninput="updateInvoiceLiveTotal()" type="number" min="0" step="any" placeholder="تعداد" value="${Number(item?.qty)||""}"><input class="inv-price" oninput="this.dataset.userEdited='1';updateInvoiceLiveTotal()" type="number" min="0" step="any" placeholder="قیمت هر واحد" value="${Number(item?.price)||""}"><button type="button" class="danger-icon" title="حذف ردیف" onclick="this.parentElement.remove();updateInvoiceLiveTotal()">🗑</button></div>`}
+function invoiceRowHTML(item,i){return `<div class="invoice-row"><input type="hidden" class="inv-product" value="${esc(item?.productId||"")}"><div class="inv-desc-wrap"><input class="inv-desc" autocomplete="off" placeholder="نام کالا یا خدمت (تایپ کن تا از انبار پیشنهاد بیاید)" value="${esc(item?.desc||"")}" oninput="onInvDescInput(this)" onfocus="onInvDescInput(this)" onblur="hideInvSuggestions(this)"><div class="inv-suggest"></div></div><input class="inv-qty" oninput="updateInvoiceLiveTotal()" type="number" min="0" step="any" placeholder="تعداد" value="${Number(item?.qty)||""}"><input class="inv-price" oninput="this.dataset.userEdited='1';updateInvoiceLiveTotal()" type="number" min="0" step="any" placeholder="قیمت هر واحد" value="${Number(item?.price)||""}"><button type="button" class="danger-icon" title="حذف ردیف" onclick="this.parentElement.remove();updateInvoiceLiveTotal()">🗑</button></div>`}
 function addInvoiceRow(pref={}){const box=$("invoiceRows");if(!box)return;const div=document.createElement("div");div.innerHTML=invoiceRowHTML(pref,box.children.length);box.appendChild(div.firstElementChild)}
 /* v3.3: جایگزین select کالا شد با سرچ زنده روی همون فیلد «توضیحات» —
  * هرچی تایپ کنی، لیست کالاهای انبار (از طریق <datalist>) فیلتر و پیشنهاد
@@ -1636,6 +1740,10 @@ function addInvoiceRow(pref={}){const box=$("invoiceRows");if(!box)return;const 
  * موجودی انبار هنگام ذخیره) خودکار پر می‌شود. اگر متن تایپ‌شده دقیقاً با
  * هیچ کالایی مطابق نباشد (مثلاً یک خدمت دلخواه)، فقط همان توضیح متنی ساده
  * ذخیره می‌شود، بدون اتصال به انبار. */
+/* v3.4: به‌جای <datalist> مرورگر (که داخل اپ روی گوشی خیلی وقت‌ها اصلاً
+ * چیزی نشون نمی‌داد یا کلیک روش درست کار نمی‌کرد)، یک لیست پیشنهاد خودمون
+ * زیر همین اینپوت رسم می‌کنیم که هم موقع تایپ زیرش دیده می‌شود و هم با
+ * کلیک روی هرکدوم مقدار داخل اینپوت جایگزین می‌شود. */
 function onInvDescInput(input){
  const row=input.closest(".invoice-row");if(!row)return;
  const val=input.value.trim().toLowerCase();
@@ -1643,7 +1751,27 @@ function onInvDescInput(input){
  const p=val?data.products.find(x=>(x.name||"").trim().toLowerCase()===val):null;
  if(p){hidden.value=p.id;const priceEl=row.querySelector(".inv-price");if(priceEl&&!priceEl.dataset.userEdited)priceEl.value=p.price||0}
  else hidden.value="";
+ const box=row.querySelector(".inv-suggest");
+ if(box){
+  const matches=val?data.products.filter(x=>(x.name||"").toLowerCase().includes(val)).slice(0,8):[];
+  box.innerHTML=matches.map(m=>`<button type="button" onmousedown="event.preventDefault()" ontouchstart="event.preventDefault()" onclick="pickInvSuggestion(this,'${m.id}')">${esc(m.name)} <small>موجودی ${fa(m.stock||0)}</small></button>`).join("");
+ }
  updateInvoiceLiveTotal();
+}
+function pickInvSuggestion(btn,productId){
+ const row=btn.closest(".invoice-row");if(!row)return;
+ const p=data.products.find(x=>x.id===productId);if(!p)return;
+ const input=row.querySelector(".inv-desc"),hidden=row.querySelector(".inv-product"),priceEl=row.querySelector(".inv-price"),box=row.querySelector(".inv-suggest");
+ if(input)input.value=p.name;
+ if(hidden)hidden.value=p.id;
+ if(priceEl&&!priceEl.dataset.userEdited)priceEl.value=p.price||0;
+ if(box)box.innerHTML="";
+ updateInvoiceLiveTotal();
+ input?.focus();
+}
+function hideInvSuggestions(input){
+ const row=input.closest(".invoice-row");const box=row?.querySelector(".inv-suggest");
+ setTimeout(()=>{if(box)box.innerHTML=""},150);
 }
 /* v3.3: انتخاب مشتری از لیست پرونده‌ها → نام/تلفن/آدرس فاکتور خودکار از
  * همان پرونده‌ی مشتری پر می‌شود تا لازم نباشد دوباره تایپ کنی. */
@@ -1700,7 +1828,6 @@ function openInvoice(id=null){
  </div>
  ${invField("آدرس","اختیاری؛ آدرس مشتری",`<textarea id="invAddress" placeholder="مثلاً: تهران، خیابان ...">${esc(inv?.address||cust?.address||"")}</textarea>`)}
  <div class="invoice-table-head"><span>توضیحات / نام کالا</span><span>تعداد</span><span>مبلغ واحد</span><span></span></div>
- <datalist id="invProductsList">${data.products.map(p=>`<option value="${esc(p.name)}">`).join("")}</datalist>
  <div id="invoiceRows">${items.map(invoiceRowHTML).join("")}</div>
  <button type="button" class="ghost-btn" onclick="addInvoiceRow()">＋ افزودن ردیف کالا یا خدمت</button>
  <div class="invoice-total-box"><div class="inv-total-row"><span>جمع اقلام</span><strong id="invLiveSubtotal">۰ تومان</strong></div><div class="inv-total-row"><span>تخفیف و مالیات</span><strong id="invLiveAdjust">۰ تومان</strong></div><div class="inv-total-row inv-total-final"><span>مبلغ نهایی فاکتور</span><strong id="invLiveTotal">۰ تومان</strong></div></div>
@@ -2252,8 +2379,7 @@ function render(){
  if($("reminderList")&&pageActive("reminders")){const normalReminders=data.reminders.filter(r=>!r.sourceNoteId).sort((a,b)=>(a.order??0)-(b.order??0)); const noteAlarms=data.reminders.filter(r=>r.sourceNoteId); const normal=normalReminders.map((r,i)=>{const accId="rem-"+r.id;const isOpen=openAccordions.has(accId);return `<div class="item accordion-card${isOpen?' open':''}" data-acc-id="${accId}"><button class="accordion-head" type="button" aria-expanded="${isOpen}" onclick="toggleAccordion(this,event)"><span>🔔 <b>${esc(r.title)}</b></span><span>⌄</span></button><div class="accordion-body"><div class="meta">${jalaliLabel(r.date)} • ${r.repeat==="once"?"یک‌بار":r.repeat==="weekly"?"هفتگی":"ماهانه"}</div><div class="accordion-actions"><strong>${r.amount?money(r.amount):""}</strong><div class="reorder-btns"><button type="button" title="انتقال به بالا" ${i===0?"disabled":""} onclick="event.stopPropagation();moveReminder('${r.id}',-1)">▲</button><button type="button" title="انتقال به پایین" ${i===normalReminders.length-1?"disabled":""} onclick="event.stopPropagation();moveReminder('${r.id}',1)">▼</button></div>${actionButtons("openReminder","deleteReminder",r.id)}</div></div></div>`}).join(""); $("reminderList").innerHTML=`<div class="section-label">🔔 یادآوری‌های مستقل</div>${normal||empty("یادآوری مستقلی ندارید")}${noteAlarms.length?`<div class="section-label">📝⏰ آلارم یادداشت‌ها</div>`+noteAlarms.map(r=>{const accId="remnote-"+r.id;const isOpen=openAccordions.has(accId);return `<div class="item accordion-card${isOpen?' open':''}" data-acc-id="${accId}"><button class="accordion-head" type="button" aria-expanded="${isOpen}" onclick="toggleAccordion(this,event)"><span>📝 <b>${esc(r.title)}</b></span><span>⌄</span></button><div class="accordion-body"><div class="meta">${jalaliLabel(r.date)} • ${r.repeat==="once"?"یک‌بار":r.repeat==="weekly"?"هفتگی":"ماهانه"}</div></div></div>`}).join(""):``}`;}
  if($("noteList")&&pageActive("notes")){const sortedNotes=[...data.notes].sort((a,b)=>(a.order??0)-(b.order??0));$("noteList").innerHTML=sortedNotes.map((n,i)=>noteHTML(n,{i,total:sortedNotes.length})).join("")||empty("یادداشتی ندارید");}
  if($("invoiceList")&&pageActive("invoices"))$("invoiceList").innerHTML=data.invoices.map(invoiceHTML).join("")||empty("هنوز فاکتوری ساخته نشده است");
- if($("checkList")&&pageActive("checks"))$("checkList").innerHTML=data.checks.map(c=>`<div class="item"><div><b>${c.type==="receive"?"دریافتی":"پرداختی"} • ${esc(c.name)}</b><div class="meta">${jalaliLabel(c.date)}${c.bank?" • "+esc(c.bank):""}</div></div><div><strong>${money(c.amount)}</strong>${actionButtons("openCheck","deleteCheck",c.id)}</div></div>`).join("")||empty("چکی ثبت نشده");
- if($("categoryList")&&pageActive("categories")){const catLine=c=>esc(c.name)+((c.children||[]).length?" ("+c.children.map(ch=>esc(ch.name)).join("، ")+")":"");$("categoryList").innerHTML='<div class="card"><b>هزینه‌ها</b><p>'+data.expenseCats.map(catLine).join(" • ")+'</p><b>دریافت‌ها</b><p>'+data.incomeCats.map(catLine).join(" • ")+'</p></div>';}
+ if($("checkList")&&pageActive("checks"))$("checkList").innerHTML=data.checks.map(c=>`<div class="item"><div><b>${c.type==="receive"?"دریافتی":"پرداختی"} • ${esc(c.name)}</b><div class="meta">${jalaliLabel(c.date)}${c.bank?" • "+esc(c.bank):""}${c.nationalCode?" • کد ملی "+esc(c.nationalCode):""}</div></div><div><strong>${money(c.amount)}</strong>${actionButtons("openCheck","deleteCheck",c.id)}</div></div>`).join("")||empty("چکی ثبت نشده");
  if(pageActive("reports")){
    const debt=data.people.filter(p=>p.type==="debt").reduce((s,p)=>s+((Number(p.amount)||0)-(Number(p.paid)||0)),0),credit=data.people.filter(p=>p.type==="credit").reduce((s,p)=>s+((Number(p.amount)||0)-(Number(p.paid)||0)),0);
    if($("totalDebt"))$("totalDebt").textContent=money(debt);if($("totalCredit"))$("totalCredit").textContent=money(credit);

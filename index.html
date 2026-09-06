@@ -22,11 +22,12 @@
     <button id="menuBtn" class="menu-trigger" aria-label="باز کردن منو" aria-haspopup="true" aria-expanded="false" aria-controls="menuModal">⋯</button>
     <img class="app-logo" src="logo.png" alt="حساب‌یار">
     <div class="top-bar-titles">
-      <h1>حساب‌یار <span class="version-pill" id="versionPill">3.3</span></h1>
+      <h1>حساب‌یار <span class="version-pill" id="versionPill">3.4</span></h1>
       <div id="syncBadge" class="sync-badge">☁️ آفلاین</div>
     </div>
   </div>
   <div class="header-actions">
+    <button id="appModeToggle" onclick="openAppModeSheet()" aria-label="حالت اپ" title="حالت اپ">🧑‍💼</button>
     <button id="langToggle" onclick="toggleAppLanguage()" aria-label="تغییر زبان برنامه">EN</button>
     <button id="theme" aria-label="تغییر حالت روشن/تاریک">☾</button>
   </div>
@@ -157,11 +158,6 @@
   <div id="checkList"></div>
 </section>
 
-<section id="categories" class="page">
-  <div class="section-head"><h2 data-i18n="page.categories">دسته‌بندی هزینه‌ها</h2><button onclick="openCategory()">＋</button></div>
-  <div id="categoryList"></div>
-</section>
-
 <section id="reports" class="page">
   <h2 data-i18n="page.reports">داشبورد و گزارش</h2>
   <div class="grid">
@@ -205,18 +201,6 @@
   <p class="hint settings-intro">تنظیمات را به بخش‌های جدا تقسیم کرده‌ایم تا پیدا کردن هر گزینه راحت‌تر باشد.</p>
   <div class="settings settings-page">
 
-    <div class="settings-group card" id="stgGroup-mode">
-      <div class="settings-group-head"><span>🧑‍💼</span><div><h3>حالت اپ</h3><p class="hint">«شخصی»: بخش‌های محصولات، مشتری‌ها و فاکتور مخفی می‌شوند. «کسب‌وکاری»: همه بخش‌ها فعال است. «فروشگاه»: یک حالت قفل‌شده (کیوسک) است که فقط «صندوق فاکتور» و «کالا و انبار» در آن در دسترس‌اند (از طریق منو) و بقیه‌ی برنامه (حساب‌ها، تراکنش‌ها، گزارش‌ها، تنظیمات و...) کاملاً مخفی می‌شود. بار اول ورود به این حالت یک رمز ادمین تعیین می‌شود؛ برای خروج از حالت فروشگاه (رفتن به حالت کسب‌وکار) همیشه همان رمز ادمین لازم است — از طریق دکمه‌ی «رفتن به حالت کسب‌وکار» بالای صفحه. تغییر رمز ادمین هم از تنظیمات ممکن است. اطلاعات هیچ بخشی پاک نمی‌شود و هر وقت خواستی می‌تونی برگردونیشون.</p></div></div>
-      <div class="settings-actions">
-        <button id="appModeBtnPersonal" onclick="setAppMode('personal')">👤 شخصی</button>
-        <button id="appModeBtnBusiness" onclick="setAppMode('business')">🏪 کسب‌وکاری</button>
-        <button id="appModeBtnStore" onclick="setAppMode('store')">🏬 فروشگاه</button>
-      </div>
-      <div class="settings-actions">
-        <button onclick="changeAdminPass()">🔑 تغییر رمز ادمین فروشگاه</button>
-      </div>
-    </div>
-
     <div class="settings-group card" id="stgGroup-branding">
       <div class="settings-group-head"><span>🏪</span><div><h3 data-i18n="stg.branding.title">ظاهر فروشگاه و فاکتور</h3><p class="hint">نام فروشگاه، لوگو، مهر و امضا برای فاکتور.</p></div></div>
       <input id="brandStore" placeholder="نام فروشگاه"/>
@@ -251,21 +235,13 @@
     </div>
 
     <div class="settings-group card upgrade-card" id="stgGroup-backup">
-      <div class="settings-group-head"><span>🚀</span><div><h3 data-i18n="stg.backup.title">پشتیبان و بروزرسانی</h3><p class="hint">پشتیبان خودکار و بررسی نسخه جدید.</p></div></div>
+      <div class="settings-group-head"><span>🚀</span><div><h3 data-i18n="stg.backup.title">پشتیبان‌گیری خودکار</h3><p class="hint">هر ۶ ساعت یک فایل پشتیبان واقعی ساخته می‌شود.</p></div></div>
       <label class="feature-row"><input id="autoBackupToggle" type="checkbox" onchange="setAutoBackupEnabled(this.checked)"><span><b>حالت اتوماتیک بکاپ</b><small>هر ۶ ساعت یک فایل پشتیبان واقعی داخل پوشه «Download / حسابداری» گوشی ساخته می‌شود (حداکثر ۵ فایل)</small></span></label>
       <div id="autoBackupLast" class="hint"></div>
       <div class="settings-actions">
         <button onclick="restoreLatestAutoBackup()">♻️ بازیابی آخرین بکاپ خودکار</button>
-        <button onclick="checkForUpdates(true)">🔄 بررسی بروزرسانی</button>
         <button onclick="verifyTwoPhoneConnection(true)">📱 بررسی مجدد اتصال ۲ گوشی</button>
       </div>
-    </div>
-
-    <div class="settings-group card">
-      <div class="settings-group-head"><span>🔄</span><div><h3 data-i18n="stg.github.title">بروزرسانی از GitHub</h3><p class="hint">نام مخزن را وارد کن تا نسخه جدید بررسی شود.</p></div></div>
-      <input id="githubRepo" placeholder="مثال: username/hesabdar">
-      <button onclick="saveGithubRepo()">💾 ذخیره مخزن GitHub</button>
-      <div id="updateStatus" class="hint"></div>
     </div>
 
     <div class="settings-group card" id="stgGroup-manualBackup">
@@ -304,7 +280,7 @@
     </div>
 
   </div>
-  <p class="hint settings-footer">نسخه <span id="appVersionText">3.3</span> • بکاپ خودکار • بروزرسانی • اتصال دو گوشی • تقویم شمسی کامل</p>
+  <p class="hint settings-footer">نسخه <span id="appVersionText">3.4</span> • بکاپ خودکار • اتصال دو گوشی • تقویم شمسی کامل</p>
   <p class="hint">تغییرات روی این گوشی ذخیره می‌شود و در صورت اتصال به Firebase با گوشی دوم ادغام می‌گردد.</p>
 </section>
 
@@ -344,7 +320,6 @@
       <div class="menu-group">
         <div class="menu-group-title" data-i18n="menu.other">دیگر</div>
         <div class="menu-grid">
-          <button class="nav" data-page="categories">#<span data-i18n="nav.categories">دسته‌ها</span></button>
           <button class="nav" data-page="settings">⚙<span data-i18n="nav.settings">تنظیمات</span></button>
         </div>
       </div>

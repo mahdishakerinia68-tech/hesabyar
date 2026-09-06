@@ -224,6 +224,12 @@ body:not(.dark) .card-number-box{background:var(--bg3)}
 
 /* categories */
 .category-window{display:flex;flex-wrap:wrap;gap:8px;max-height:220px;overflow:auto;padding:4px 2px}
+.cat-head-row{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.cat-toolbar{display:flex;gap:6px}
+.cat-toolbar button{border:none;background:var(--bg3);color:var(--label);border-radius:8px;width:30px;height:30px;font-size:14px;display:flex;align-items:center;justify-content:center}
+.cat-toolbar button.danger-icon{background:color-mix(in srgb, var(--red) 12%, transparent);color:var(--red)}
+.cat-toolbar button:active{transform:scale(.92)}
+.cat-manage-link{display:block;width:100%;text-align:center;background:none;border:none;color:var(--label2);font-size:11.5px;padding:6px 2px 2px;text-decoration:underline}
 .cat-btn{border:.5px solid var(--sep);background:var(--card);padding:9px 14px;border-radius:999px;font-size:13px;color:var(--label)}
 .cat-btn.selected-cat{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:700}
 
@@ -283,9 +289,16 @@ body:not(.dark) .sheet .close{background:#E5E5EA}
 
 /* invoice builder */
 .invoice-table-head{display:grid;grid-template-columns:2.2fr .7fr .9fr .3fr;gap:6px;font-size:10.5px;color:var(--label2);padding:0 4px;font-weight:700}
-.invoice-row{display:grid;grid-template-columns:2.2fr .7fr .9fr .3fr;gap:6px;align-items:center}
+.invoice-row{display:grid;grid-template-columns:2.2fr .7fr .9fr .3fr;gap:6px;align-items:start}
 .invoice-row select,.invoice-row input{padding:9px 8px;font-size:12.5px;border-radius:9px;border:.5px solid var(--sep);background:var(--card);color:var(--label);width:100%;min-width:0}
 .invoice-row button{border:none;background:color-mix(in srgb, var(--red) 12%, transparent);color:var(--red);border-radius:8px;height:32px}
+.inv-desc-wrap{position:relative;width:100%}
+.inv-suggest{position:absolute;z-index:60;top:100%;right:0;left:0;margin-top:3px;background:var(--card);border:.5px solid var(--sep);border-radius:10px;max-height:190px;overflow:auto;box-shadow:0 6px 18px rgba(0,0,0,.18)}
+.inv-suggest:empty{display:none;border:none;box-shadow:none}
+.inv-suggest button{display:flex;justify-content:space-between;gap:8px;width:100%;text-align:right;padding:8px 10px;border:none;background:none;color:var(--label);font:inherit;border-bottom:.5px solid var(--sep)}
+.inv-suggest button:last-child{border-bottom:none}
+.inv-suggest button:active{background:var(--bg3)}
+.inv-suggest button small{color:var(--label2);font-size:10.5px;white-space:nowrap}
 /* On narrow phones, five squeezed columns get unreadable — stack each row
    into a small card instead of shrinking columns to nothing. */
 @media (max-width:400px){
@@ -296,7 +309,7 @@ body:not(.dark) .sheet .close{background:#E5E5EA}
     background:var(--card);border:.5px solid var(--sep);border-radius:var(--radius-sm);
     padding:8px;margin-bottom:8px;
   }
-  .invoice-row .inv-desc{grid-area:desc}
+  .invoice-row .inv-desc-wrap{grid-area:desc}
   .invoice-row .inv-qty{grid-area:qty}
   .invoice-row .inv-price{grid-area:price}
   .invoice-row button{grid-area:del;width:100%}
@@ -598,7 +611,16 @@ body.store-mode .store-exit-bar{display:flex;justify-content:center;padding:8px 
  * This avoids WebView/body scrolling differences and avoids nested scrolling.
  */
 html,body{width:100%;height:100%;min-height:100%;margin:0;overflow:hidden!important;overscroll-behavior:none}
-body{touch-action:auto;-webkit-user-select:none;user-select:none}
+/* v3.4 fix: this used to reset touch-action back to "auto" on body, silently
+ * undoing the "pan-y" set higher up in this file (whose whole point was to
+ * stop the WebView's own edge-swipe-back gesture from firing alongside our
+ * JS swipe handler). With it back to "auto", swiping in from the edge on a
+ * page with tall content (e.g. کالا و انبار) could let the native gesture
+ * win: the WebView actually navigated back in its history, which reloaded
+ * index.html from scratch — a blank/white flash followed by the app
+ * re-initializing from its first page (home), i.e. exactly the "سفید میشه و
+ * با تاخیر میره خانه" bug. Keeping it pan-y here too closes that gap. */
+body{touch-action:pan-y;-webkit-user-select:none;user-select:none}
 .app{width:100%;max-width:600px;height:100vh;min-height:100vh;margin:0 auto;display:block;overflow-x:hidden!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;touch-action:pan-y;padding-bottom:calc(var(--safe-b) + 32px)}
 main{width:100%;min-height:0;height:auto;display:block;overflow:visible!important;padding:0;touch-action:pan-y}
 .page{min-height:0;height:auto;touch-action:pan-y}
