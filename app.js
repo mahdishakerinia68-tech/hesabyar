@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="3.8";
+const APP_VERSION="3.9";
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v1";
 const AUTO_BACKUP_MS=6*60*60*1000;
@@ -762,11 +762,10 @@ function showWhatsNewOnce(){
   <h2>🎉 به حساب‌یار خوش آمدی</h2>
   <p class="hint">این صفحه فقط یک‌بار در اولین اجرای این نسخه نمایش داده می‌شود.</p>
   <div class="whats-new-section">
-   <h3>🛠 تغییرات این نسخه (۳.۸)</h3>
+   <h3>🛠 تغییرات این نسخه (۳.۹)</h3>
    <ul>
-    <li>در فرم ثبت تراکنش، زیرمجموعه‌های هر دسته دیگر همیشه باز نیستند؛ با زدن روی خود دسته باز می‌شود و از داخلش زیرمجموعه را انتخاب می‌کنی.</li>
-    <li>به «کالا و انبار» جعبه‌ی جستجوی کالا اضافه شد و کالاهای کم‌موجودی که در بالای لیست می‌آیند حالا با رنگ مشخص هم برجسته می‌شوند.</li>
-    <li>آیتم جدید «📈 افزایش موجودی کالا»: کالا را سرچ کن، تعداد را بنویس و با ＋ موجودی‌اش را جمع بزن، بدون باز کردن فرم کامل ویرایش.</li>
+    <li>صفحه تنظیمات به‌جای یک لیست بلند و شلوغ، حالا هر بخش را باید باز کنی: با زدن روی عنوان هر بخش، همان بخش باز می‌شود و بقیه جمع می‌مانند.</li>
+    <li>میان‌برهای تنظیمات در صفحه خانه هم هوشمند شدند؛ با زدن روی هرکدام، به تنظیمات می‌روی و بخش مربوطه خودکار باز و هایلایت می‌شود.</li>
    </ul>
   </div>
   <div class="whats-new-section">
@@ -2347,6 +2346,7 @@ function goToSettingsGroup(targetId){
  if(navBtn)navBtn.click();
  setTimeout(()=>{
   const el=$(targetId);if(!el)return;
+  if(!el.classList.contains("open")){const head=el.querySelector(".accordion-head");if(head)toggleAccordion(head)}
   el.scrollIntoView({behavior:"smooth",block:"start"});
   el.classList.add("settings-group-highlight");
   setTimeout(()=>el.classList.remove("settings-group-highlight"),1600);
