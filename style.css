@@ -584,13 +584,15 @@ body.personal-mode [data-widget="invoiceBtn"]{display:none!important}
    the hamburger menu button stays visible so the two allowed pages can be
    switched between; a fixed bar with the only way out stays on screen:
    "رفتن به حالت کسب‌وکار" (admin-password gated, see setAppMode() in app.js). */
+/* v3.5: مشتری‌ها هم به فهرست فروشگاهی برگشت — دقیقاً مثل صندوق فاکتور و
+ * کالا و انبار، کامل و با همون امکانات حالت کسب‌وکار در دسترسه. */
+/* v3.6: ثبت چک هم به فهرست فروشگاهی اضافه شد — کامل و با همون امکانات
+ * حالت کسب‌وکار. */
 body.store-mode [data-page="home"],
 body.store-mode [data-page="transactions"],
 body.store-mode [data-page="reports"],
 body.store-mode [data-page="accounts"],
 body.store-mode [data-page="people"],
-body.store-mode [data-page="customers"],
-body.store-mode [data-page="checks"],
 body.store-mode [data-page="reminders"],
 body.store-mode [data-page="notes"],
 body.store-mode [data-page="categories"],

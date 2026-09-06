@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="3.4";
+const APP_VERSION="3.6";
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v1";
 const AUTO_BACKUP_MS=6*60*60*1000;
@@ -61,7 +61,7 @@ function changeAdminPass(){
    (kept visible in store mode, with every other menu item still hidden).
    No separate mode; store mode itself just has two reachable pages now. */
 const LOCKED_MODES=["store"];
-const STORE_ALLOWED_PAGES=["invoices","products"];
+const STORE_ALLOWED_PAGES=["invoices","products","customers","checks"];
 async function setAppMode(v){
  const cur=appMode();
  if(cur===v)return;
@@ -855,9 +855,9 @@ function goToPage(name,fromNav){
  logEvent("ورود به بخش",page?.querySelector("h2")?.textContent||name,"nav");
 }
 function goBackPage(){
- /* در حالت فروشگاه به بیرون از دو صفحه‌ی مجاز (صندوق فاکتور/کالا و انبار)
-    برنمی‌گردیم؛ فراتر از قفل activatePage، خود استک تاریخچه هم درگیر
-    صفحات قدیمی قبل از ورود به حالت فروشگاه نمی‌شود. */
+ /* در حالت فروشگاه به بیرون از صفحات مجاز (صندوق فاکتور/کالا و انبار/
+    مشتری‌ها/چک) برنمی‌گردیم؛ فراتر از قفل activatePage، خود استک تاریخچه
+    هم درگیر صفحات قدیمی قبل از ورود به حالت فروشگاه نمی‌شود. */
  if(appMode()==="store"){
   while(pageHistory.length>1&&!STORE_ALLOWED_PAGES.includes(pageHistory[pageHistory.length-2]))pageHistory.splice(pageHistory.length-2,1);
   if(pageHistory.length>1){pageHistory.pop();activatePage(pageHistory[pageHistory.length-1]);return true}
