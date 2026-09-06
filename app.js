@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="3.9";
+const APP_VERSION="3.11";
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v1";
 const AUTO_BACKUP_MS=6*60*60*1000;
@@ -59,7 +59,9 @@ function changeAdminPass(){
    v3.1: "store" now also allows reaching «کالا و انبار» (products) from
    inside the kiosk — not just the invoice box — via the hamburger menu
    (kept visible in store mode, with every other menu item still hidden).
-   No separate mode; store mode itself just has two reachable pages now. */
+   v3.10: «مشتری‌ها» و «چک‌ها» هم به همین لیست اضافه شدند — یک فروشنده در
+   کیوسک باید بتواند پرونده مشتری و چک‌های دریافتی/پرداختی را هم ببیند،
+   بدون دسترسی به بقیه‌ی برنامه (حساب‌ها، تراکنش‌ها، گزارش‌ها، تنظیمات). */
 const LOCKED_MODES=["store"];
 const STORE_ALLOWED_PAGES=["invoices","products","customers","checks"];
 async function setAppMode(v){
@@ -92,7 +94,7 @@ function applyAppMode(){
  * کنار دارک‌مود/تغییر زبان در نوار بالا؛ همان محتوای قبلی، فقط داخل یک
  * شیت کوچک به‌جای بخشی از صفحه تنظیمات. */
 function openAppModeSheet(){
-  openModal(`<h2>🧑‍💼 حالت اپ</h2><p class="hint">«شخصی»: بخش‌های محصولات، مشتری‌ها و فاکتور مخفی می‌شوند. «کسب‌وکاری»: همه بخش‌ها فعال است. «فروشگاه»: یک حالت قفل‌شده (کیوسک) است که فقط «صندوق فاکتور» و «کالا و انبار» در آن در دسترس‌اند (از طریق منو) و بقیه‌ی برنامه (حساب‌ها، تراکنش‌ها، گزارش‌ها، تنظیمات و...) کاملاً مخفی می‌شود. بار اول ورود به این حالت یک رمز ادمین تعیین می‌شود؛ برای خروج از حالت فروشگاه (رفتن به حالت کسب‌وکار) همیشه همان رمز ادمین لازم است. تغییر رمز ادمین هم از همینجا ممکن است. اطلاعات هیچ بخشی پاک نمی‌شود و هر وقت خواستی می‌تونی برگردونیشون.</p>
+  openModal(`<h2>🧑‍💼 حالت اپ</h2><p class="hint">«شخصی»: بخش‌های محصولات، مشتری‌ها و فاکتور مخفی می‌شوند. «کسب‌وکاری»: همه بخش‌ها فعال است. «فروشگاه»: یک حالت قفل‌شده (کیوسک) است که فقط «صندوق فاکتور»، «کالا و انبار»، «مشتری‌ها» و «چک‌ها» در آن در دسترس‌اند (از طریق منو) و بقیه‌ی برنامه (حساب‌ها، تراکنش‌ها، گزارش‌ها، تنظیمات و...) کاملاً مخفی می‌شود. بار اول ورود به این حالت یک رمز ادمین تعیین می‌شود؛ برای خروج از حالت فروشگاه (رفتن به حالت کسب‌وکار) همیشه همان رمز ادمین لازم است. تغییر رمز ادمین هم از همینجا ممکن است. اطلاعات هیچ بخشی پاک نمی‌شود و هر وقت خواستی می‌تونی برگردونیشون.</p>
   <div class="settings-actions">
     <button id="appModeBtnPersonal" onclick="setAppMode('personal')">👤 شخصی</button>
     <button id="appModeBtnBusiness" onclick="setAppMode('business')">🏪 کسب‌وکاری</button>
@@ -395,6 +397,8 @@ if(!data.accounts.some(a=>String(a.name||"").trim()==="کیف پول نقدی"))
 data.transactions??=[];data.people??=[];data.customers??=[];data.products??=[];data.reminders??=[];data.notes??=[];data.checks??=[];data.invoices??=[];data.audit??=[];data.expenseCats??=defaultsExpense.map((name,i)=>({id:"e"+i,name,children:[]}));data.incomeCats??=defaultsIncome.map((name,i)=>({id:"i"+i,name,children:[]}));data.pin=typeof data.pin==="string"?data.pin:"";data.pinHash=typeof data.pinHash==="string"?data.pinHash:"";data.pinSalt=typeof data.pinSalt==="string"?data.pinSalt:"";data.patternHash=typeof data.patternHash==="string"?data.patternHash:"";data.patternSalt=typeof data.patternSalt==="string"?data.patternSalt:"";data.lockMethod=(data.lockMethod==="pattern")?"pattern":"pin";data.biometricEnabled=!!data.biometricEnabled;data.webauthnCredId=typeof data.webauthnCredId==="string"?data.webauthnCredId:"";data.lang=(data.lang==="en")?"en":"fa";data.branding??={storeName:"",logo:"",stamp:"",signature:""};data.branding.storeName??="";data.branding.logo??="";data.branding.stamp??="";data.branding.signature??="";data.yearSettlements??={};data._sync??={tombstones:{}};data._sync.tombstones??={};for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats"]){for(const r of data[k]){r.id??=uid();r.updatedAt??=new Date().toISOString()}}for(const c of [...data.expenseCats,...data.incomeCats]){c.children??=[];for(const ch of c.children){ch.id??=uid()}}
 // Normalize older people records so saved debtors/creditors always render correctly.
 for(const p of data.people){if(p.type==="debtor"||p.type==="debtors"||p.type==="بدهکار")p.type="debt";if(p.type==="creditor"||p.type==="creditors"||p.type==="طلبکار"||p.type==="بستانکار")p.type="credit";if(p.type!=="debt"&&p.type!=="credit")p.type="debt";p.amount=Number(p.amount)||0;p.paid=Number(p.paid)||0;p.name=String(p.name||"").trim()} 
+// v3.10: older checks از قبل از اتصال چک به حساب — مقادیر پیش‌فرض بگیرند تا خطا ندهند.
+for(const c of data.checks){c.settled=!!c.settled;c.accountID=typeof c.accountID==="string"?c.accountID:"";c.txId=c.txId||null}
 let peopleMode="debt";
 const AUDIT_LIMIT=1000;
 /* v5.9 perf fix: logEvent() used to write the ENTIRE app data blob to
@@ -762,10 +766,12 @@ function showWhatsNewOnce(){
   <h2>🎉 به حساب‌یار خوش آمدی</h2>
   <p class="hint">این صفحه فقط یک‌بار در اولین اجرای این نسخه نمایش داده می‌شود.</p>
   <div class="whats-new-section">
-   <h3>🛠 تغییرات این نسخه (۳.۹)</h3>
+   <h3>🛠 تغییرات این نسخه (۳.۱۱)</h3>
    <ul>
-    <li>صفحه تنظیمات به‌جای یک لیست بلند و شلوغ، حالا هر بخش را باید باز کنی: با زدن روی عنوان هر بخش، همان بخش باز می‌شود و بقیه جمع می‌مانند.</li>
-    <li>میان‌برهای تنظیمات در صفحه خانه هم هوشمند شدند؛ با زدن روی هرکدام، به تنظیمات می‌روی و بخش مربوطه خودکار باز و هایلایت می‌شود.</li>
+    <li>هر چک حالا به یک حساب وصل می‌شود. با زدن «✅ ثبت نشستن»، مبلغ چک دریافتی به همان حساب اضافه یا مبلغ چک پرداختی از آن کسر می‌شود و یک تراکنش واقعی هم در «تراکنش‌ها» ثبت می‌گردد؛ «لغو نشستن» همان تراکنش را برمی‌دارد.</li>
+    <li>بخش چک‌ها و مشتری‌ها به حالت «فروشگاه» (کیوسک) هم اضافه شدند.</li>
+    <li>انتقال به «حساب دیگران» حالا روش انتقال را هم می‌پرسد: «کارت به کارت» (شماره کارت) یا «انتقال به شبا» (شماره شبا).</li>
+    <li>همه‌ی انتقال‌ها (چه بین حساب‌های خودت، چه به حساب دیگران) علاوه بر «تراکنش‌ها»، حالا در خود بخش «انتقال بین حساب‌ها» هم فهرست می‌شوند.</li>
    </ul>
   </div>
   <div class="whats-new-section">
@@ -1151,25 +1157,43 @@ function processBankMessage(){
   data.transactions.unshift(nt);markDirty("transactions",nt.id,false,nt,nt.updatedAt);save();logEvent("ثبت پیامک بانکی",`${title} • ${money(amount)}`,"create");closeModal();
 }
 function saveBankTx(type,amount,accountID){const nt=touch({id:uid(),title:$("bt").value.trim()||"تراکنش بانکی",amount,type,category:$("bc").value,accountID,date:new Date().toISOString(),source:"bank"});data.transactions.unshift(nt);markDirty("transactions",nt.id,false,nt,nt.updatedAt);save();logEvent("ایجاد تراکنش بانکی",`${nt.title} • ${money(nt.amount)}`,"create");closeModal()}
+/* v3.11: انتقال به «حساب دیگران» تا امروز فقط شماره کارت گیرنده را
+   می‌گرفت. حالا روش انتقال هم مشخص می‌شود — «کارت به کارت» (شماره کارت
+   ۱۶ رقمی) یا «انتقال به شبا» (شماره شبا) — و همان روش هم در عنوان
+   پیش‌فرض تراکنش و هم در لیست «انتقال بین حساب‌ها» نمایش داده می‌شود. */
 function openTransfer(id=null){
  const t=id&&data.transactions.find(x=>x.id===id);
- const mode=t?.destinationType||((t?.otherName||t?.otherCard)?"other":"self");
+ const mode=t?.destinationType||((t?.otherName||t?.otherCard||t?.otherSheba)?"other":"self");
+ const method=t?.otherMethod==="sheba"?"sheba":"card";
  const fromId=t?.from||data.accounts[0]?.id||"";
  if(!fromId)return alert("ابتدا یک حساب اضافه کنید");
  openModal(`<h2>${t?"ویرایش انتقال":"انتقال / کارت‌به‌کارت"}</h2><div class="form">
  <label>نوع مقصد</label><div class="type-switch"><button type="button" id="selfTransferBtn" class="${mode==="self"?"chosen":""}" onclick="transferMode('self')">🏦 حساب خودم</button><button type="button" id="otherTransferBtn" class="${mode==="other"?"chosen":""}" onclick="transferMode('other')">👤 حساب دیگران</button></div>
  <input id="transferMode" type="hidden" value="${mode}"><div id="selfTransferPanel" style="display:${mode==="self"?"block":"none"}">${accountSelect("from",fromId)}<span style="text-align:center">↓</span>${accountSelect("to",t?.to||data.accounts.find(a=>a.id!==fromId)?.id||"")}</div>
- <div id="otherTransferPanel" style="display:${mode==="other"?"block":"none"}"><select id="otherFrom">${data.accounts.map(a=>`<option value="${a.id}" ${a.id===fromId?"selected":""}>${esc(a.name)}</option>`).join("")}</select><input id="otherName" placeholder="نام صاحب حساب / گیرنده" value="${esc(t?.otherName||"")}"><input id="otherCard" inputmode="numeric" placeholder="شماره کارت گیرنده" value="${esc(t?.otherCard||"")}"></div>
+ <div id="otherTransferPanel" style="display:${mode==="other"?"block":"none"}"><select id="otherFrom">${data.accounts.map(a=>`<option value="${a.id}" ${a.id===fromId?"selected":""}>${esc(a.name)}</option>`).join("")}</select><input id="otherName" placeholder="نام صاحب حساب / گیرنده" value="${esc(t?.otherName||"")}">
+   <label class="hint" style="display:block;margin:6px 2px 4px">روش انتقال</label>
+   <div class="type-switch"><button type="button" id="otherMethodCardBtn" class="${method==="card"?"chosen":""}" onclick="otherTransferMethod('card')">💳 کارت به کارت</button><button type="button" id="otherMethodShebaBtn" class="${method==="sheba"?"chosen":""}" onclick="otherTransferMethod('sheba')">🏦 انتقال به شبا</button></div>
+   <input id="otherMethod" type="hidden" value="${method}">
+   <input id="otherCard" inputmode="numeric" maxlength="16" placeholder="شماره کارت گیرنده (۱۶ رقم)" value="${esc(t?.otherCard||"")}" style="display:${method==="card"?"block":"none"}">
+   <input id="otherSheba" inputmode="numeric" maxlength="26" placeholder="شماره شبا گیرنده (IR + ۲۴ رقم)" value="${esc(t?.otherSheba||"")}" style="display:${method==="sheba"?"block":"none"}">
+ </div>
  <input id="tam" type="number" placeholder="مبلغ" value="${Number(t?.amount)||""}"><input id="tnote" placeholder="توضیحات" value="${esc(t?.title||"")}"><button class="primary" onclick="saveTransfer('${t?.id||""}')">${t?"ذخیره تغییرات":"ثبت انتقال"}</button></div>`)
 }
 function transferMode(mode){$("transferMode").value=mode;$("selfTransferBtn").classList.toggle("chosen",mode==="self");$("otherTransferBtn").classList.toggle("chosen",mode==="other");$("selfTransferPanel").style.display=mode==="self"?"block":"none";$("otherTransferPanel").style.display=mode==="other"?"block":"none"}
+function otherTransferMethod(method){$("otherMethod").value=method;$("otherMethodCardBtn").classList.toggle("chosen",method==="card");$("otherMethodShebaBtn").classList.toggle("chosen",method==="sheba");$("otherCard").style.display=method==="card"?"block":"none";$("otherSheba").style.display=method==="sheba"?"block":"none"}
 function saveTransfer(id){
  const mode=$("transferMode").value,amount=parseMoney($("tam").value);if(!amount)return alert("مبلغ را وارد کنید");
+ const method=mode==="other"?$("otherMethod").value:"";
  if(mode==="self"){
   if(!$("to").value||$("from").value===$("to").value)return alert("مبدأ و مقصد باید متفاوت باشند");
- }else if(!$("otherName").value.trim()||!$("otherCard").value.trim())return alert("نام و شماره کارت گیرنده را وارد کنید");
+ }else{
+  if(!$("otherName").value.trim())return alert("نام گیرنده را وارد کنید");
+  if(method==="card"&&!$("otherCard").value.trim())return alert("شماره کارت گیرنده را وارد کنید");
+  if(method==="sheba"&&!$("otherSheba").value.trim())return alert("شماره شبای گیرنده را وارد کنید");
+ }
  const from=mode==="self"?$("from").value:$("otherFrom").value;
- const o={title:$("tnote").value.trim()||"کارت‌به‌کارت",amount,type:"transfer",from,to:mode==="self"?$("to").value:null,source:"transfer",destinationType:mode,otherName:mode==="other"?$("otherName").value.trim():"",otherCard:mode==="other"?$("otherCard").value.trim():""};
+ const defaultTitle=mode==="other"?(method==="sheba"?"انتقال به شبا":"کارت‌به‌کارت"):"انتقال بین حساب‌ها";
+ const o={title:$("tnote").value.trim()||defaultTitle,amount,type:"transfer",from,to:mode==="self"?$("to").value:null,source:"transfer",destinationType:mode,otherName:mode==="other"?$("otherName").value.trim():"",otherMethod:mode==="other"?method:"",otherCard:mode==="other"&&method==="card"?$("otherCard").value.trim():"",otherSheba:mode==="other"&&method==="sheba"?$("otherSheba").value.trim():""};
  if(id){const t=data.transactions.find(x=>x.id===id);if(!t)return;Object.assign(t,o);touch(t);markDirty("transactions",t.id,false,t,t.updatedAt)}else{const nt=touch({id:uid(),date:new Date().toISOString(),...o});data.transactions.unshift(nt);markDirty("transactions",nt.id,false,nt,nt.updatedAt)}save();logEvent(id?"ویرایش انتقال":"ایجاد انتقال",`${money(amount)} • ${mode==="other"?o.otherName:"حساب خودم"}`,id?"edit":"create");closeModal()
 }
 function deleteTx(id){if(confirm("این تراکنش حذف شود؟")){const t=data.transactions.find(x=>x.id===id);removeRecord("transactions",id);logEvent("حذف تراکنش",t?.title||id,"delete")}}
@@ -1590,9 +1614,54 @@ function moveReminder(id,dir){
 async function saveReminder(id){if(!$("rt").value||!$("rdPicker").value)return alert("عنوان و تاریخ لازم است");const o={title:$("rt").value.trim(),amount:parseMoney($("ra").value),date:pickerToISO("rdPicker","rtPicker"),repeat:$("rr").value,type:$("rb").value};if(id){const r=data.reminders.find(x=>x.id===id);Object.assign(r,o);touch(r);markDirty("reminders",r.id,false,r,r.updatedAt);save();await cancelNativeReminder(r.id);await scheduleNativeReminder(r);if((r.type||"")==="note" && (r.repeat||"once")==="once") await addToAndroidClock(r)}else{const maxOrder=data.reminders.length?Math.max(...data.reminders.map(x=>x.order??0)):-1;const nr=touch({id:uid(),order:maxOrder+1,...o});data.reminders.push(nr);markDirty("reminders",nr.id,false,nr,nr.updatedAt);save();await scheduleNativeReminder(nr);if((nr.type||"")==="note" && (nr.repeat||"once")==="once") await addToAndroidClock(nr)}logEvent(id?"ویرایش یادآوری":"ایجاد یادآوری",o.title,id?"edit":"create");closeModal()}
 async function deleteReminder(id){if(confirm("این یادآوری حذف شود؟")){const r=data.reminders.find(x=>x.id===id);await cancelNativeReminder(id);removeRecord("reminders",id);logEvent("حذف یادآوری",r?.title||id,"delete")}}
 
-function openCheck(id=null){const c=id&&data.checks.find(x=>x.id===id);openModal(`<h2>${c?"ویرایش چک":"ثبت چک"}</h2><div class="form"><select id="ct"><option value="receive" ${c?.type==="receive"?"selected":""}>چک دریافتی</option><option value="pay" ${c?.type==="pay"?"selected":""}>چک پرداختی</option></select><input id="cn" placeholder="نام شخص" value="${esc(c?.name||"")}"><input id="cnid" inputmode="numeric" maxlength="10" placeholder="کد ملی (اختیاری)" value="${esc(c?.nationalCode||"")}"><input id="camount" type="number" placeholder="مبلغ" value="${Number(c?.amount)||""}">${simpleDateField("cdate",jalaliInputValue(c?.date||""))}<input id="cnum" placeholder="شماره چک" value="${esc(c?.number||"")}"><input id="cbank" placeholder="بانک" value="${esc(c?.bank||"")}"><textarea id="cnote" placeholder="توضیحات">${esc(c?.note||"")}</textarea><button class="primary" onclick="saveCheck('${c?.id||""}')">${c?"ذخیره تغییرات":"ذخیره"}</button></div>`)}
-function saveCheck(id){if(!$("cn").value.trim()||!parseMoney($("camount").value)||!$("cdate").value)return alert("نام، مبلغ و تاریخ لازم است");const o={type:$("ct").value,name:$("cn").value.trim(),nationalCode:$("cnid").value.trim(),amount:parseMoney($("camount").value),date:jalaliToISO($("cdate").value),number:$("cnum").value.trim(),bank:$("cbank").value.trim(),note:$("cnote").value};if(id){const c=data.checks.find(x=>x.id===id);Object.assign(c,o);touch(c);markDirty("checks",c.id,false,c,c.updatedAt)}else{const nc=touch({id:uid(),done:false,...o});data.checks.push(nc);markDirty("checks",nc.id,false,nc,nc.updatedAt)}save();logEvent(id?"ویرایش چک":"ثبت چک",`${o.name} • ${money(o.amount)}`,id?"edit":"create");closeModal()}
-function deleteCheck(id){if(confirm("این چک حذف شود؟")){const c=data.checks.find(x=>x.id===id);removeRecord("checks",id);logEvent("حذف چک",c?.name||id,"delete")}}
+/* v3.10: چک‌ها حالا به یک حساب وصل می‌شوند. تا وقتی چک «نشسته» (وصول/نقد)
+   علامت نخورده، هیچ اثری روی موجودی حساب یا لیست تراکنش‌ها ندارد — چون تا
+   وصول نشده، پولش واقعاً جابه‌جا نشده. با زدن دکمه «نشست»، یک تراکنش واقعی
+   (دریافت برای چک دریافتی، هزینه برای چک پرداختی) در همان حساب ساخته
+   می‌شود و به موجودی اضافه/کم می‌گردد؛ لغوش هم همان تراکنش را برمی‌دارد.
+   وقتی چک نشسته باشد، نوع/مبلغ/حساب دیگر قابل ویرایش نیستند (چون یک
+   تراکنش واقعی به آن‌ها وصل است) — برای تغییرشان اول باید «لغو وصول» شود. */
+function openCheck(id=null){
+ const c=id&&data.checks.find(x=>x.id===id);
+ const locked=!!c?.settled;
+ const lockNote=locked?`<p class="hint">این چک «نشسته» است؛ نوع، مبلغ و حساب قابل ویرایش نیستند. برای تغییرشان، اول از لیست چک‌ها وضعیت را به «در انتظار» برگردان.</p>`:"";
+ openModal(`<h2>${c?"ویرایش چک":"ثبت چک"}</h2><div class="form">${lockNote}<select id="ct" ${locked?"disabled":""}><option value="receive" ${c?.type==="receive"?"selected":""}>چک دریافتی</option><option value="pay" ${c?.type==="pay"?"selected":""}>چک پرداختی</option></select><input id="cn" placeholder="نام شخص" value="${esc(c?.name||"")}"><input id="cnid" inputmode="numeric" maxlength="10" placeholder="کد ملی (اختیاری)" value="${esc(c?.nationalCode||"")}"><input id="camount" type="number" placeholder="مبلغ" value="${Number(c?.amount)||""}" ${locked?"disabled":""}>${simpleDateField("cdate",jalaliInputValue(c?.date||""))}<input id="cnum" placeholder="شماره چک" value="${esc(c?.number||"")}"><input id="cbank" placeholder="بانک" value="${esc(c?.bank||"")}">${invField("حساب مرتبط","با «نشستن» چک، مبلغ از/به همین حساب کم یا زیاد و در تراکنش‌ها ثبت می‌شود",accountSelect("cacc",c?.accountID||""))}<textarea id="cnote" placeholder="توضیحات">${esc(c?.note||"")}</textarea><button class="primary" onclick="saveCheck('${c?.id||""}')">${c?"ذخیره تغییرات":"ذخیره"}</button></div>`);
+ if(!data.accounts.length)setTimeout(()=>alert("برای اتصال چک به حساب، اول از بخش حساب‌ها یک حساب اضافه کن."),0);
+}
+function saveCheck(id){
+ if(!$("cn").value.trim()||!parseMoney($("camount").value)||!$("cdate").value)return alert("نام، مبلغ و تاریخ لازم است");
+ if(!$("cacc").value)return alert("حساب مرتبط را انتخاب کن");
+ const existing=id&&data.checks.find(x=>x.id===id);
+ const o={type:$("ct").value,name:$("cn").value.trim(),nationalCode:$("cnid").value.trim(),amount:parseMoney($("camount").value),date:jalaliToISO($("cdate").value),number:$("cnum").value.trim(),bank:$("cbank").value.trim(),accountID:$("cacc").value,note:$("cnote").value};
+ if(existing?.settled){o.type=existing.type;o.amount=existing.amount;o.accountID=existing.accountID}
+ if(id){const c=data.checks.find(x=>x.id===id);Object.assign(c,o);touch(c);markDirty("checks",c.id,false,c,c.updatedAt)}else{const nc=touch({id:uid(),done:false,settled:false,txId:null,...o});data.checks.push(nc);markDirty("checks",nc.id,false,nc,nc.updatedAt)}
+ save();logEvent(id?"ویرایش چک":"ثبت چک",`${o.name} • ${money(o.amount)}`,id?"edit":"create");closeModal()
+}
+function toggleCheckSettled(id){
+ const c=data.checks.find(x=>x.id===id);if(!c)return;
+ if(!c.settled){
+  if(!c.accountID)return alert("اول از «ویرایش چک» یک حساب برای آن انتخاب کن.");
+  const isReceive=c.type==="receive";
+  const nt=touch({id:uid(),title:(isReceive?"وصول چک دریافتی":"نقد شدن چک پرداختی")+" - "+c.name,amount:c.amount,type:isReceive?"income":"expense",category:isReceive?"چک دریافتی":"چک پرداختی",accountID:c.accountID,date:new Date().toISOString(),source:"check-settle",checkId:c.id});
+  data.transactions.unshift(nt);markDirty("transactions",nt.id,false,nt,nt.updatedAt);
+  c.settled=true;c.txId=nt.id;touch(c);markDirty("checks",c.id,false,c,c.updatedAt);
+  save();
+  logEvent(isReceive?"وصول چک":"نقد شدن چک",`${c.name} • ${money(c.amount)} • ${data.accounts.find(a=>a.id===c.accountID)?.name||""}`,"payment");
+ }else{
+  if(c.txId)removeRecord("transactions",c.txId);
+  c.settled=false;c.txId=null;touch(c);markDirty("checks",c.id,false,c,c.updatedAt);
+  save();
+  logEvent("لغو وضعیت چک",c.name,"edit");
+ }
+}
+function deleteCheck(id){
+ if(confirm("این چک حذف شود؟")){
+  const c=data.checks.find(x=>x.id===id);
+  if(c?.txId)removeRecord("transactions",c.txId);
+  removeRecord("checks",id);
+  logEvent("حذف چک",c?.name||id,"delete")
+ }
+}
 
 
 /* ============================================================
@@ -1771,7 +1840,21 @@ function saveQuickRows(){
 }
 function accountBalance(id){let a=data.accounts.find(x=>x.id===id),v=Number(a?.balance)||0;data.transactions.forEach(t=>{const amt=Number(t.amount)||0;if(t.type==="income"&&t.accountID===id)v+=amt;if(t.type==="expense"&&t.accountID===id)v-=amt;if(t.type==="transfer"){if(t.from===id)v-=amt;if(t.destinationType!=="other"&&t.to===id)v+=amt}});return v}
 function actionButtons(editFn,deleteFn,id){return `<div class="actions"><button type="button" title="ویرایش" onclick="${editFn}(\'${id}\')">✏️</button><button type="button" class="danger-icon" title="حذف" onclick="${deleteFn}(\'${id}\')">🗑</button></div>`}
-function txHTML(t){if(t.type==="transfer"){const dest=t.destinationType==="other"?`👤 ${esc(t.otherName||"حساب دیگران")} • ${esc(t.otherCard||"")}`:`🏦 ${esc(data.accounts.find(a=>a.id===t.to)?.name||"")}`;return `<div class="item"><div><b>↔ ${esc(t.title)}</b><div class="meta">از ${esc(data.accounts.find(a=>a.id===t.from)?.name||"")} ← ${dest}</div><div class="meta">${jalaliDateTimeInput(t.date)}</div></div><div><strong>${money(t.amount)}</strong>${actionButtons("openTransfer","deleteTx",t.id)}</div></div>`;}let a=data.accounts.find(x=>x.id===t.accountID),sign=t.type==="income"?"+":"−";const recurBadge=t.recurring&&t.recurring!=="none"?` • 🔁 ${t.recurring==="monthly"?"ماهانه":"هفتگی"}`:t.source==="recurring"?" • 🔁 خودکار":"";return `<div class="item"><div><b>${esc(t.title)}</b><div class="meta">${esc(t.category||"")} • ${a?esc(a.name):""} • ${t.source==="bank"?"بانکی":t.source==="recurring"?"تکرارشونده":"دستی"}${recurBadge}</div><div class="meta">${jalaliDateTimeInput(t.date)}</div>${t.image?`<img class="tx-thumb" src="${t.image}" alt="پیوست" onclick="viewImage('${t.id}')">`:""}</div><div><strong class="${t.type}">${sign}${money(t.amount)}</strong>${actionButtons("openTx","deleteTx",t.id)}</div></div>`}
+/* v3.11: transfer row markup pulled into its own function so it can be
+   reused both in the transactions list (txHTML) and in a dedicated list
+   inside «انتقال بین حساب‌ها» — before, that section only had a "+" button
+   and no record of past transfers at all. */
+function transferItemHTML(t){
+ let destLabel;
+ if(t.destinationType==="other"){
+  const methodLabel=t.otherMethod==="sheba"?`🏦 شبا: ${esc(t.otherSheba||"")}`:`💳 کارت: ${esc(t.otherCard||"")}`;
+  destLabel=`👤 ${esc(t.otherName||"حساب دیگران")} • ${methodLabel}`;
+ }else{
+  destLabel=`🏦 ${esc(data.accounts.find(a=>a.id===t.to)?.name||"")}`;
+ }
+ return `<div class="item"><div><b>↔ ${esc(t.title)}</b><div class="meta">از ${esc(data.accounts.find(a=>a.id===t.from)?.name||"")} ← ${destLabel}</div><div class="meta">${jalaliDateTimeInput(t.date)}</div></div><div><strong>${money(t.amount)}</strong>${actionButtons("openTransfer","deleteTx",t.id)}</div></div>`;
+}
+function txHTML(t){if(t.type==="transfer")return transferItemHTML(t);let a=data.accounts.find(x=>x.id===t.accountID),sign=t.type==="income"?"+":"−";const recurBadge=t.recurring&&t.recurring!=="none"?` • 🔁 ${t.recurring==="monthly"?"ماهانه":"هفتگی"}`:t.source==="recurring"?" • 🔁 خودکار":"";return `<div class="item"><div><b>${esc(t.title)}</b><div class="meta">${esc(t.category||"")} • ${a?esc(a.name):""} • ${t.source==="bank"?"بانکی":t.source==="recurring"?"تکرارشونده":"دستی"}${recurBadge}</div><div class="meta">${jalaliDateTimeInput(t.date)}</div>${t.image?`<img class="tx-thumb" src="${t.image}" alt="پیوست" onclick="viewImage('${t.id}')">`:""}</div><div><strong class="${t.type}">${sign}${money(t.amount)}</strong>${actionButtons("openTx","deleteTx",t.id)}</div></div>`}
 function viewImage(id){const t=data.transactions.find(x=>x.id===id);if(!t?.image)return;openModal(`<h2>📎 تصویر پیوست</h2><div class="attachment-large"><img src="${t.image}" alt="پیوست"></div>`)}
 function empty(s){return `<div class="card" style="text-align:center">${s}</div>`}
 
@@ -2415,6 +2498,7 @@ function render(){
  if($("balance"))$("balance").textContent=money(totalBalance);if($("income"))$("income").textContent=money(inc);if($("expense"))$("expense").textContent=money(exp);
  if($("recent"))$("recent").innerHTML=data.transactions.slice(0,6).map(txHTML).join("")||empty("هنوز تراکنشی ثبت نشده");
  if($("accountList")&&pageActive("accounts"))$("accountList").innerHTML=data.accounts.map(a=>`<div class="item account-item"><div class="account-main"><b>${esc(a.name)}</b><div class="meta">${esc(a.bank||"حساب شخصی")}${a.sender?" • فرستنده: "+esc(a.sender):""}</div>${cardActions(a)}</div><div><strong>${money(accountBalance(a.id))}</strong>${actionButtons("openAccount","deleteAccount",a.id)}<button type="button" title="گزارش Excel" onclick="exportAccountExcel('${a.id}')">📊</button></div></div>`).join("")||empty("هنوز حسابی اضافه نشده");
+ if($("transferList")&&pageActive("accounts"))$("transferList").innerHTML=data.transactions.filter(t=>t.type==="transfer").map(transferItemHTML).join("")||empty("هنوز انتقالی ثبت نشده");
  if($("productList")&&pageActive("products"))renderProducts();
  const q=$("search")?.value?.trim()||"",ft=$("filterType")?.value||"",fc=$("filterCat")?.value||"";
  if($("reportAccount")&&pageActive("reports")){const rv=$("reportAccount").value;$("reportAccount").innerHTML='<option value="">همه حساب‌ها</option>'+data.accounts.map(a=>`<option value="${esc(a.id)}">${esc(a.name)}</option>`).join("");$("reportAccount").value=rv;}
@@ -2425,7 +2509,7 @@ function render(){
  if($("reminderList")&&pageActive("reminders")){const normalReminders=data.reminders.filter(r=>!r.sourceNoteId).sort((a,b)=>(a.order??0)-(b.order??0)); const noteAlarms=data.reminders.filter(r=>r.sourceNoteId); const normal=normalReminders.map((r,i)=>{const accId="rem-"+r.id;const isOpen=openAccordions.has(accId);return `<div class="item accordion-card${isOpen?' open':''}" data-acc-id="${accId}"><button class="accordion-head" type="button" aria-expanded="${isOpen}" onclick="toggleAccordion(this,event)"><span>🔔 <b>${esc(r.title)}</b></span><span>⌄</span></button><div class="accordion-body"><div class="meta">${jalaliLabel(r.date)} • ${r.repeat==="once"?"یک‌بار":r.repeat==="weekly"?"هفتگی":"ماهانه"}</div><div class="accordion-actions"><strong>${r.amount?money(r.amount):""}</strong><div class="reorder-btns"><button type="button" title="انتقال به بالا" ${i===0?"disabled":""} onclick="event.stopPropagation();moveReminder('${r.id}',-1)">▲</button><button type="button" title="انتقال به پایین" ${i===normalReminders.length-1?"disabled":""} onclick="event.stopPropagation();moveReminder('${r.id}',1)">▼</button></div>${actionButtons("openReminder","deleteReminder",r.id)}</div></div></div>`}).join(""); $("reminderList").innerHTML=`<div class="section-label">🔔 یادآوری‌های مستقل</div>${normal||empty("یادآوری مستقلی ندارید")}${noteAlarms.length?`<div class="section-label">📝⏰ آلارم یادداشت‌ها</div>`+noteAlarms.map(r=>{const accId="remnote-"+r.id;const isOpen=openAccordions.has(accId);return `<div class="item accordion-card${isOpen?' open':''}" data-acc-id="${accId}"><button class="accordion-head" type="button" aria-expanded="${isOpen}" onclick="toggleAccordion(this,event)"><span>📝 <b>${esc(r.title)}</b></span><span>⌄</span></button><div class="accordion-body"><div class="meta">${jalaliLabel(r.date)} • ${r.repeat==="once"?"یک‌بار":r.repeat==="weekly"?"هفتگی":"ماهانه"}</div></div></div>`}).join(""):``}`;}
  if($("noteList")&&pageActive("notes")){const sortedNotes=[...data.notes].sort((a,b)=>(a.order??0)-(b.order??0));$("noteList").innerHTML=sortedNotes.map((n,i)=>noteHTML(n,{i,total:sortedNotes.length})).join("")||empty("یادداشتی ندارید");}
  if($("invoiceList")&&pageActive("invoices"))$("invoiceList").innerHTML=data.invoices.map(invoiceHTML).join("")||empty("هنوز فاکتوری ساخته نشده است");
- if($("checkList")&&pageActive("checks"))$("checkList").innerHTML=data.checks.map(c=>`<div class="item"><div><b>${c.type==="receive"?"دریافتی":"پرداختی"} • ${esc(c.name)}</b><div class="meta">${jalaliLabel(c.date)}${c.bank?" • "+esc(c.bank):""}${c.nationalCode?" • کد ملی "+esc(c.nationalCode):""}</div></div><div><strong>${money(c.amount)}</strong>${actionButtons("openCheck","deleteCheck",c.id)}</div></div>`).join("")||empty("چکی ثبت نشده");
+ if($("checkList")&&pageActive("checks"))$("checkList").innerHTML=data.checks.map(c=>{const accName=data.accounts.find(a=>a.id===c.accountID)?.name;return `<div class="item check-row${c.settled?" check-settled":""}"><div><b>${c.type==="receive"?"دریافتی":"پرداختی"} • ${esc(c.name)}</b><div class="meta">${jalaliLabel(c.date)}${c.bank?" • "+esc(c.bank):""}${c.nationalCode?" • کد ملی "+esc(c.nationalCode):""}</div><div class="meta">${accName?"🏦 "+esc(accName):"⚠️ بدون حساب متصل"} • ${c.settled?"✅ نشسته":"⏳ در انتظار"}</div></div><div class="check-row-side"><strong class="${c.type==="receive"?"income":"expense"}">${money(c.amount)}</strong><button type="button" class="check-settle-btn${c.settled?" is-settled":""}" onclick="toggleCheckSettled('${c.id}')">${c.settled?"↩️ لغو نشستن":"✅ ثبت نشستن"}</button>${actionButtons("openCheck","deleteCheck",c.id)}</div></div>`}).join("")||empty("چکی ثبت نشده");
  if(pageActive("reports")){
    const debt=data.people.filter(p=>p.type==="debt").reduce((s,p)=>s+((Number(p.amount)||0)-(Number(p.paid)||0)),0),credit=data.people.filter(p=>p.type==="credit").reduce((s,p)=>s+((Number(p.amount)||0)-(Number(p.paid)||0)),0);
    if($("totalDebt"))$("totalDebt").textContent=money(debt);if($("totalCredit"))$("totalCredit").textContent=money(credit);

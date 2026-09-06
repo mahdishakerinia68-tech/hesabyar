@@ -94,7 +94,8 @@
     <button class="accordion-head" type="button" aria-expanded="false" onclick="toggleAccordion(this,event)"><b data-i18n="page.transfer">انتقال بین حساب‌ها</b><span class="acc-arrow">⌄</span></button>
     <div class="accordion-body">
       <div class="section-head"><span></span><button onclick="event.stopPropagation();openTransfer()">＋</button></div>
-      <div class="card hint">انتقال بین حساب‌های خودت به‌عنوان هزینه محاسبه نمی‌شود.</div>
+      <div class="card hint">انتقال بین حساب‌های خودت به‌عنوان هزینه محاسبه نمی‌شود؛ انتقال به حساب دیگران هم اینجا و هم در تراکنش‌ها ثبت می‌شود.</div>
+      <div id="transferList"></div>
     </div>
   </div>
   <div class="item accordion-card page-accordion" data-acc-id="pageAcc-bankMsg">
@@ -156,6 +157,7 @@
 
 <section id="checks" class="page">
   <div class="section-head"><h2 data-i18n="page.checks">چک‌ها</h2><button onclick="openCheck()">＋</button></div>
+  <p class="hint">هر چک را به یک حساب وصل کن. با زدن «✅ ثبت نشستن»، مبلغ چک دریافتی به همان حساب اضافه یا مبلغ چک پرداختی از آن کسر می‌شود و در تراکنش‌ها هم ثبت می‌گردد.</p>
   <div id="checkList"></div>
 </section>
 

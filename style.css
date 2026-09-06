@@ -553,6 +553,13 @@ body:not(.dark) .cat-chip{background:var(--bg3)}
 .stock-adj-controls{display:flex;gap:6px;align-items:center;flex-shrink:0}
 .stock-adj-qty{width:64px;padding:8px 10px;border-radius:10px;border:.5px solid var(--sep);background:var(--card);font:inherit;font-size:14px;color:var(--label);text-align:center}
 .stock-adj-controls .primary{width:auto;padding:0 14px;height:36px;border:none;border-radius:10px;background:var(--blue);color:#fff;font-weight:700;font-size:16px}
+
+/* v3.10: check ↔ account settlement UI */
+.check-row{align-items:flex-start;flex-wrap:wrap}
+.check-row.check-settled{border-color:var(--green);background:rgba(52,199,89,.06)}
+.check-row-side{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.check-settle-btn{border:none;border-radius:10px;padding:6px 12px;font-size:12px;font-weight:700;background:var(--blue);color:#fff}
+.check-settle-btn.is-settled{background:color-mix(in srgb, var(--red) 12%, transparent);color:var(--red)}
 .cat-manage-row{display:flex;flex-direction:column;gap:6px;padding:10px 0;border-bottom:.5px solid var(--sep)}
 .cat-manage-row:last-child{border-bottom:none}
 .cat-manage-head{display:flex;justify-content:space-between;align-items:center}
