@@ -1,8 +1,9 @@
 {
   "name": "hesabdar",
-  "version": "2.0.0",
+  "version": "4.0.0",
   "private": true,
   "scripts": {
+    "build": "echo \"no build step; web assets in repo root\"",
     "sync": "npx cap sync",
     "android": "npx cap open android",
     "ios": "npx cap open ios"
