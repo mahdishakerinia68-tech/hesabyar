@@ -538,6 +538,18 @@ body:not(.dark) .dash-cfg-move button{background:var(--bg3)}
 .cat-chip{border:.5px solid var(--sep);background:var(--bg3);padding:6px 12px;border-radius:999px;font-size:12px;color:var(--label2)}
 body:not(.dark) .cat-chip{background:var(--bg3)}
 .cat-chip.selected-cat{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:700}
+.cat-btn.cat-expanded{border-color:var(--blue)}
+
+/* v3.8: low-stock rows in «کالا و انبار» — pinned to the top already, now
+   also visually flagged so they don't need to be found by reading. */
+.item.item-low{border-color:#e0a12e;background:rgba(224,161,46,.08)}
+
+/* v3.8: quick stock top-up list (search + qty + ＋ per row) */
+.stock-adj-list{max-height:60vh;overflow-y:auto;margin-top:10px}
+.stock-adj-row{flex-wrap:wrap}
+.stock-adj-controls{display:flex;gap:6px;align-items:center;flex-shrink:0}
+.stock-adj-qty{width:64px;padding:8px 10px;border-radius:10px;border:.5px solid var(--sep);background:var(--card);font:inherit;font-size:14px;color:var(--label);text-align:center}
+.stock-adj-controls .primary{width:auto;padding:0 14px;height:36px;border:none;border-radius:10px;background:var(--blue);color:#fff;font-weight:700;font-size:16px}
 .cat-manage-row{display:flex;flex-direction:column;gap:6px;padding:10px 0;border-bottom:.5px solid var(--sep)}
 .cat-manage-row:last-child{border-bottom:none}
 .cat-manage-head{display:flex;justify-content:space-between;align-items:center}

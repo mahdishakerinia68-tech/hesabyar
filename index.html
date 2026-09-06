@@ -120,8 +120,9 @@
 </section>
 
 <section id="products" class="page">
-  <div class="section-head"><h2 data-i18n="page.products">📦 کالا و انبار</h2><button onclick="openProduct()">＋</button></div>
+  <div class="section-head"><h2 data-i18n="page.products">📦 کالا و انبار</h2><div class="actions"><button onclick="openStockAdjust()" title="افزایش موجودی کالا">📈</button><button onclick="openProduct()">＋</button></div></div>
   <div class="card hint">موجودی کالا، قیمت فروش و هشدار موجودی کم. فاکتورهای فروش موجودی را خودکار کم می‌کنند.</div>
+  <input id="productSearchInput" class="search" type="text" placeholder="🔍 جستجوی کالا..." oninput="renderProducts()">
   <div id="productSummary"></div>
   <div id="productList"></div>
 </section>

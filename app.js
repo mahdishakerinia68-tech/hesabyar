@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="3.7";
+const APP_VERSION="3.8";
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v1";
 const AUTO_BACKUP_MS=6*60*60*1000;
@@ -762,10 +762,11 @@ function showWhatsNewOnce(){
   <h2>🎉 به حساب‌یار خوش آمدی</h2>
   <p class="hint">این صفحه فقط یک‌بار در اولین اجرای این نسخه نمایش داده می‌شود.</p>
   <div class="whats-new-section">
-   <h3>🛠 تغییرات این نسخه (۳.۳)</h3>
+   <h3>🛠 تغییرات این نسخه (۳.۸)</h3>
    <ul>
-    <li>در ساخت فاکتور، فیلد «نام کالا/خدمت» حالا هرچی تایپ کنی زنده داخل کالاهای انبار سرچ می‌کند و پیشنهاد می‌دهد؛ با زدن روی پیشنهاد، قیمت واحد خودکار پر می‌شود و همان کالا برای کسر از موجودی انبار به فاکتور وصل می‌ماند.</li>
-    <li>در فاکتور مشتری، وقتی از «انتخاب از لیست مشتری‌ها» یک مشتری را انتخاب می‌کنی، نام/شماره تماس/آدرس فاکتور خودکار از روی همان پرونده‌ی مشتری پر می‌شود.</li>
+    <li>در فرم ثبت تراکنش، زیرمجموعه‌های هر دسته دیگر همیشه باز نیستند؛ با زدن روی خود دسته باز می‌شود و از داخلش زیرمجموعه را انتخاب می‌کنی.</li>
+    <li>به «کالا و انبار» جعبه‌ی جستجوی کالا اضافه شد و کالاهای کم‌موجودی که در بالای لیست می‌آیند حالا با رنگ مشخص هم برجسته می‌شوند.</li>
+    <li>آیتم جدید «📈 افزایش موجودی کالا»: کالا را سرچ کن، تعداد را بنویس و با ＋ موجودی‌اش را جمع بزن، بدون باز کردن فرم کامل ویرایش.</li>
    </ul>
   </div>
   <div class="whats-new-section">
@@ -969,18 +970,32 @@ function cardActions(a){
  return `<div class="card-number-box"><span>💳 ${esc(a.card)}</span><div class="actions card-actions"><button type="button" title="کپی شماره کارت" onclick="copyCardNumber('${a.id}\')">📋 کپی</button><button type="button" title="ارسال شماره کارت" onclick="shareCardNumber('${a.id}\')">📤 ارسال</button></div></div>`;
 }
 function deleteAccount(id){const a=data.accounts.find(x=>x.id===id);if(!a)return;if(confirm("این حساب و تراکنش‌های مرتبط با آن حذف شوند؟")){const related=data.transactions.filter(t=>t.accountID===id||t.from===id||t.to===id);related.forEach(t=>removeRecord("transactions",t.id));removeRecord("accounts",id);logEvent("حذف حساب",`${a.name} • ${related.length} تراکنش مرتبط حذف شد`,"delete")}}
+/* v3.8: subcategories used to always render open under every parent, making
+   the picker a long wall of buttons. Now a parent with children just toggles
+   open/closed on tap (catExpand) and its children only render while it's the
+   expanded one; a parent with no children still picks itself directly. The
+   parent of whatever is already selected auto-expands so editing a tx with a
+   subcategory set doesn't look like nothing is picked. */
+let catExpand={expense:null,income:null};
 function categoryButtons(type,selected=""){
   const arr=type==="expense"?data.expenseCats:data.incomeCats;
+  if(catExpand[type]==null&&selected){
+    const parent=arr.find(c=>c.name===selected||(c.children||[]).some(ch=>c.name+" - "+ch.name===selected));
+    if(parent)catExpand[type]=parent.id;
+  }
   return `<div class="category-window">${arr.map(c=>{
     const kids=c.children||[];
     const isParentSel=c.name===selected;
+    const isExpanded=catExpand[type]===c.id;
+    const openAction=kids.length?`toggleCategoryExpand('${type}','${c.id}')`:`pickCategory('${type}','${c.id}')`;
     return `<div class="cat-group">
-      <button type="button" class="cat-btn ${isParentSel?"selected-cat":""}" onclick="pickCategory('${type}','${c.id}')">${esc(c.name)}${kids.length?'<span class="cat-caret">›</span>':""}</button>
-      ${kids.length?`<div class="cat-children">${kids.map(ch=>{const full=c.name+" - "+ch.name;return `<button type="button" class="cat-chip ${selected===full?"selected-cat":""}" onclick="pickSubCategory('${type}','${c.id}','${ch.id}')">${esc(ch.name)}</button>`}).join("")}</div>`:""}
+      <button type="button" class="cat-btn ${isParentSel?"selected-cat":""} ${isExpanded?"cat-expanded":""}" onclick="${openAction}">${esc(c.name)}${kids.length?`<span class="cat-caret">${isExpanded?"▾":"›"}</span>`:""}</button>
+      ${kids.length&&isExpanded?`<div class="cat-children">${kids.map(ch=>{const full=c.name+" - "+ch.name;return `<button type="button" class="cat-chip ${selected===full?"selected-cat":""}" onclick="pickSubCategory('${type}','${c.id}','${ch.id}')">${esc(ch.name)}</button>`}).join("")}</div>`:""}
     </div>`;
   }).join("")}</div><button type="button" class="cat-manage-link" onclick="openCategory()">⚙ مدیریت کامل دسته‌ها و زیرمجموعه‌ها</button>`;
 }
-function openTx(id=null){if(!data.accounts.length)return alert("اول از بخش حساب‌ها یک حساب اضافه کنید");const t=id&&data.transactions.find(x=>x.id===id);if(t?.type==="transfer")return openTransfer(id);const typ=t?.type||"expense";openModal(`<h2>${t?"ویرایش تراکنش":"ثبت تراکنش"}</h2><div class="form"><div class="type-switch"><button type="button" id="expBtn" class="${typ==="expense"?"chosen":""}" onclick="txType('expense')">💸 هزینه</button><button type="button" id="incBtn" class="${typ==="income"?"chosen":""}" onclick="txType('income')">💰 دریافت</button></div><input id="txKind" type="hidden" value="${typ}"><input id="title" placeholder="عنوان" value="${esc(t?.title||"")}"><input id="amount" type="number" placeholder="مبلغ" value="${Number(t?.amount)||""}"><div id="expensePanel" style="display:${typ==="expense"?"block":"none"}"><div class="cat-head-row"><b id="catLabel">${t?.category?"دسته: "+esc(t.category):"دسته را انتخاب کنید"}</b><div class="cat-toolbar"><button type="button" title="افزودن دسته" onclick="quickAddCategory('expense')">＋</button><button type="button" title="ویرایش دسته انتخاب‌شده" onclick="quickEditCategory('expense')">✏️</button><button type="button" title="حذف دسته انتخاب‌شده" class="danger-icon" onclick="quickDeleteCategory('expense')">🗑</button></div></div><div id="expenseCatButtons">${categoryButtons("expense",typ==="expense"?t?.category:"")}</div><input id="cat" type="hidden" value="${esc(typ==="expense"?t?.category||"":"")}"></div><div id="incomePanel" style="display:${typ==="income"?"block":"none"}"><div class="cat-head-row"><b id="incatLabel">${t?.category?"دسته: "+esc(t.category):"دسته را انتخاب کنید"}</b><div class="cat-toolbar"><button type="button" title="افزودن دسته" onclick="quickAddCategory('income')">＋</button><button type="button" title="ویرایش دسته انتخاب‌شده" onclick="quickEditCategory('income')">✏️</button><button type="button" title="حذف دسته انتخاب‌شده" class="danger-icon" onclick="quickDeleteCategory('income')">🗑</button></div></div><div id="incomeCatButtons">${categoryButtons("income",typ==="income"?t?.category:"")}</div><input id="incat" type="hidden" value="${esc(typ==="income"?t?.category||"":"")}"></div>${accountSelect("acc",t?.accountID||"")}<label class="hint" style="display:block;margin-top:8px">🔁 تکرار خودکار</label><select id="txRecur"><option value="none" ${!t?.recurring||t?.recurring==="none"?"selected":""}>بدون تکرار</option><option value="weekly" ${t?.recurring==="weekly"?"selected":""}>هفتگی</option><option value="monthly" ${t?.recurring==="monthly"?"selected":""}>ماهانه</option></select><label class="file-label">📎 تصویر پیوست (اختیاری)<input id="txImage" type="file" accept="image/*" onchange="previewTxImage(this)"></label>${t?.image?`<div class="attachment-preview"><img src="${t.image}" alt="پیوست"></div>`:""}<div id="txImagePreview"></div><button class="primary" onclick="saveTx('${t?.id||""}')">${t?"ذخیره تغییرات":"ثبت تراکنش"}</button></div>`)}
+function toggleCategoryExpand(type,id){catExpand[type]=catExpand[type]===id?null:id;refreshCategoryButtonsInTxForm(type)}
+function openTx(id=null){if(!data.accounts.length)return alert("اول از بخش حساب‌ها یک حساب اضافه کنید");const t=id&&data.transactions.find(x=>x.id===id);if(t?.type==="transfer")return openTransfer(id);const typ=t?.type||"expense";catExpand={expense:null,income:null};openModal(`<h2>${t?"ویرایش تراکنش":"ثبت تراکنش"}</h2><div class="form"><div class="type-switch"><button type="button" id="expBtn" class="${typ==="expense"?"chosen":""}" onclick="txType('expense')">💸 هزینه</button><button type="button" id="incBtn" class="${typ==="income"?"chosen":""}" onclick="txType('income')">💰 دریافت</button></div><input id="txKind" type="hidden" value="${typ}"><input id="title" placeholder="عنوان" value="${esc(t?.title||"")}"><input id="amount" type="number" placeholder="مبلغ" value="${Number(t?.amount)||""}"><div id="expensePanel" style="display:${typ==="expense"?"block":"none"}"><div class="cat-head-row"><b id="catLabel">${t?.category?"دسته: "+esc(t.category):"دسته را انتخاب کنید"}</b><div class="cat-toolbar"><button type="button" title="افزودن دسته" onclick="quickAddCategory('expense')">＋</button><button type="button" title="ویرایش دسته انتخاب‌شده" onclick="quickEditCategory('expense')">✏️</button><button type="button" title="حذف دسته انتخاب‌شده" class="danger-icon" onclick="quickDeleteCategory('expense')">🗑</button></div></div><div id="expenseCatButtons">${categoryButtons("expense",typ==="expense"?t?.category:"")}</div><input id="cat" type="hidden" value="${esc(typ==="expense"?t?.category||"":"")}"></div><div id="incomePanel" style="display:${typ==="income"?"block":"none"}"><div class="cat-head-row"><b id="incatLabel">${t?.category?"دسته: "+esc(t.category):"دسته را انتخاب کنید"}</b><div class="cat-toolbar"><button type="button" title="افزودن دسته" onclick="quickAddCategory('income')">＋</button><button type="button" title="ویرایش دسته انتخاب‌شده" onclick="quickEditCategory('income')">✏️</button><button type="button" title="حذف دسته انتخاب‌شده" class="danger-icon" onclick="quickDeleteCategory('income')">🗑</button></div></div><div id="incomeCatButtons">${categoryButtons("income",typ==="income"?t?.category:"")}</div><input id="incat" type="hidden" value="${esc(typ==="income"?t?.category||"":"")}"></div>${accountSelect("acc",t?.accountID||"")}<label class="hint" style="display:block;margin-top:8px">🔁 تکرار خودکار</label><select id="txRecur"><option value="none" ${!t?.recurring||t?.recurring==="none"?"selected":""}>بدون تکرار</option><option value="weekly" ${t?.recurring==="weekly"?"selected":""}>هفتگی</option><option value="monthly" ${t?.recurring==="monthly"?"selected":""}>ماهانه</option></select><label class="file-label">📎 تصویر پیوست (اختیاری)<input id="txImage" type="file" accept="image/*" onchange="previewTxImage(this)"></label>${t?.image?`<div class="attachment-preview"><img src="${t.image}" alt="پیوست"></div>`:""}<div id="txImagePreview"></div><button class="primary" onclick="saveTx('${t?.id||""}')">${t?"ذخیره تغییرات":"ثبت تراکنش"}</button></div>`)}
 function txType(t){$("txKind").value=t;$("expBtn").classList.toggle("chosen",t==="expense");$("incBtn").classList.toggle("chosen",t==="income");$("expensePanel").style.display=t==="expense"?"block":"none";$("incomePanel").style.display=t==="income"?"block":"none"}
 function pickCategory(type,id){const c=(type==="expense"?data.expenseCats:data.incomeCats).find(x=>x.id===id);if(!c)return;setCategoryValue(type,c.name)}
 function pickSubCategory(type,catId,childId){const c=(type==="expense"?data.expenseCats:data.incomeCats).find(x=>x.id===catId);const ch=c?.children?.find(x=>x.id===childId);if(!c||!ch)return;setCategoryValue(type,c.name+" - "+ch.name)}
@@ -1214,15 +1229,46 @@ function deleteProduct(id){if(!confirm("این کالا حذف شود؟"))return
    matter how many products existed. Also now shows a small summary
    (count / inventory value / low-stock count) and sorts low-stock items
    to the top, so shortages are the first thing seen. */
+/* v3.8: added a live search box (name or code) above the list — with the
+   catalog sitting behind a scroll on real inventories, finding one item by
+   eye stopped being practical. Low-stock items are still pinned to the top,
+   and now also get a highlighted row (item-low) so the ones needing
+   restocking jump out instantly instead of blending into the rest. */
 function renderProducts(){
  const box=$("productList");if(!box)return;
  const isLow=p=>Number(p.minStock)>0&&Number(p.stock)<=Number(p.minStock);
- const list=[...data.products].sort((a,b)=>(isLow(a)?0:1)-(isLow(b)?0:1));
- const lowCount=list.filter(isLow).length;
- const invValue=list.reduce((s,p)=>s+(Number(p.stock)||0)*(Number(p.buyPrice)||0),0);
+ const q=($("productSearchInput")?.value||"").trim().toLowerCase();
+ const all=[...data.products].sort((a,b)=>(isLow(a)?0:1)-(isLow(b)?0:1));
+ const lowCount=all.filter(isLow).length;
+ const invValue=all.reduce((s,p)=>s+(Number(p.stock)||0)*(Number(p.buyPrice)||0),0);
  const sumBox=$("productSummary");
- if(sumBox)sumBox.innerHTML=list.length?`<div class="inventory-summary"><div class="inv-stat"><span>تعداد کالا</span><b>${fa(list.length)}</b></div><div class="inv-stat"><span>ارزش انبار (قیمت خرید)</span><b>${money(invValue)}</b></div><div class="inv-stat${lowCount?" warn":""}"><span>کسری موجودی</span><b>${lowCount?"⚠️ "+fa(lowCount):"۰"}</b></div></div>`:"";
- box.innerHTML=list.map(p=>`<div class="item"><div><b>📦 ${esc(p.name)}</b><div class="meta">${p.code?"کد: "+esc(p.code)+" • ":""}خرید: ${money(p.buyPrice||0)} • فروش: ${money(p.price)}</div><div class="meta">موجودی: ${fa(p.stock)} ${isLow(p)?" • ⚠️ موجودی کم":""}</div></div><div class="actions"><button onclick="openProduct('${p.id}')">✏️</button><button onclick="deleteProduct('${p.id}')" class="danger-icon">🗑</button></div></div>`).join("")||empty("هنوز کالایی ثبت نشده است")
+ if(sumBox)sumBox.innerHTML=all.length?`<div class="inventory-summary"><div class="inv-stat"><span>تعداد کالا</span><b>${fa(all.length)}</b></div><div class="inv-stat"><span>ارزش انبار (قیمت خرید)</span><b>${money(invValue)}</b></div><div class="inv-stat${lowCount?" warn":""}"><span>کسری موجودی</span><b>${lowCount?"⚠️ "+fa(lowCount):"۰"}</b></div></div>`:"";
+ const list=q?all.filter(p=>String(p.name||"").toLowerCase().includes(q)||String(p.code||"").toLowerCase().includes(q)):all;
+ box.innerHTML=list.map(p=>`<div class="item${isLow(p)?" item-low":""}"><div><b>📦 ${esc(p.name)}</b><div class="meta">${p.code?"کد: "+esc(p.code)+" • ":""}خرید: ${money(p.buyPrice||0)} • فروش: ${money(p.price)}</div><div class="meta">موجودی: ${fa(p.stock)} ${isLow(p)?" • ⚠️ موجودی کم":""}</div></div><div class="actions"><button onclick="openProduct('${p.id}')">✏️</button><button onclick="deleteProduct('${p.id}')" class="danger-icon">🗑</button></div></div>`).join("")||empty(q?"کالایی با این جستجو پیدا نشد":"هنوز کالایی ثبت نشده است")
+}
+/* v3.8: quick stock top-up — search a product and bump its quantity with a
+   single ＋ tap, instead of opening the full edit form just to change one
+   number. Stays open after each add so several items can be topped up in a
+   row (handy right after the low-stock warning fires). */
+function openStockAdjust(){
+ openModal(`<h2>📈 افزایش موجودی کالا</h2><p class="hint">کالا را سرچ کن، تعداد اضافه‌شده را بنویس و روی ＋ بزن؛ موجودی خودکار جمع می‌شود.</p><input id="stockAdjSearch" class="search" type="text" placeholder="🔍 جستجوی کالا..." oninput="renderStockAdjustList()"><div id="stockAdjList" class="stock-adj-list"></div>`);
+ renderStockAdjustList();
+}
+function renderStockAdjustList(){
+ const box=$("stockAdjList");if(!box)return;
+ const q=($("stockAdjSearch")?.value||"").trim().toLowerCase();
+ const isLow=p=>Number(p.minStock)>0&&Number(p.stock)<=Number(p.minStock);
+ const list=[...data.products].filter(p=>!q||String(p.name||"").toLowerCase().includes(q)||String(p.code||"").toLowerCase().includes(q)).sort((a,b)=>(isLow(a)?0:1)-(isLow(b)?0:1));
+ box.innerHTML=list.map(p=>`<div class="item stock-adj-row${isLow(p)?" item-low":""}"><div><b>📦 ${esc(p.name)}</b><div class="meta">موجودی فعلی: ${fa(p.stock||0)}${isLow(p)?" • ⚠️ موجودی کم":""}</div></div><div class="stock-adj-controls"><input type="number" min="1" inputmode="numeric" placeholder="تعداد" id="qtyAdj_${p.id}" class="stock-adj-qty" onkeydown="if(event.key==='Enter')increaseStock('${p.id}')"><button type="button" class="primary" onclick="increaseStock('${p.id}')">＋</button></div></div>`).join("")||empty(q?"کالایی با این جستجو پیدا نشد":"هنوز کالایی ثبت نشده است");
+}
+function increaseStock(id){
+ const input=$("qtyAdj_"+id);const qty=Number(input?.value);
+ if(!qty||qty<=0)return alert("تعداد را وارد کن");
+ const p=data.products.find(x=>x.id===id);if(!p)return;
+ p.stock=Number(p.stock||0)+qty;touch(p);markDirty("products",p.id,false,p,p.updatedAt);save();
+ logEvent("افزایش موجودی کالا",`${p.name} • +${fa(qty)}`,"edit");
+ renderStockAdjustList();
+ if(pageActive("products"))renderProducts();
 }
 function adjustStockForInvoice(inv,dir){for(const it of inv?.items||[]){if(!it.productId)continue;const p=data.products.find(x=>x.id===it.productId);if(p){p.stock=Math.max(0,Number(p.stock||0)+(dir*Number(it.qty||0)));touch(p);markDirty("products",p.id,false,p,p.updatedAt)}}}
 
