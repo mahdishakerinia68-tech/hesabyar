@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="3.11";
+const APP_VERSION="3.12";
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v1";
 const AUTO_BACKUP_MS=6*60*60*1000;
@@ -207,7 +207,7 @@ function maybeAutoBackup(reason){
 }
 function getAutoBackupFileInfo(){try{return JSON.parse(localStorage.getItem(AUTO_BACKUP_LAST_FILE_KEY)||"null")}catch{return null}}
 function restoreLatestAutoBackup(){try{const list=JSON.parse(localStorage.getItem(AUTO_BACKUP_KEY)||"[]"); if(!list.length)return alert("هنوز پشتیبان خودکاری وجود ندارد."); if(!confirm("آخرین پشتیبان خودکار جایگزین اطلاعات فعلی شود؟"))return; data=list[0].data; normalizeData(); save(); logEvent("بازیابی پشتیبان خودکار",new Date(list[0].at).toLocaleString("fa-IR"),"settings"); alert("آخرین پشتیبان خودکار بازیابی شد.")}catch(e){alert("پشتیبان خودکار قابل بازیابی نیست.")}}
-function normalizeData(){data=data||blankData(); for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats","audit"]){data[k]??=[];} data.pin=typeof data.pin==="string"?data.pin:""; data.pinHash=typeof data.pinHash==="string"?data.pinHash:""; data.pinSalt=typeof data.pinSalt==="string"?data.pinSalt:""; data.patternHash=typeof data.patternHash==="string"?data.patternHash:""; data.patternSalt=typeof data.patternSalt==="string"?data.patternSalt:""; data.lockMethod=(data.lockMethod==="pattern")?"pattern":"pin"; data.biometricEnabled=!!data.biometricEnabled; data.webauthnCredId=typeof data.webauthnCredId==="string"?data.webauthnCredId:""; data.lang=(data.lang==="en")?"en":"fa"; data.branding??={storeName:"",logo:"",stamp:"",signature:""}; data.yearSettlements??={}; data._sync??={tombstones:{}}; data._sync.tombstones??={}; for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats"]){for(const r of data[k]){r.id??=uid();r.updatedAt??=new Date().toISOString();}} for(const c of [...data.expenseCats,...data.incomeCats]){c.children??=[];for(const ch of c.children){ch.id??=uid();}} data.notes.forEach((n,i)=>{if(typeof n.order!=="number")n.order=i;}); data.reminders.forEach((r,i)=>{if(typeof r.order!=="number")r.order=i;});}
+function normalizeData(){data=data||blankData(); for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats","audit","trash"]){data[k]??=[];} data.pin=typeof data.pin==="string"?data.pin:""; data.pinHash=typeof data.pinHash==="string"?data.pinHash:""; data.pinSalt=typeof data.pinSalt==="string"?data.pinSalt:""; data.patternHash=typeof data.patternHash==="string"?data.patternHash:""; data.patternSalt=typeof data.patternSalt==="string"?data.patternSalt:""; data.lockMethod=(data.lockMethod==="pattern")?"pattern":"pin"; data.biometricEnabled=!!data.biometricEnabled; data.webauthnCredId=typeof data.webauthnCredId==="string"?data.webauthnCredId:""; data.lang=(data.lang==="en")?"en":"fa"; data.branding??={storeName:"",logo:"",stamp:"",signature:""}; data.yearSettlements??={}; data._sync??={tombstones:{}}; data._sync.tombstones??={}; for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats"]){for(const r of data[k]){r.id??=uid();r.updatedAt??=new Date().toISOString();}} for(const c of [...data.expenseCats,...data.incomeCats]){c.children??=[];for(const ch of c.children){ch.id??=uid();}} data.notes.forEach((n,i)=>{if(typeof n.order!=="number")n.order=i;}); data.reminders.forEach((r,i)=>{if(typeof r.order!=="number")r.order=i;});}
 /* ---- Language switch (v5.9) -------------------------------------------
  * Translates the app's static "chrome" — menu, page section headers, and
  * settings group titles — between Persian and English, and switches
@@ -240,7 +240,49 @@ function setAppLanguage(lang){
 }
 function toggleAppLanguage(){setAppLanguage(data.lang==="en"?"fa":"en")}
 
-function renderSettingsFeatures(){const e=$("autoBackupToggle");if(e)e.checked=autoBackupEnabled(); const last=$("autoBackupLast"); if(last){const d=getAutoBackupInfo();const f=getAutoBackupFileInfo();last.textContent=d?"آخرین پشتیبان: "+d.toLocaleString("fa-IR")+(f?.filename?` • فایل: ${f.filename} (${f.where})`:""):"هنوز پشتیبان خودکاری ساخته نشده";} const v=$("appVersionText");if(v)v.textContent=APP_VERSION; const vp=$("versionPill");if(vp)vp.textContent=APP_VERSION;
+/* ---- v3.12: تم رنگی قابل انتخاب ----
+ * چون رنگ اصلی برنامه در تمام صفحه از متغیر CSS به‌نام --blue خوانده
+ * می‌شود (دکمه‌های اصلی، تب فعال، لینک‌ها...)، برای تغییر تم فقط کافیست
+ * همین یک متغیر روی body با data-accent بازنویسی شود — نیازی به تغییر
+ * چیز دیگری در کل برنامه نیست. مقدار انتخابی در localStorage می‌ماند و
+ * هم روی حالت روشن هم تاریک، رنگ مناسب همان حالت اعمال می‌شود. */
+const ACCENT_THEME_KEY="hesabdar-accent";
+const ACCENT_THEMES=[
+ {id:"turquoise",label:"فیروزه‌ای (پیش‌فرض)",swatch:"#0F9B8E"},
+ {id:"blue",label:"آبی",swatch:"#2563EB"},
+ {id:"purple",label:"بنفش",swatch:"#7C3AED"},
+ {id:"rose",label:"صورتی",swatch:"#DB2777"},
+ {id:"amber",label:"کهربایی",swatch:"#B45309"},
+ {id:"emerald",label:"زمردی",swatch:"#059669"},
+ {id:"indigo",label:"نیلی",swatch:"#4338CA"},
+ {id:"crimson",label:"زرشکی",swatch:"#B91C1C"},
+ {id:"gold",label:"طلایی",swatch:"#A16207"},
+];
+function currentAccentTheme(){return localStorage.getItem(ACCENT_THEME_KEY)||"turquoise"}
+function applyAccentThemeOnLoad(){const id=currentAccentTheme();if(id&&id!=="turquoise")document.body.setAttribute("data-accent",id);else document.body.removeAttribute("data-accent")}
+function applyAccentTheme(id){
+ localStorage.setItem(ACCENT_THEME_KEY,id);
+ applyAccentThemeOnLoad();
+ renderColorThemeSwatches();
+}
+function renderColorThemeSwatches(){
+ const box=$("colorThemeSwatches");if(!box)return;
+ const cur=currentAccentTheme();
+ box.innerHTML=ACCENT_THEMES.map(t=>`<button type="button" class="theme-swatch-btn${cur===t.id?" active":""}" style="--swatch:${t.swatch}" onclick="applyAccentTheme('${t.id}')"><span class="theme-swatch-dot"></span><span>${t.label}</span></button>`).join("");
+}
+/* ---- v3.12: نشانگر قرمز کنار بخش‌های تنظیم‌نشده ----
+ * دایره قرمز کوچک کنار عنوان هر بخش تنظیمات که هنوز پیکربندی نشده است،
+ * تا کاربر سریع بفهمد کجا کار باقی مانده — بدون باز کردن تک‌تک بخش‌ها. */
+function notificationsConfigured(){try{return !("Notification" in window)||Notification.permission==="granted"}catch(e){return true}}
+function updateSettingsDots(){
+ const set=(id,unset)=>{const el=$(id);if(el)el.classList.toggle("show",!!unset)};
+ set("dotSecurity",!hasLockCode());
+ set("dotBackup",!autoBackupEnabled());
+ set("dotNotif",!notificationsConfigured());
+ set("dotSync",!sync?.user);
+ set("dotBranding",!(data.branding?.storeName||data.branding?.logo));
+}
+function renderSettingsFeatures(){const e=$("autoBackupToggle");if(e)e.checked=autoBackupEnabled(); const last=$("autoBackupLast"); if(last){const d=getAutoBackupInfo();const f=getAutoBackupFileInfo();last.textContent=d?"آخرین پشتیبان: "+d.toLocaleString("fa-IR")+(f?.filename?` • فایل: ${f.filename} (${f.where})`:""):"هنوز پشتیبان خودکاری ساخته نشده";} const v=$("appVersionText");if(v)v.textContent=APP_VERSION; const vp=$("versionPill");if(vp)vp.textContent=APP_VERSION;updateSettingsDots();renderColorThemeSwatches();
  const bio=$("biometricToggle");if(bio)bio.checked=!!data.biometricEnabled;
  const mh=$("securityMethodHint");if(mh)mh.textContent=hasLockCode()?("روش فعلی: "+(data.lockMethod==="pattern"?"رمز الگو":"رمز عددی")+(data.biometricEnabled?" + بیومتریک":"")):"هنوز رمزی برای ورود تنظیم نشده.";
  const lt=$("langToggle");if(lt){lt.textContent=data.lang==="en"?"فا":"EN";lt.setAttribute("aria-label",data.lang==="en"?"تغییر زبان به فارسی":"Switch language to English")}
@@ -287,6 +329,77 @@ async function rescheduleAllNativeReminders(){if(!getNativeLocalNotifications())
 async function requestNativeNotifications(){const p=getNativeLocalNotifications();if(p){try{const perm=await p.requestPermissions();if(perm.display!=="granted")return false;if(typeof p.checkExactNotificationSetting==="function"){const exact=await p.checkExactNotificationSetting();if(exact.value!=="granted"&&typeof p.changeExactNotificationSetting==="function")try{await p.changeExactNotificationSetting()}catch(e){console.warn("exact notification setting",e)}}await rescheduleAllNativeReminders();return true}catch(e){console.warn("native notification permission",e);return false}}if("Notification"in window){try{return (await Notification.requestPermission())==="granted"}catch(e){}}return false}
 function reminderBodyFromNote(note){const parts=[];if(note?.text)parts.push(note.text);const pending=(note?.items||[]).filter(x=>!x.done).map(x=>x.text).filter(Boolean);if(pending.length)parts.push(pending.join(" • "));return parts.join(" — ")||"یادآوری یادداشت"}
 function removeRecordSilent(type,id){const i=data[type].findIndex(x=>x.id===id);if(i<0)return;data[type].splice(i,1);markDeleted(type,id)}
+/* ---- v3.11: زباله‌دان ۳۰ روزه برای تراکنش/فاکتور/چک ----
+ * حذف در این سه بخش برگشت‌ناپذیر بود؛ حالا رکورد حذف‌شده یک کپی کامل از
+ * خودش را در data.trash می‌گذارد و به مدت TRASH_DAYS روز قابل بازگردانی
+ * است. حذف‌های کناری (مثلاً تراکنشِ خودکارِ تسویه‌ی یک فاکتور که با خود آن
+ * فاکتور حذف می‌شود) از این طریق نمی‌روند تا زباله‌دان شلوغ نشود — فقط
+ * حذف مستقیمی که کاربر با دکمه 🗑 روی خودِ آیتم می‌زند وارد زباله‌دان
+ * می‌شود. */
+const TRASH_DAYS=30;
+const TRASHABLE_TYPES=["transactions","invoices","checks"];
+function trashLabel(type,record){
+ if(type==="transactions")return record?.title||"تراکنش";
+ if(type==="invoices")return record?.name||("فاکتور "+(record?.number||""));
+ if(type==="checks")return `چک ${record?.type==="receive"?"دریافتی":"پرداختی"} ${record?.name||""}`;
+ return record?.name||record?.title||"مورد حذف‌شده";
+}
+function pushToTrash(type,record){
+ if(!TRASHABLE_TYPES.includes(type)||!record)return;
+ data.trash??=[];
+ data.trash.unshift({trashId:uid(),type,record:JSON.parse(JSON.stringify(record)),deletedAt:new Date().toISOString(),label:trashLabel(type,record)});
+}
+function removeRecordToTrash(type,id){
+ const rec=data[type]?.find(x=>x.id===id);
+ if(rec)pushToTrash(type,rec);
+ removeRecord(type,id);
+}
+function purgeOldTrash(){
+ data.trash??=[];
+ const cutoff=Date.now()-TRASH_DAYS*86400000;
+ const before=data.trash.length;
+ data.trash=data.trash.filter(t=>new Date(t.deletedAt).getTime()>=cutoff);
+ if(data.trash.length!==before)localStorage.setItem(KEY,JSON.stringify(data));
+}
+function trashDaysLeft(t){const passed=(Date.now()-new Date(t.deletedAt).getTime())/86400000;return Math.max(0,Math.ceil(TRASH_DAYS-passed))}
+function restoreFromTrash(trashId){
+ const i=data.trash.findIndex(t=>t.trashId===trashId);if(i<0)return;
+ const t=data.trash[i];
+ const rec=t.record;
+ data[t.type]??=[];
+ if(!data[t.type].some(x=>x.id===rec.id)){
+  data[t.type].push(rec);
+  if(t.type==="invoices")adjustStockForInvoice(rec,-1);
+  if(data._sync?.tombstones?.[t.type])delete data._sync.tombstones[t.type][rec.id];
+  touch(rec);markDirty(t.type,rec.id,false,rec,rec.updatedAt);
+ }
+ data.trash.splice(i,1);
+ save();
+ logEvent("بازگردانی از زباله‌دان",t.label,"create");
+ if(t.type==="checks")upsertReminderForCheck(rec).catch(console.error);
+ if(pageActive("trash"))renderTrash();
+}
+function deleteFromTrashForever(trashId){
+ if(!confirm("این مورد برای همیشه پاک شود؟ دیگر قابل بازگردانی نیست."))return;
+ const i=data.trash.findIndex(t=>t.trashId===trashId);if(i<0)return;
+ data.trash.splice(i,1);
+ localStorage.setItem(KEY,JSON.stringify(data));syncSave();
+ if(pageActive("trash"))renderTrash();
+}
+function emptyTrashNow(){
+ if(!data.trash?.length)return;
+ if(!confirm(`${fa(data.trash.length)} مورد برای همیشه پاک شود؟ دیگر قابل بازگردانی نیست.`))return;
+ data.trash=[];
+ localStorage.setItem(KEY,JSON.stringify(data));syncSave();
+ if(pageActive("trash"))renderTrash();
+}
+function trashTypeIcon(type){return {transactions:"☷",invoices:"🧾",checks:"✓"}[type]||"🗑"}
+function renderTrash(){
+ const box=$("trashList");if(!box)return;
+ purgeOldTrash();
+ const empty1=$("trashEmptyBtn");if(empty1)empty1.style.display=data.trash?.length?"":"none";
+ box.innerHTML=(data.trash||[]).map(t=>`<div class="item trash-row"><div><b>${trashTypeIcon(t.type)} ${esc(t.label)}</b><div class="meta">حذف‌شده: ${jalaliLabel(t.deletedAt)} • ${fa(trashDaysLeft(t))} روز تا حذف همیشگی</div></div><div class="actions"><button class="primary" onclick="restoreFromTrash('${t.trashId}')">↩️ بازگردانی</button><button onclick="deleteFromTrashForever('${t.trashId}')" class="danger-icon">🗑</button></div></div>`).join("")||empty("زباله‌دان خالی است");
+}
 async function upsertReminderForNote(note,renderAfter=true){if(!note?.id)return;const linked=(data.reminders||[]).filter(x=>x.sourceNoteId===note.id);let r=linked[0];for(const duplicate of linked.slice(1)){await cancelNativeReminder(duplicate.id);removeRecordSilent("reminders",duplicate.id)}if(!note.date){if(r){await cancelNativeReminder(r.id);removeRecordSilent("reminders",r.id);if(renderAfter)save();else{localStorage.setItem(KEY,JSON.stringify(data));syncSave()}}return}const o={title:note.title||"یادداشت",amount:0,date:note.date,repeat:note.repeat&&note.repeat!=="none"?note.repeat:"once",type:"note",sourceNoteId:note.id,body:reminderBodyFromNote(note)};if(r){Object.assign(r,o);touch(r);markDirty("reminders",r.id,false,r,r.updatedAt)}else{r=touch({id:uid(),...o});data.reminders.push(r);markDirty("reminders",r.id,false,r,r.updatedAt)}if(renderAfter)save();else{localStorage.setItem(KEY,JSON.stringify(data));syncSave()}await cancelNativeReminder(r.id);await scheduleNativeReminder(r);if((r.type||"")==="note" && (r.repeat||"once")==="once") await addToAndroidClock(r)}
 async function syncAllNotesToReminders(){let changed=false;const noteIds=new Set((data.notes||[]).map(n=>n.id));for(const n of data.notes||[]){const before=(data.reminders||[]).length;await upsertReminderForNote(n);if((data.reminders||[]).length!==before)changed=true}for(const r of [...(data.reminders||[])]){if(r.sourceNoteId&&!noteIds.has(r.sourceNoteId)){await cancelNativeReminder(r.id);removeRecordSilent("reminders",r.id);changed=true}}if(changed)save();else render();if(sync.db)syncSave()}
 async function removeReminderForNote(noteId){const matches=(data.reminders||[]).filter(r=>r.sourceNoteId===noteId);for(const r of matches){await cancelNativeReminder(r.id);removeRecordSilent("reminders",r.id)}if(matches.length)save()}
@@ -369,7 +482,7 @@ function renderDueSoon(){
   box.innerHTML=`🔔 ${overdue?`<b>${fa(overdue)} یادآوری دیرشده</b> • `:""}${fa(todayCount)} یادآوری در ۲۴ ساعت آینده`;
 }
 
-const blankData=()=>({accounts:[],transactions:[],people:[],reminders:[],notes:[],checks:[],invoices:[],customers:[],products:[],audit:[],expenseCats:defaultsExpense.map((name,i)=>({id:"e"+i,name,children:[]})),incomeCats:defaultsIncome.map((name,i)=>({id:"i"+i,name,children:[]})),pin:"",patternHash:"",patternSalt:"",lockMethod:"pin",biometricEnabled:false,webauthnCredId:"",lang:"fa",branding:{storeName:"",logo:"",stamp:"",signature:""},yearSettlements:{}});
+const blankData=()=>({accounts:[],transactions:[],people:[],reminders:[],notes:[],checks:[],invoices:[],customers:[],products:[],audit:[],trash:[],expenseCats:defaultsExpense.map((name,i)=>({id:"e"+i,name,children:[]})),incomeCats:defaultsIncome.map((name,i)=>({id:"i"+i,name,children:[]})),pin:"",patternHash:"",patternSalt:"",lockMethod:"pin",biometricEnabled:false,webauthnCredId:"",lang:"fa",branding:{storeName:"",logo:"",stamp:"",signature:""},yearSettlements:{}});
 window.addEventListener("error",e=>{console.error(e.error||e.message)});
 window.addEventListener("unhandledrejection",e=>{console.error(e.reason)});
 window.addEventListener("online",async()=>{if(sync.db)sync.db.enableNetwork().catch(console.error);setSyncStatus("🌐 اینترنت برقرار شد؛ در حال بررسی اتصال دو گوشی..."); if(!sync.auth)await initSync(); if(sync.dirty&&sync.dirty.size)syncSave(); await verifyTwoPhoneConnection(true);});
@@ -394,7 +507,7 @@ data=data||blankData();
 normalizeData();
 data.accounts??=[];
 if(!data.accounts.some(a=>String(a.name||"").trim()==="کیف پول نقدی")){const cash=touch({id:uid(),name:"کیف پول نقدی",bank:"",sender:"",card:"",balance:0,default:true});data.accounts.unshift(cash);localStorage.setItem(KEY,JSON.stringify(data));}
-data.transactions??=[];data.people??=[];data.customers??=[];data.products??=[];data.reminders??=[];data.notes??=[];data.checks??=[];data.invoices??=[];data.audit??=[];data.expenseCats??=defaultsExpense.map((name,i)=>({id:"e"+i,name,children:[]}));data.incomeCats??=defaultsIncome.map((name,i)=>({id:"i"+i,name,children:[]}));data.pin=typeof data.pin==="string"?data.pin:"";data.pinHash=typeof data.pinHash==="string"?data.pinHash:"";data.pinSalt=typeof data.pinSalt==="string"?data.pinSalt:"";data.patternHash=typeof data.patternHash==="string"?data.patternHash:"";data.patternSalt=typeof data.patternSalt==="string"?data.patternSalt:"";data.lockMethod=(data.lockMethod==="pattern")?"pattern":"pin";data.biometricEnabled=!!data.biometricEnabled;data.webauthnCredId=typeof data.webauthnCredId==="string"?data.webauthnCredId:"";data.lang=(data.lang==="en")?"en":"fa";data.branding??={storeName:"",logo:"",stamp:"",signature:""};data.branding.storeName??="";data.branding.logo??="";data.branding.stamp??="";data.branding.signature??="";data.yearSettlements??={};data._sync??={tombstones:{}};data._sync.tombstones??={};for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats"]){for(const r of data[k]){r.id??=uid();r.updatedAt??=new Date().toISOString()}}for(const c of [...data.expenseCats,...data.incomeCats]){c.children??=[];for(const ch of c.children){ch.id??=uid()}}
+data.transactions??=[];data.people??=[];data.customers??=[];data.products??=[];data.reminders??=[];data.notes??=[];data.checks??=[];data.invoices??=[];data.audit??=[];data.trash??=[];data.expenseCats??=defaultsExpense.map((name,i)=>({id:"e"+i,name,children:[]}));data.incomeCats??=defaultsIncome.map((name,i)=>({id:"i"+i,name,children:[]}));data.pin=typeof data.pin==="string"?data.pin:"";data.pinHash=typeof data.pinHash==="string"?data.pinHash:"";data.pinSalt=typeof data.pinSalt==="string"?data.pinSalt:"";data.patternHash=typeof data.patternHash==="string"?data.patternHash:"";data.patternSalt=typeof data.patternSalt==="string"?data.patternSalt:"";data.lockMethod=(data.lockMethod==="pattern")?"pattern":"pin";data.biometricEnabled=!!data.biometricEnabled;data.webauthnCredId=typeof data.webauthnCredId==="string"?data.webauthnCredId:"";data.lang=(data.lang==="en")?"en":"fa";data.branding??={storeName:"",logo:"",stamp:"",signature:""};data.branding.storeName??="";data.branding.logo??="";data.branding.stamp??="";data.branding.signature??="";data.yearSettlements??={};data._sync??={tombstones:{}};data._sync.tombstones??={};for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats"]){for(const r of data[k]){r.id??=uid();r.updatedAt??=new Date().toISOString()}}for(const c of [...data.expenseCats,...data.incomeCats]){c.children??=[];for(const ch of c.children){ch.id??=uid()}}
 // Normalize older people records so saved debtors/creditors always render correctly.
 for(const p of data.people){if(p.type==="debtor"||p.type==="debtors"||p.type==="بدهکار")p.type="debt";if(p.type==="creditor"||p.type==="creditors"||p.type==="طلبکار"||p.type==="بستانکار")p.type="credit";if(p.type!=="debt"&&p.type!=="credit")p.type="debt";p.amount=Number(p.amount)||0;p.paid=Number(p.paid)||0;p.name=String(p.name||"").trim()} 
 // v3.10: older checks از قبل از اتصال چک به حساب — مقادیر پیش‌فرض بگیرند تا خطا ندهند.
@@ -766,7 +879,21 @@ function showWhatsNewOnce(){
   <h2>🎉 به حساب‌یار خوش آمدی</h2>
   <p class="hint">این صفحه فقط یک‌بار در اولین اجرای این نسخه نمایش داده می‌شود.</p>
   <div class="whats-new-section">
-   <h3>🛠 تغییرات این نسخه (۳.۱۱)</h3>
+   <h3>🛠 تغییرات این نسخه (۳.۱۲)</h3>
+   <ul>
+    <li>هشدار سررسید چک: چک‌های نزدیک به سررسید (یا گذشته) بالای لیست چک‌ها می‌آیند و برای هرکدام یک یادآوری خودکار با اعلان ساخته می‌شود.</li>
+    <li>زباله‌دان: حذف تراکنش، فاکتور یا چک از این پس ۳۰ روز قابل بازگردانی است (منو ← دیگر ← زباله‌دان).</li>
+    <li>صورت‌حساب PDF مشتری: از لیست مشتری‌ها، یک PDF جمع‌وجور از همه‌ی فاکتورهای یک مشتری می‌سازد و آماده‌ی اشتراک‌گذاری است.</li>
+    <li>گزارش سودآوری کالا در صفحه گزارش‌ها: پرسودترین و کم‌سودترین کالاها بر اساس فروش واقعی.</li>
+    <li>جستجوی سراسری (🔍 در نوار بالا): هم‌زمان در تراکنش، مشتری، کالا، چک و فاکتور می‌گردد.</li>
+    <li>نوار پایین ثابت با ۵ دسترسی سریع (خانه، تراکنش، فاکتور، گزارش، منو).</li>
+    <li>منو حالا جعبه جستجو دارد و عنوان هر گروه را می‌زنی تا باز شود (چون فهرست طولانی شده بود).</li>
+    <li>تنظیمات: امنیت و پشتیبان‌گیری به بالای لیست آمدند؛ کنار بخش‌های پیکربندی‌نشده (مثل رمز ورود یا اتصال ابری) یک نشانه‌ی قرمز کوچک نشان داده می‌شود.</li>
+    <li>تم رنگی قابل انتخاب: از تنظیمات ← تم رنگی، رنگ اصلی برنامه و فاکتور را از میان چند رنگ عوض کن.</li>
+   </ul>
+  </div>
+  <div class="whats-new-section">
+   <h3>🛠 تغییرات نسخه قبل (۳.۱۱)</h3>
    <ul>
     <li>هر چک حالا به یک حساب وصل می‌شود. با زدن «✅ ثبت نشستن»، مبلغ چک دریافتی به همان حساب اضافه یا مبلغ چک پرداختی از آن کسر می‌شود و یک تراکنش واقعی هم در «تراکنش‌ها» ثبت می‌گردد؛ «لغو نشستن» همان تراکنش را برمی‌دارد.</li>
     <li>بخش چک‌ها و مشتری‌ها به حالت «فروشگاه» (کیوسک) هم اضافه شدند.</li>
@@ -882,8 +1009,46 @@ document.querySelectorAll(".nav").forEach(b=>b.addEventListener("click",e=>{
 }));
 document.addEventListener("input",e=>{if(e.target.closest("#invoiceRows"))updateInvoiceLiveTotal()});
 $("theme").onclick=()=>{const dark=document.body.classList.toggle("dark");logEvent("تغییر تم",dark?"حالت شیشه‌ای تیره فعال شد":"حالت شیشه‌ای روشن فعال شد","settings")};
-function openMenu(){const m=$("menuModal");if(!m)return;m.classList.remove("hidden");$("menuBtn")?.setAttribute("aria-expanded","true");logEvent("باز کردن منو","منوی اصلی","nav")}
+function openMenu(){
+ const m=$("menuModal");if(!m)return;m.classList.remove("hidden");$("menuBtn")?.setAttribute("aria-expanded","true");
+ const si=$("menuSearchInput");if(si){si.value="";filterMenu()}
+ document.querySelectorAll("#menuGroups .menu-group").forEach(g=>g.classList.remove("open"));
+ logEvent("باز کردن منو","منوی اصلی","nav");setTimeout(()=>si?.focus(),150)
+}
 function closeMenu(){const m=$("menuModal");if(!m)return;m.classList.add("hidden");$("menuBtn")?.setAttribute("aria-expanded","false")}
+/* ---- v3.12: آکاردئون منو ----
+ * چون فهرست منو طولانی شده، عنوان هر گروه همیشه دیده می‌شود ولی دکمه‌های
+ * زیرش تا زده نشدن باز نمی‌شوند — دقیقاً مثل آکاردئون تنظیمات. اینجا به‌
+ * جای دستکاری تک‌تک عنوان‌ها در HTML، یک‌بار روی همه‌ی .menu-group-title
+ * موجود کلیک‌گیر سوار می‌شود (ساده‌تر و کمتر مستعد فراموشیِ یک مورد). */
+function toggleMenuGroup(titleEl){titleEl.parentElement?.classList.toggle("open")}
+document.querySelectorAll("#menuGroups .menu-group-title").forEach(t=>{
+ t.style.cursor="pointer";
+ t.insertAdjacentHTML("beforeend",'<span class="menu-group-arrow">⌄</span>');
+ t.addEventListener("click",()=>toggleMenuGroup(t));
+});
+/* ---- v3.11: جعبه جستجو بالای منو ----
+ * با تایپ کردن، فقط دکمه‌های منوی مطابق (بر اساس متن نمایشی‌شان) نشان
+ * داده می‌شوند و گروه‌هایی که هیچ نتیجه‌ای ندارند مخفی می‌شوند؛ زدن Enter
+ * وقتی فقط یک نتیجه باقی مانده باشد، مستقیم همان بخش را باز می‌کند. */
+function filterMenu(){
+ const q=($("menuSearchInput")?.value||"").trim().toLowerCase();
+ const groups=document.querySelectorAll("#menuGroups .menu-group");
+ groups.forEach(g=>{
+  let anyVisible=false;
+  g.querySelectorAll(".menu-grid button").forEach(b=>{
+   const match=!q||b.textContent.toLowerCase().includes(q);
+   b.style.display=match?"":"none";
+   if(match)anyVisible=true;
+  });
+  g.style.display=anyVisible?"":"none";
+  g.classList.toggle("open",q?anyVisible:false);
+ });
+}
+function menuSearchEnter(){
+ const visible=[...document.querySelectorAll("#menuGroups .menu-grid button")].filter(b=>b.style.display!=="none");
+ if(visible.length===1)visible[0].click();
+}
 $("menuBtn").onclick=openMenu;
 $("menuModal").addEventListener("click",e=>{if(e.target.id==="menuModal")closeMenu()});
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeMenu()});
@@ -891,6 +1056,31 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeMenu()});
 const modal=$("modal"),modalBody=$("modalBody");
 function openModal(html){modalBody.innerHTML=html;modal.classList.remove("hidden")}
 function closeModal(){modal.classList.add("hidden")}
+
+/* ---- v3.11: جستجوی سراسری ----
+ * یک ذره‌بین بالای صفحه که هم‌زمان در تراکنش، مشتری، کالا، چک و فاکتور
+ * می‌گردد و نتیجه را دسته‌بندی‌شده نشان می‌دهد؛ با زدن روی هر نتیجه،
+ * همان آیتم برای ویرایش/مشاهده باز می‌شود. از همان مودال عمومی برنامه
+ * استفاده می‌کند، پس چیز تازه‌ای به رابط کاربری اضافه نمی‌کند. */
+function openGlobalSearch(){
+ openModal(`<h2>🔍 جستجوی سراسری</h2><div class="form"><input id="gsInput" placeholder="در تراکنش، مشتری، کالا، چک، فاکتور جستجو کن..." oninput="renderGlobalSearch()"></div><div id="gsResults" class="gs-results"></div>`);
+ setTimeout(()=>$("gsInput")?.focus(),50);
+ renderGlobalSearch();
+}
+function gsGroup(title,items){return items.length?`<div class="gs-group"><div class="gs-group-title">${title} (${fa(items.length)})</div>${items.join("")}</div>`:""}
+function renderGlobalSearch(){
+ const box=$("gsResults");if(!box)return;
+ const q=($("gsInput")?.value||"").trim().toLowerCase();
+ if(!q){box.innerHTML=`<p class="hint">برای جستجو در همه‌ی بخش‌ها تایپ کن.</p>`;return}
+ const has=s=>String(s||"").toLowerCase().includes(q);
+ const txRows=data.transactions.filter(t=>has(t.title)||has(t.category)).slice(0,8).map(t=>`<div class="item gs-row" onclick="closeModal();openTx('${t.id}')"><div><b>${esc(t.title||"تراکنش")}</b><div class="meta">${jalaliLabel(t.date)}${t.category?" • "+esc(t.category):""}</div></div><strong class="${t.type}">${money(t.amount)}</strong></div>`);
+ const custRows=data.customers.filter(c=>has(c.name)||has(c.phone)).slice(0,8).map(c=>`<div class="item gs-row" onclick="closeModal();openCustomer('${c.id}')"><div><b>👤 ${esc(c.name)}</b><div class="meta">${esc(c.phone||"")}</div></div></div>`);
+ const prodRows=data.products.filter(p=>has(p.name)||has(p.code)).slice(0,8).map(p=>`<div class="item gs-row" onclick="closeModal();openProduct('${p.id}')"><div><b>📦 ${esc(p.name)}</b><div class="meta">موجودی: ${fa(p.stock||0)} • فروش: ${money(p.price||0)}</div></div></div>`);
+ const checkRows=data.checks.filter(c=>has(c.name)||has(c.bank)||has(c.number)).slice(0,8).map(c=>`<div class="item gs-row" onclick="closeModal();openCheck('${c.id}')"><div><b>✓ ${esc(c.name)}</b><div class="meta">${jalaliLabel(c.date)}${c.bank?" • "+esc(c.bank):""}</div></div><strong class="${c.type==="receive"?"income":"expense"}">${money(c.amount)}</strong></div>`);
+ const invRows=data.invoices.filter(i=>has(i.name)||has(i.number)||has(invoiceCustomerLabel(i))).slice(0,8).map(i=>`<div class="item gs-row" onclick="closeModal();previewInvoice('${i.id}')"><div><b>🧾 ${esc(i.name||"فاکتور")}</b><div class="meta">${jalaliLabel(i.date)}${i.number?" • شماره "+esc(i.number):""}</div></div><strong>${money(invoiceTotal(i))}</strong></div>`);
+ const groups=[gsGroup("تراکنش‌ها",txRows),gsGroup("مشتری‌ها",custRows),gsGroup("کالاها",prodRows),gsGroup("چک‌ها",checkRows),gsGroup("فاکتورها",invRows)].join("");
+ box.innerHTML=groups||`<p class="hint">چیزی پیدا نشد.</p>`;
+}
 
 /* ---- Swipe-back / hardware-back gesture, like iOS & Android: swiping in
  * from either screen edge (or pressing the system/browser back button)
@@ -1196,7 +1386,7 @@ function saveTransfer(id){
  const o={title:$("tnote").value.trim()||defaultTitle,amount,type:"transfer",from,to:mode==="self"?$("to").value:null,source:"transfer",destinationType:mode,otherName:mode==="other"?$("otherName").value.trim():"",otherMethod:mode==="other"?method:"",otherCard:mode==="other"&&method==="card"?$("otherCard").value.trim():"",otherSheba:mode==="other"&&method==="sheba"?$("otherSheba").value.trim():""};
  if(id){const t=data.transactions.find(x=>x.id===id);if(!t)return;Object.assign(t,o);touch(t);markDirty("transactions",t.id,false,t,t.updatedAt)}else{const nt=touch({id:uid(),date:new Date().toISOString(),...o});data.transactions.unshift(nt);markDirty("transactions",nt.id,false,nt,nt.updatedAt)}save();logEvent(id?"ویرایش انتقال":"ایجاد انتقال",`${money(amount)} • ${mode==="other"?o.otherName:"حساب خودم"}`,id?"edit":"create");closeModal()
 }
-function deleteTx(id){if(confirm("این تراکنش حذف شود؟")){const t=data.transactions.find(x=>x.id===id);removeRecord("transactions",id);logEvent("حذف تراکنش",t?.title||id,"delete")}}
+function deleteTx(id){if(confirm("این تراکنش حذف شود؟")){const t=data.transactions.find(x=>x.id===id);removeRecordToTrash("transactions",id);logEvent("حذف تراکنش",t?.title||id,"delete")}}
 function categoryManageRow(type,c){
   const kids=c.children||[];
   const budgetRow=type==="expense"?`<div class="cat-budget-row"><span class="hint">💰 بودجه ماهانه:</span><input type="number" value="${Number(c.budget)||""}" placeholder="بدون سقف" onchange="setCategoryBudget('${c.id}',this.value)"></div>`:"";
@@ -1299,10 +1489,82 @@ function openCustomer(id=null){const c=id&&data.customers.find(x=>x.id===id);ope
 function saveCustomer(id){const name=$("cname").value.trim();if(!name)return alert("نام مشتری را وارد کن");const o={name,phone:$("cphone").value.trim(),address:$("caddress").value.trim(),note:$("cnote").value.trim()};if(id){const c=data.customers.find(x=>x.id===id);Object.assign(c,o);touch(c);markDirty("customers",c.id,false,c,c.updatedAt)}else{const c=touch({id:uid(),...o});data.customers.unshift(c);markDirty("customers",c.id,false,c,c.updatedAt)}save();logEvent(id?"ویرایش مشتری":"ایجاد مشتری",name,id?"edit":"create");closeModal()}
 function deleteCustomer(id){if(!confirm("این مشتری حذف شود؟"))return;const c=data.customers.find(x=>x.id===id);removeRecord("customers",id);logEvent("حذف مشتری",c?.name||id,"delete")}
 function customerStats(c){const inv=data.invoices.filter(x=>x.customerId===c.id);return {count:inv.length,total:inv.reduce((s,x)=>s+invoiceTotal(x),0),paid:inv.reduce((s,x)=>s+Number(x.paid||0),0),due:inv.reduce((s,x)=>s+invoiceRemaining(x),0)}}
-function renderCustomers(){const box=$("customerList");if(!box)return;box.innerHTML=data.customers.map(c=>{const st=customerStats(c);return `<div class="item"><div><b>👤 ${esc(c.name)}</b><div class="meta">${esc(c.phone||"بدون شماره")} • ${fa(st.count)} فاکتور</div><div class="meta">خرید: ${money(st.total)} • پرداخت: ${money(st.paid)} • مانده: ${money(st.due)}</div></div><div class="actions"><button onclick="openCustomer('${c.id}')">✏️</button><button onclick="exportCustomerExcel('${c.id}')">📊</button><button onclick="deleteCustomer('${c.id}')" class="danger-icon">🗑</button></div></div>`}).join("")||empty("هنوز مشتری ثبت نشده است")}
+function renderCustomers(){const box=$("customerList");if(!box)return;box.innerHTML=data.customers.map(c=>{const st=customerStats(c);return `<div class="item"><div><b>👤 ${esc(c.name)}</b><div class="meta">${esc(c.phone||"بدون شماره")} • ${fa(st.count)} فاکتور</div><div class="meta">خرید: ${money(st.total)} • پرداخت: ${money(st.paid)} • مانده: ${money(st.due)}</div></div><div class="actions"><button onclick="openCustomer('${c.id}')">✏️</button><button title="صورت‌حساب PDF" onclick="shareCustomerStatement('${c.id}')">📄</button><button onclick="exportCustomerExcel('${c.id}')">📊</button><button onclick="deleteCustomer('${c.id}')" class="danger-icon">🗑</button></div></div>`}).join("")||empty("هنوز مشتری ثبت نشده است")}
 function exportXLS(filename,headers,rows){const escHtml=v=>String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");const html=`<html><head><meta charset="UTF-8"></head><body><table><thead><tr>${headers.map(h=>`<th>${escHtml(h)}</th>`).join("")}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(v=>`<td>${escHtml(v)}</td>`).join("")}</tr>`).join("")}</tbody></table></body></html>`;const blob=new Blob(["\ufeff",html],{type:"application/vnd.ms-excel;charset=utf-8"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=filename.endsWith(".xls")?filename:filename+".xls";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000)}
 function exportAccountExcel(id){const a=data.accounts.find(x=>x.id===id);if(!a)return;const tx=data.transactions.filter(t=>t.accountID===id||t.from===id||t.to===id).sort((x,y)=>String(x.date).localeCompare(String(y.date)));const rows=tx.map(t=>{const kind=t.type==="income"?"دریافتی":t.type==="expense"?"پرداختی":"انتقال";const other=t.type==="transfer"?(t.destinationType==="other"?(t.otherName||"دیگران"):data.accounts.find(x=>x.id===t.to)?.name||""):"";const sign=t.type==="income"?Number(t.amount||0):(t.type==="expense"||t.from===id)?-Number(t.amount||0):Number(t.amount||0);return [jalaliDateTimeInput(t.date),kind,t.title||"",data.accounts.find(x=>x.id===t.accountID)?.name||a.name,other,sign,accountBalance(a.id)]});exportXLS(`گزارش-${a.name}`,['تاریخ و ساعت ثبت','نوع','شرح','حساب','مقصد','مبلغ خالص','مانده حساب'],rows)}
 function exportCustomerExcel(id){const c=data.customers.find(x=>x.id===id);if(!c)return;const inv=data.invoices.filter(x=>x.customerId===id);const rows=inv.map(x=>[invoiceDateLabel(x.date),x.number||"",x.name||"",invoiceTotal(x),Number(x.paid||0),invoiceRemaining(x),x.status==="paid"?"پرداخت کامل":x.status==="partial"?"پرداخت بخشی":"پرداخت نشده"]);exportXLS(`مشتری-${c.name}`,['تاریخ','شماره فاکتور','عنوان','مبلغ','پرداخت','مانده','وضعیت'],rows)}
+/* ---- v3.11: صورت‌حساب PDF مشتری ----
+ * دقیقاً مثل ساخت PDF تک‌فاکتور (drawInvoiceCanvas → canvasToPdfBytes)، اما
+ * به‌جای یک فاکتور، همه‌ی فاکتورهای یک مشتری را در یک صفحه (با صفحه‌بندی
+ * خودکار اگر ردیف‌ها زیاد باشند) جمع می‌کند و یک جمع‌بندی کلی بدهی/طلب در
+ * پایین می‌آورد — تا بشود مستقیم برای مشتری فرستاد. کاملاً آفلاین و با
+ * همان زیرساخت فعلی فاکتور. */
+async function drawCustomerStatementCanvas(customer,scale=1){
+ const b=data.branding||{};
+ const inv=data.invoices.filter(x=>x.customerId===customer.id).sort((a,b2)=>new Date(a.date)-new Date(b2.date));
+ const W=794, rowH=42, headH=250, H=Math.max(1000,headH+inv.length*rowH+140);
+ const [logoImg]=await Promise.all([loadImg(b.logo)]);
+ const c=document.createElement("canvas");c.width=W*scale;c.height=H*scale;const x=c.getContext("2d");
+ x.scale(scale,scale);
+ x.fillStyle="#fff";x.fillRect(0,0,W,H);x.fillStyle="#17352b";x.textAlign="right";x.direction="rtl";
+ if(logoImg)try{x.drawImage(logoImg,55,25,90,70)}catch(e){}
+ x.font="bold 30px sans-serif";x.fillText("صورت‌حساب مشتری",W-45,55);
+ x.font="bold 22px sans-serif";x.fillText(b.storeName||"",W-45,90);
+ x.font="17px sans-serif";x.fillStyle="#56645f";x.fillText("تاریخ صدور: "+jalaliLabel(new Date().toISOString()),W-45,120);
+ x.fillStyle="#17352b";x.font="bold 21px sans-serif";x.fillText("مشتری: "+(customer.name||""),W-45,160);
+ x.font="16px sans-serif";x.fillStyle="#56645f";
+ if(customer.phone)x.fillText("تماس: "+customer.phone,W-45,185);
+ if(customer.address)x.fillText("آدرس: "+customer.address,W-45,208);
+ let y=headH;x.fillStyle="#eaf2ee";x.fillRect(28,y-30,W-56,40);x.fillStyle="#17352b";x.font="bold 13px sans-serif";
+ x.fillText("مانده",W-38,y-8);x.fillText("پرداخت",W-160,y-8);x.fillText("مبلغ کل",W-280,y-8);x.fillText("عنوان",W-420,y-8);x.fillText("شماره",W-580,y-8);x.fillText("تاریخ",W-680,y-8);
+ x.font="14px sans-serif";
+ inv.forEach((it,i)=>{y+=rowH;x.fillStyle=i%2?"#fafcfb":"#fff";x.fillRect(55,y-32,W-110,rowH);x.fillStyle="#23312c";
+  x.fillText(money(invoiceRemaining(it)),W-38,y-6);x.fillText(money(Number(it.paid||0)),W-160,y-6);x.fillText(money(invoiceTotal(it)),W-280,y-6);
+  x.fillText(String(it.name||"—").slice(0,22),W-420,y-6);x.fillText(it.number||"—",W-580,y-6);x.fillText(invoiceDateLabel(it.date),W-680,y-6);
+ });
+ y+=60;
+ const totalAll=inv.reduce((s,it)=>s+invoiceTotal(it),0),paidAll=inv.reduce((s,it)=>s+Number(it.paid||0),0),dueAll=inv.reduce((s,it)=>s+invoiceRemaining(it),0);
+ x.fillStyle="#eaf2ee";x.fillRect(28,y-30,W-56,90);x.fillStyle="#17352b";x.font="bold 16px sans-serif";
+ x.fillText("جمع کل فاکتورها: "+money(totalAll),W-45,y);
+ x.fillText("جمع پرداخت‌شده: "+money(paidAll),W-45,y+28);
+ x.font="bold 20px sans-serif";x.fillStyle=dueAll>0?"#C1483A":"#2F9E5B";
+ x.fillText("مانده کل: "+money(dueAll),W-45,y+62);
+ return c;
+}
+async function buildCustomerStatementPdf(customer){
+ const c=await drawCustomerStatementCanvas(customer);
+ const bytes=canvasToPdfBytes(c);
+ const filename=`صورتحساب-${(customer.name||"مشتری").replace(/[\\/:*?"<>|]/g,"_")}.pdf`;
+ return {bytes,filename,blob:new Blob([bytes],{type:"application/pdf"})};
+}
+async function shareOrSaveCustomerStatementPdf(customer){
+ const {bytes,filename,blob}=await buildCustomerStatementPdf(customer);
+ const file=new File([blob],filename,{type:"application/pdf"});
+ try{
+  if(navigator.share&&(!navigator.canShare||navigator.canShare({files:[file]}))){
+   await navigator.share({title:filename,text:`صورت‌حساب ${customer.name||""}`,files:[file]});
+   return true;
+  }
+ }catch(e){if(e?.name==="AbortError")return false}
+ const fs=filesystemPlugin();
+ if(fs){
+  try{
+   await fs.writeFile({path:`${INVOICE_PDF_FOLDER}/${filename}`,data:uint8ToBase64(bytes),directory:AUTO_BACKUP_DIRECTORY,recursive:true});
+   alert(`صورت‌حساب ذخیره شد:\nDownload/حسابداری/فاکتورها/${filename}`);
+   return true;
+  }catch(e){console.warn("statement pdf native save failed",e)}
+ }
+ try{
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+  alert("فایل PDF صورت‌حساب آماده دانلود شد.");
+  return true;
+ }catch(e){console.warn("statement pdf download failed",e);alert("ساخت PDF صورت‌حساب با خطا مواجه شد.");return false}
+}
+async function shareCustomerStatement(id){
+ const c=data.customers.find(x=>x.id===id);if(!c)return;
+ if(!data.invoices.some(x=>x.customerId===id))return alert("این مشتری هنوز فاکتوری ندارد.");
+ await shareOrSaveCustomerStatementPdf(c);
+}
 function exportAllCustomersExcel(){const rows=data.customers.map(c=>{const st=customerStats(c);return [c.name,c.phone||"",st.count,st.total,st.paid,st.due]});exportXLS('همه-مشتریان',['نام مشتری','شماره تماس','تعداد فاکتور','مجموع خرید','مجموع پرداخت','مانده'],rows)}
 
 function openPerson(id=null){const p=id&&data.people.find(x=>x.id===id);const instCount=p?.installments?.count||1;openModal(`<h2>${p?"ویرایش بدهکار/بستانکار":"بدهکار / بستانکار"}</h2><div class="form"><select id="pt"><option value="debt" ${p?.type==="debt"?"selected":""}>من بدهکارم</option><option value="credit" ${p?.type==="credit"?"selected":""}>من طلبکارم</option></select><input id="pn" placeholder="نام شخص" value="${esc(p?.name||"")}"><input id="pa" type="number" placeholder="مبلغ کل" value="${Number(p?.amount)||""}">${simpleDateField("pd",jalaliInputValue(p?.due||""))}${invField("تعداد اقساط","اگر پرداخت قسطی است عددی بزرگ‌تر از ۱ بگذار؛ برای پرداخت یکجا همان ۱ بماند",`<input id="pInstCount" type="number" min="1" value="${instCount}">`)}<textarea id="pnote" placeholder="توضیحات">${esc(p?.note||"")}</textarea><button class="primary" onclick="savePerson('${p?.id||""}')">${p?"ذخیره تغییرات":"ذخیره"}</button></div>`)}
@@ -1634,8 +1896,10 @@ function saveCheck(id){
  const existing=id&&data.checks.find(x=>x.id===id);
  const o={type:$("ct").value,name:$("cn").value.trim(),nationalCode:$("cnid").value.trim(),amount:parseMoney($("camount").value),date:jalaliToISO($("cdate").value),number:$("cnum").value.trim(),bank:$("cbank").value.trim(),accountID:$("cacc").value,note:$("cnote").value};
  if(existing?.settled){o.type=existing.type;o.amount=existing.amount;o.accountID=existing.accountID}
- if(id){const c=data.checks.find(x=>x.id===id);Object.assign(c,o);touch(c);markDirty("checks",c.id,false,c,c.updatedAt)}else{const nc=touch({id:uid(),done:false,settled:false,txId:null,...o});data.checks.push(nc);markDirty("checks",nc.id,false,nc,nc.updatedAt)}
- save();logEvent(id?"ویرایش چک":"ثبت چک",`${o.name} • ${money(o.amount)}`,id?"edit":"create");closeModal()
+ let savedCheck;
+ if(id){const c=data.checks.find(x=>x.id===id);Object.assign(c,o);touch(c);markDirty("checks",c.id,false,c,c.updatedAt);savedCheck=c}else{const nc=touch({id:uid(),done:false,settled:false,txId:null,...o});data.checks.push(nc);markDirty("checks",nc.id,false,nc,nc.updatedAt);savedCheck=nc}
+ save();logEvent(id?"ویرایش چک":"ثبت چک",`${o.name} • ${money(o.amount)}`,id?"edit":"create");closeModal();
+ upsertReminderForCheck(savedCheck).catch(console.error)
 }
 function toggleCheckSettled(id){
  const c=data.checks.find(x=>x.id===id);if(!c)return;
@@ -1647,21 +1911,55 @@ function toggleCheckSettled(id){
   c.settled=true;c.txId=nt.id;touch(c);markDirty("checks",c.id,false,c,c.updatedAt);
   save();
   logEvent(isReceive?"وصول چک":"نقد شدن چک",`${c.name} • ${money(c.amount)} • ${data.accounts.find(a=>a.id===c.accountID)?.name||""}`,"payment");
+  removeReminderForCheck(c.id).catch(console.error);
  }else{
   if(c.txId)removeRecord("transactions",c.txId);
   c.settled=false;c.txId=null;touch(c);markDirty("checks",c.id,false,c,c.updatedAt);
   save();
   logEvent("لغو وضعیت چک",c.name,"edit");
+  upsertReminderForCheck(c).catch(console.error);
  }
 }
 function deleteCheck(id){
  if(confirm("این چک حذف شود؟")){
   const c=data.checks.find(x=>x.id===id);
+  if(c)pushToTrash("checks",c);
   if(c?.txId)removeRecord("transactions",c.txId);
+  removeReminderForCheck(id);
   removeRecord("checks",id);
   logEvent("حذف چک",c?.name||id,"delete")
  }
 }
+/* ---- v3.11: هشدار سررسید چک + یادآوری خودکار ----
+ * دقیقاً مثل هشدار «موجودی کم» که کالاهای رو به اتمام را بالای لیست کالا
+ * می‌آورد، اینجا چک‌هایی که سررسیدشان نزدیک است (یا گذشته) بالای لیست چک‌ها
+ * می‌آیند و علامت هشدار می‌گیرند. علاوه بر آن، برای هر چک «در انتظار» یک
+ * یادآوری واقعی (همان موتور یادآوری‌های برنامه، با اعلان واقعی) چند روز
+ * قبل از سررسید ساخته می‌شود — دقیقاً به همان روشی که یادداشت‌ها به
+ * یادآوری وصل می‌شوند (upsertReminderForNote). با نشستن/لغو/حذف چک، همان
+ * یادآوری هم به‌روزرسانی یا حذف می‌شود تا اعلان‌های قدیمی و بی‌ربط نماند. */
+const CHECK_ALERT_DAYS=5; // چند روز مانده به سررسید، چک را «نزدیک به سررسید» حساب کن
+const CHECK_REMINDER_DAYS_BEFORE=3; // چند روز قبل از سررسید یادآوری بزن
+function checkDueDays(c){const d=new Date(c?.date);if(Number.isNaN(d.getTime()))return null;return Math.ceil((d.setHours(0,0,0,0)-new Date().setHours(0,0,0,0))/86400000)}
+function isCheckDueSoon(c){if(!c||c.settled)return false;const dd=checkDueDays(c);return dd!==null&&dd<=CHECK_ALERT_DAYS}
+function checkDueBadge(c){if(c.settled)return"";const dd=checkDueDays(c);if(dd===null)return"";if(dd<0)return`⚠️ ${fa(Math.abs(dd))} روز از سررسید گذشته`;if(dd===0)return"⚠️ امروز سررسید است";if(dd<=CHECK_ALERT_DAYS)return`⏰ ${fa(dd)} روز تا سررسید`;return""}
+async function upsertReminderForCheck(check,renderAfter=true){
+ if(!check?.id)return;
+ const linked=(data.reminders||[]).filter(x=>x.sourceCheckId===check.id);
+ let r=linked[0];
+ for(const dup of linked.slice(1)){await cancelNativeReminder(dup.id);removeRecordSilent("reminders",dup.id)}
+ if(check.settled||!check.date){if(r){await cancelNativeReminder(r.id);removeRecordSilent("reminders",r.id);if(renderAfter)save();else{localStorage.setItem(KEY,JSON.stringify(data));syncSave()}}return}
+ const due=new Date(check.date);
+ if(Number.isNaN(due.getTime()))return;
+ const alertAt=new Date(due.getTime()-CHECK_REMINDER_DAYS_BEFORE*86400000);
+ const useDate=(alertAt>new Date()?alertAt:due).toISOString();
+ const o={title:`⚠️ سررسید چک ${check.type==="receive"?"دریافتی":"پرداختی"}: ${check.name}`,amount:check.amount||0,date:useDate,repeat:"once",type:"check",sourceCheckId:check.id,body:`مبلغ: ${money(check.amount||0)} • سررسید: ${jalaliLabel(check.date)}`};
+ if(r){Object.assign(r,o);touch(r);markDirty("reminders",r.id,false,r,r.updatedAt)}else{r=touch({id:uid(),...o});data.reminders.push(r);markDirty("reminders",r.id,false,r,r.updatedAt)}
+ if(renderAfter)save();else{localStorage.setItem(KEY,JSON.stringify(data));syncSave()}
+ await cancelNativeReminder(r.id);await scheduleNativeReminder(r);
+}
+async function removeReminderForCheck(checkId){const matches=(data.reminders||[]).filter(r=>r.sourceCheckId===checkId);for(const r of matches){await cancelNativeReminder(r.id);removeRecordSilent("reminders",r.id)}if(matches.length)save()}
+async function syncAllChecksToReminders(){let changed=false;const checkIds=new Set((data.checks||[]).map(c=>c.id));for(const c of data.checks||[]){const before=(data.reminders||[]).length;await upsertReminderForCheck(c,false);if((data.reminders||[]).length!==before)changed=true}for(const r of [...(data.reminders||[])]){if(r.sourceCheckId&&!checkIds.has(r.sourceCheckId)){await cancelNativeReminder(r.id);removeRecordSilent("reminders",r.id);changed=true}}if(changed){localStorage.setItem(KEY,JSON.stringify(data));syncSave();render()}}
 
 
 /* ============================================================
@@ -1795,7 +2093,7 @@ function addSmartNoteSelected(){
  * ورودی نام مخزن و اعلان نسخه جدید). به‌روزرسانی سرویس‌ورکر (فایل‌های خود
  * همین گوشی) و پشتیبان خودکار هر ۶ ساعت هنوز کار می‌کنند. */
 async function updateServiceWorkerNow(){try{if(!('serviceWorker' in navigator))return; const reg=await navigator.serviceWorker.getRegistration(); if(reg){await reg.update();}}catch(e){console.warn("service worker update",e)}}
-function startUpdateChecker(){setTimeout(()=>{updateServiceWorkerNow()},2500);setInterval(()=>{updateServiceWorkerNow()},AUTO_BACKUP_MS);setInterval(()=>{maybeAutoBackup("هر ۶ ساعت")},AUTO_BACKUP_MS)}
+function startUpdateChecker(){setTimeout(()=>{updateServiceWorkerNow()},2500);setInterval(()=>{updateServiceWorkerNow()},AUTO_BACKUP_MS);setInterval(()=>{maybeAutoBackup("هر ۶ ساعت")},AUTO_BACKUP_MS);setInterval(purgeOldTrash,AUTO_BACKUP_MS)}
 async function testNotifications(){
   const ok=await requestNativeNotifications();
   if(!ok)return alert("اجازه اعلان داده نشد. از تنظیمات گوشی/مرورگر اجازه اعلان را برای حساب‌یار فعال کن.");
@@ -2065,7 +2363,7 @@ function syncInvoiceFromPerson(p){
  }
 }
 function duplicateInvoice(id){const inv=data.invoices.find(x=>x.id===id);if(!inv)return;const x=touch({...JSON.parse(JSON.stringify(inv)),id:uid(),number:"",date:new Date().toISOString().slice(0,10),status:"unpaid",paid:0,personId:"",settleTxId:""});data.invoices.unshift(x);markDirty("invoices",x.id,false,x,x.updatedAt);save();logEvent("تکرار فاکتور",x.name,"create")}
-function deleteInvoice(id){if(!confirm("این فاکتور حذف شود؟"))return;const x=data.invoices.find(v=>v.id===id);adjustStockForInvoice(x,+1);if(x?.personId)removeRecordSilent("people",x.personId);if(x?.settleTxId)removeRecordSilent("transactions",x.settleTxId);removeRecord("invoices",id);logEvent("حذف فاکتور",x?.name||id,"delete")}
+function deleteInvoice(id){if(!confirm("این فاکتور حذف شود؟"))return;const x=data.invoices.find(v=>v.id===id);if(x)pushToTrash("invoices",x);adjustStockForInvoice(x,+1);if(x?.personId)removeRecordSilent("people",x.personId);if(x?.settleTxId)removeRecordSilent("transactions",x.settleTxId);removeRecord("invoices",id);logEvent("حذف فاکتور",x?.name||id,"delete")}
 function invoiceCustomerLabel(inv){if(inv.customerName)return inv.customerName;const c=inv.customerId?data.customers.find(x=>x.id===inv.customerId):null;return c?.name||""}
 function invoiceHTML(inv){
  const total=invoiceTotal(inv);
@@ -2509,14 +2807,17 @@ function render(){
  if($("reminderList")&&pageActive("reminders")){const normalReminders=data.reminders.filter(r=>!r.sourceNoteId).sort((a,b)=>(a.order??0)-(b.order??0)); const noteAlarms=data.reminders.filter(r=>r.sourceNoteId); const normal=normalReminders.map((r,i)=>{const accId="rem-"+r.id;const isOpen=openAccordions.has(accId);return `<div class="item accordion-card${isOpen?' open':''}" data-acc-id="${accId}"><button class="accordion-head" type="button" aria-expanded="${isOpen}" onclick="toggleAccordion(this,event)"><span>🔔 <b>${esc(r.title)}</b></span><span>⌄</span></button><div class="accordion-body"><div class="meta">${jalaliLabel(r.date)} • ${r.repeat==="once"?"یک‌بار":r.repeat==="weekly"?"هفتگی":"ماهانه"}</div><div class="accordion-actions"><strong>${r.amount?money(r.amount):""}</strong><div class="reorder-btns"><button type="button" title="انتقال به بالا" ${i===0?"disabled":""} onclick="event.stopPropagation();moveReminder('${r.id}',-1)">▲</button><button type="button" title="انتقال به پایین" ${i===normalReminders.length-1?"disabled":""} onclick="event.stopPropagation();moveReminder('${r.id}',1)">▼</button></div>${actionButtons("openReminder","deleteReminder",r.id)}</div></div></div>`}).join(""); $("reminderList").innerHTML=`<div class="section-label">🔔 یادآوری‌های مستقل</div>${normal||empty("یادآوری مستقلی ندارید")}${noteAlarms.length?`<div class="section-label">📝⏰ آلارم یادداشت‌ها</div>`+noteAlarms.map(r=>{const accId="remnote-"+r.id;const isOpen=openAccordions.has(accId);return `<div class="item accordion-card${isOpen?' open':''}" data-acc-id="${accId}"><button class="accordion-head" type="button" aria-expanded="${isOpen}" onclick="toggleAccordion(this,event)"><span>📝 <b>${esc(r.title)}</b></span><span>⌄</span></button><div class="accordion-body"><div class="meta">${jalaliLabel(r.date)} • ${r.repeat==="once"?"یک‌بار":r.repeat==="weekly"?"هفتگی":"ماهانه"}</div></div></div>`}).join(""):``}`;}
  if($("noteList")&&pageActive("notes")){const sortedNotes=[...data.notes].sort((a,b)=>(a.order??0)-(b.order??0));$("noteList").innerHTML=sortedNotes.map((n,i)=>noteHTML(n,{i,total:sortedNotes.length})).join("")||empty("یادداشتی ندارید");}
  if($("invoiceList")&&pageActive("invoices"))$("invoiceList").innerHTML=data.invoices.map(invoiceHTML).join("")||empty("هنوز فاکتوری ساخته نشده است");
- if($("checkList")&&pageActive("checks"))$("checkList").innerHTML=data.checks.map(c=>{const accName=data.accounts.find(a=>a.id===c.accountID)?.name;return `<div class="item check-row${c.settled?" check-settled":""}"><div><b>${c.type==="receive"?"دریافتی":"پرداختی"} • ${esc(c.name)}</b><div class="meta">${jalaliLabel(c.date)}${c.bank?" • "+esc(c.bank):""}${c.nationalCode?" • کد ملی "+esc(c.nationalCode):""}</div><div class="meta">${accName?"🏦 "+esc(accName):"⚠️ بدون حساب متصل"} • ${c.settled?"✅ نشسته":"⏳ در انتظار"}</div></div><div class="check-row-side"><strong class="${c.type==="receive"?"income":"expense"}">${money(c.amount)}</strong><button type="button" class="check-settle-btn${c.settled?" is-settled":""}" onclick="toggleCheckSettled('${c.id}')">${c.settled?"↩️ لغو نشستن":"✅ ثبت نشستن"}</button>${actionButtons("openCheck","deleteCheck",c.id)}</div></div>`}).join("")||empty("چکی ثبت نشده");
+ if($("checkList")&&pageActive("checks")){
+   const sortedChecks=[...data.checks].sort((a,b)=>{const da=isCheckDueSoon(a)?0:1,db=isCheckDueSoon(b)?0:1;if(da!==db)return da-db;const ta=new Date(a.date).getTime()||0,tb=new Date(b.date).getTime()||0;return ta-tb});
+   $("checkList").innerHTML=sortedChecks.map(c=>{const accName=data.accounts.find(a=>a.id===c.accountID)?.name;const dueSoon=isCheckDueSoon(c);const badge=checkDueBadge(c);return `<div class="item check-row${c.settled?" check-settled":""}${dueSoon?" item-low check-duesoon":""}"><div><b>${c.type==="receive"?"دریافتی":"پرداختی"} • ${esc(c.name)}</b><div class="meta">${jalaliLabel(c.date)}${c.bank?" • "+esc(c.bank):""}${c.nationalCode?" • کد ملی "+esc(c.nationalCode):""}</div><div class="meta">${accName?"🏦 "+esc(accName):"⚠️ بدون حساب متصل"} • ${c.settled?"✅ نشسته":"⏳ در انتظار"}${badge?" • "+badge:""}</div></div><div class="check-row-side"><strong class="${c.type==="receive"?"income":"expense"}">${money(c.amount)}</strong><button type="button" class="check-settle-btn${c.settled?" is-settled":""}" onclick="toggleCheckSettled('${c.id}')">${c.settled?"↩️ لغو نشستن":"✅ ثبت نشستن"}</button>${actionButtons("openCheck","deleteCheck",c.id)}</div></div>`}).join("")||empty("چکی ثبت نشده");
+ }
  if(pageActive("reports")){
    const debt=data.people.filter(p=>p.type==="debt").reduce((s,p)=>s+((Number(p.amount)||0)-(Number(p.paid)||0)),0),credit=data.people.filter(p=>p.type==="credit").reduce((s,p)=>s+((Number(p.amount)||0)-(Number(p.paid)||0)),0);
    if($("totalDebt"))$("totalDebt").textContent=money(debt);if($("totalCredit"))$("totalCredit").textContent=money(credit);
    if($("reportStats")){const now=new Date(),m=now.getMonth(),y=now.getFullYear();const mt=data.transactions.filter(t=>{const d=new Date(t.date);return !isNaN(d)&&d.getMonth()===m&&d.getFullYear()===y});const mi=mt.filter(t=>t.type==="income").reduce((s,t)=>s+Number(t.amount||0),0),me=mt.filter(t=>t.type==="expense").reduce((s,t)=>s+Number(t.amount||0),0);const cats={};mt.filter(t=>t.type==="expense").forEach(t=>cats[t.category||"سایر"]=(cats[t.category||"سایر"]||0)+Number(t.amount||0));const top=Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,5);$("reportStats").innerHTML=`<div class="grid"><div class="card"><span>تعداد تراکنش</span><b>${fa(data.transactions.length)}</b></div><div class="card"><span>تعداد چک</span><b>${fa(data.checks.length)}</b></div><div class="card"><span>درآمد این ماه</span><b class="income">${money(mi)}</b></div><div class="card"><span>هزینه این ماه</span><b class="expense">${money(me)}</b></div></div><div class="card report-card"><h3>📊 بیشترین دسته‌های هزینه این ماه</h3>${top.map((x,i)=>`<div class="report-row"><span>${fa(i+1)}. ${esc(x[0])}</span><strong>${money(x[1])}</strong></div>`).join("")||`<p class="hint">هنوز هزینه‌ای در این ماه ثبت نشده.</p>`}</div><div class="card report-card"><h3>🏦 مانده حساب‌ها</h3>${data.accounts.map(a=>`<div class="report-row"><span>${esc(a.name)}</span><strong>${money(accountBalance(a.id))}</strong></div>`).join("")||`<p class="hint">حسابی ثبت نشده.</p>`}</div>`;}
-   drawChart(inc,exp);renderAudit();renderAdvancedReport();renderBudgets();
+   drawChart(inc,exp);renderAudit();renderAdvancedReport();renderBudgets();renderProductProfit();
  }
- renderYearSettlement();renderDueSoon();if($("settings" )?.classList.contains("active"))renderBrandingInSettings()}
+ renderYearSettlement();renderDueSoon();if($("settings" )?.classList.contains("active"))renderBrandingInSettings();if(pageActive("trash"))renderTrash()}
 const renderDebounced=debounce(render,120);
 function renderAdvancedReport(){
  const box=$("advancedReport"); if(!box)return;
@@ -2530,6 +2831,37 @@ function renderAdvancedReport(){
  box.innerHTML=`<div class="report-summary"><div><span>دریافتی</span><b class="income">${money(income)}</b></div><div><span>هزینه</span><b class="expense">${money(expense)}</b></div><div><span>خالص</span><b>${money(income-expense)}</b></div></div><div class="report-table">${rows.slice(0,100).map(t=>`<div class="report-row"><span>${esc(t.title||"تراکنش")}<small>${jalaliDateTimeInput(t.date)} • ${esc(t.category||"")}</small></span><strong class="${t.type}">${t.type==="income"?"+":"−"}${money(t.amount)}</strong></div>`).join("")||`<p class="hint">موردی با این فیلتر پیدا نشد.</p>`}</div>`;
 }
 function drawChart(inc,exp){const c=$("chart");if(!c)return;const x=c.getContext("2d"),w=c.width,h=c.height;x.clearRect(0,0,w,h);const max=Math.max(inc,exp,1);[[inc,"درآمد"],[exp,"هزینه"]].forEach((v,i)=>{const bh=v[0]/max*170;x.fillStyle=i?"#C1483A":"#2F9E5B";x.fillRect(150+i*190,h-45-bh,90,bh);x.fillStyle="#5B564A";x.font="20px sans-serif";x.fillText(v[1],155+i*190,h-12)})}
+/* ---- v3.11: گزارش سودآوری کالا ----
+ * چون هر کالا از قبل قیمت خرید (buyPrice) و قیمت فروش دارد، و هر ردیف
+ * فاکتور (invoice.items) شامل productId/qty/price است، سود واقعیِ هر
+ * کالا را می‌شود مستقیم از فروش‌های ثبت‌شده حساب کرد — بدون نیاز به هیچ
+ * داده‌ی تازه‌ای. اینجا برای هر کالا مجموع فروش، تعداد فروخته‌شده، سود
+ * کل و درصد سود حساب و مرتب می‌شود؛ اگر کالایی هنوز در هیچ فاکتوری
+ * فروخته نشده، در این گزارش نمی‌آید (چیزی برای سنجیدن ندارد). */
+function productProfitData(){
+ const stats=new Map();
+ for(const inv of data.invoices){
+  for(const it of inv.items||[]){
+   if(!it.productId)continue;
+   const p=data.products.find(x=>x.id===it.productId);if(!p)continue;
+   const qty=Number(it.qty)||0,revenue=qty*(Number(it.price)||0),cost=qty*(Number(p.buyPrice)||0);
+   const s=stats.get(p.id)||{name:p.name,qty:0,revenue:0,cost:0};
+   s.qty+=qty;s.revenue+=revenue;s.cost+=cost;
+   stats.set(p.id,s);
+  }
+ }
+ return [...stats.values()].map(s=>({...s,profit:s.revenue-s.cost,margin:s.revenue>0?(s.revenue-s.cost)/s.revenue*100:0}));
+}
+function renderProductProfit(){
+ const box=$("productProfitReport"),card=$("productProfitCard");if(!box||!card)return;
+ const rows=productProfitData();
+ if(!rows.length){card.style.display="none";return}
+ card.style.display="";
+ const bySoldDesc=[...rows].sort((a,b)=>b.profit-a.profit);
+ const top=bySoldDesc.slice(0,5),bottom=[...bySoldDesc].reverse().slice(0,5);
+ const rowHTML=r=>`<div class="report-row"><span>${esc(r.name)}<small>${fa(r.qty)} فروش • حاشیه سود ${fa(Math.round(r.margin))}٪</small></span><strong class="${r.profit>=0?"income":"expense"}">${money(r.profit)}</strong></div>`;
+ box.innerHTML=`<div class="report-sub-title">🥇 پرسودترین کالاها</div>${top.map(rowHTML).join("")}<div class="report-sub-title">🥶 کم‌سودترین کالاها</div>${bottom.map(rowHTML).join("")}`;
+}
 function backupPayload(){return {format:"hesabdar-backup",version:2,appVersion:APP_VERSION,createdAt:new Date().toISOString(),data:JSON.parse(JSON.stringify(data))}}
 function exportData(){
  const json=JSON.stringify(backupPayload(),null,2),blob=new Blob([json],{type:"application/json;charset=utf-8"});
@@ -2595,4 +2927,4 @@ async function importData(e){
   alert(msg)}
 }
 function clearData(){if(confirm("همه اطلاعات حذف شود؟")){const pin=data.pin,pinHash=data.pinHash,pinSalt=data.pinSalt,patternHash=data.patternHash,patternSalt=data.patternSalt,lockMethod=data.lockMethod,biometricEnabled=data.biometricEnabled,webauthnCredId=data.webauthnCredId,lang=data.lang;data=blankData();data.pin=pin;data.pinHash=pinHash;data.pinSalt=pinSalt;data.patternHash=patternHash;data.patternSalt=patternSalt;data.lockMethod=lockMethod;data.biometricEnabled=biometricEnabled;data.webauthnCredId=webauthnCredId;data.lang=lang;save();logEvent("پاک کردن اطلاعات","اطلاعات برنامه پاک شد","delete");}}
-(async function initApp(){normalizeData();await migratePinSecurity();showLock();render();applyDashboardConfig();applyAppMode();renderBrandingInSettings();renderSettingsFeatures();applyLanguage();maybeAutoBackup("اجرای برنامه");processRecurringTransactions();logEvent("اجرای برنامه","برنامه حسابدار اجرا شد","system");await initSync();if(!sync.auth){[4000,12000,30000].forEach(ms=>setTimeout(()=>{if(!sync.auth)initSync()},ms))}syncAllNotesToReminders().catch(console.error);rescheduleAllNativeReminders().catch(console.error);startUpdateChecker();startReminderChecker();if(!hasLockCode())setTimeout(showWhatsNewOnce,320);})();
+(async function initApp(){normalizeData();purgeOldTrash();applyAccentThemeOnLoad();await migratePinSecurity();showLock();render();applyDashboardConfig();applyAppMode();renderBrandingInSettings();renderSettingsFeatures();applyLanguage();maybeAutoBackup("اجرای برنامه");processRecurringTransactions();logEvent("اجرای برنامه","برنامه حسابدار اجرا شد","system");await initSync();if(!sync.auth){[4000,12000,30000].forEach(ms=>setTimeout(()=>{if(!sync.auth)initSync()},ms))}syncAllNotesToReminders().catch(console.error);syncAllChecksToReminders().catch(console.error);rescheduleAllNativeReminders().catch(console.error);startUpdateChecker();startReminderChecker();if(!hasLockCode())setTimeout(showWhatsNewOnce,320);})();

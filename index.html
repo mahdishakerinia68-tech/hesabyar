@@ -27,6 +27,7 @@
     </div>
   </div>
   <div class="header-actions">
+    <button id="globalSearchBtn" onclick="openGlobalSearch()" aria-label="جستجوی سراسری" title="جستجو">🔍</button>
     <button id="appModeToggle" onclick="openAppModeSheet()" aria-label="حالت اپ" title="حالت اپ">🧑‍💼</button>
     <button id="langToggle" onclick="toggleAppLanguage()" aria-label="تغییر زبان برنامه">EN</button>
     <button id="theme" aria-label="تغییر حالت روشن/تاریک">☾</button>
@@ -186,6 +187,11 @@
   </div>
   <div class="card"><canvas id="chart" width="600" height="260"></canvas></div>
   <div id="reportStats"></div>
+  <div class="card report-filters" id="productProfitCard" style="display:none">
+    <h3>🏆 گزارش سودآوری کالا</h3>
+    <p class="hint">بر اساس قیمت خرید و فروش هر کالا و فروش‌های ثبت‌شده در فاکتورها.</p>
+    <div id="productProfitReport"></div>
+  </div>
   <div class="section-head"><h2 data-i18n="page.audit">📋 گزارش فعالیت‌ها</h2><button class="mini-danger" onclick="clearAudit()">پاک‌سازی</button></div>
   <div class="card audit-card">
     <p class="hint">تمام رویدادهای مهم برنامه، از ایجاد و ویرایش تا حذف، تسویه، تنظیمات و همگام‌سازی در این بخش ثبت می‌شوند.</p>
@@ -199,67 +205,33 @@
   <div id="invoiceList"></div>
 </section>
 
+<section id="trash" class="page">
+  <div class="section-head"><h2>🗑 زباله‌دان</h2><button id="trashEmptyBtn" class="danger" onclick="emptyTrashNow()" style="display:none">خالی کردن</button></div>
+  <div class="card hint">تراکنش، فاکتور و چکِ حذف‌شده تا ۳۰ روز اینجا می‌ماند و قابل بازگردانی است؛ بعد از آن برای همیشه پاک می‌شود.</div>
+  <div id="trashList"></div>
+</section>
+
 <section id="settings" class="page">
   <h2 data-i18n="page.settings">تنظیمات</h2>
   <p class="hint settings-intro">هر بخش را باز کن تا گزینه‌هایش دیده شود؛ برای جمع‌وجورتر شدن صفحه، پیش‌فرض همه بسته‌اند.</p>
   <div class="settings settings-page">
 
-    <div class="item accordion-card page-accordion settings-group" id="stgGroup-branding" data-acc-id="stg-branding">
+    <div class="item accordion-card page-accordion settings-group security-group" id="stgGroup-security" data-acc-id="stg-security">
       <button class="accordion-head settings-acc-head" type="button" aria-expanded="false" onclick="toggleAccordion(this,event)">
-        <div class="settings-group-head"><span>🏪</span><div><h3 data-i18n="stg.branding.title">ظاهر فروشگاه و فاکتور</h3><p class="hint">نام فروشگاه، لوگو، مهر و امضا برای فاکتور.</p></div></div>
+        <div class="settings-group-head"><span>🔐</span><div><h3 data-i18n="stg.security.title">امنیت ورود <span class="settings-dot" id="dotSecurity"></span></h3><p class="hint">رمز عددی یا الگو را برای قفل برنامه تنظیم کن؛ اگر گوشی اثرانگشت یا Face ID دارد می‌توانی آن را هم فعال کنی.</p></div></div>
         <span class="acc-arrow">⌄</span>
       </button>
       <div class="accordion-body">
-        <input id="brandStore" placeholder="نام فروشگاه"/>
-        <label class="file-label">🖼 لوگوی فروشگاه<input id="brandLogo" type="file" accept="image/*" onchange="previewBrandFile(this,'logo')"></label>
-        <div id="brandLogoPreview"></div>
-        <label class="file-label">🔴 مهر فروشگاه<input id="brandStamp" type="file" accept="image/*" onchange="previewBrandFile(this,'stamp')"></label>
-        <div id="brandStampPreview"></div>
-        <label class="file-label">✍️ امضا<input id="brandSignature" type="file" accept="image/*" onchange="previewBrandFile(this,'signature')"></label>
-        <div id="brandSignaturePreview"></div>
-        <div class="settings-actions"><button class="primary" onclick="saveBranding()">💾 ذخیره مشخصات فاکتور</button><button onclick="clearBranding()">🧹 حذف لوگو، مهر و امضا</button></div>
-      </div>
-    </div>
-
-    <div class="item accordion-card page-accordion settings-group" id="stgGroup-ai" data-acc-id="stg-ai">
-      <button class="accordion-head settings-acc-head" type="button" aria-expanded="false" onclick="toggleAccordion(this,event)">
-        <div class="settings-group-head"><span>✨</span><div><h3>یادداشت هوشمند (Claude)</h3><p class="hint">برای استفاده از «یادداشت هوشمند» در صفحه یادداشت‌ها، کلید API شخصی خودت از Claude (Anthropic) را اینجا وارد کن. این کلید فقط روی همین گوشی ذخیره می‌شود.</p></div></div>
-        <span class="acc-arrow">⌄</span>
-      </button>
-      <div class="accordion-body">
-        <div id="anthropicKeyStatus" class="hint"></div>
-        <input id="anthropicKeyInput" type="password" placeholder="sk-ant-..." autocomplete="off">
-        <div class="settings-actions">
-          <button class="primary" onclick="saveAnthropicKey()">💾 ذخیره کلید</button>
-          <button class="danger" onclick="clearAnthropicKey()">🗑 حذف کلید</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="item accordion-card page-accordion settings-group" id="stgGroup-year" data-acc-id="stg-year">
-      <button class="accordion-head settings-acc-head" type="button" aria-expanded="false" onclick="toggleAccordion(this,event)">
-        <div class="settings-group-head"><span>📅</span><div><h3 data-i18n="stg.year.title">سال مالی</h3><p class="hint">بستن سال فقط وضعیت سال را ثبت می‌کند؛ بدهی و طلب پاک نمی‌شود.</p></div></div>
-        <span class="acc-arrow">⌄</span>
-      </button>
-      <div class="accordion-body">
-        <div id="yearSettlementBox"></div>
-        <button onclick="settleCurrentYear()">☑️ تسویه کامل سال</button>
-      </div>
-    </div>
-
-    <div class="item accordion-card page-accordion settings-group" id="stgGroup-notif" data-acc-id="stg-notif">
-      <button class="accordion-head settings-acc-head" type="button" aria-expanded="false" onclick="toggleAccordion(this,event)">
-        <div class="settings-group-head"><span>🔔</span><div><h3 data-i18n="stg.notif.title">اعلان‌ها</h3><p class="hint">اعلان‌های یادآوری را فعال یا آزمایش کن.</p></div></div>
-        <span class="acc-arrow">⌄</span>
-      </button>
-      <div class="accordion-body">
-        <div class="settings-actions"><button onclick="requestNotifications()">🔔 فعال‌سازی اعلان‌ها</button><button onclick="testNotifications()">🧪 تست اعلان</button></div>
+        <div class="settings-actions"><button onclick="setPin()">🔢 گذاشتن / تغییر رمز عددی</button><button onclick="openPatternSetup()">🔗 گذاشتن / تغییر رمز الگو</button></div>
+        <div class="settings-actions"><button class="danger" onclick="removePin()">🔓 حذف رمز ورود</button></div>
+        <label class="feature-row"><input id="biometricToggle" type="checkbox" onchange="setBiometricEnabled(this.checked)"><span><b>ورود با اثرانگشت / Face ID</b><small>در صورت پشتیبانی گوشی، علاوه بر رمز، امکان ورود سریع با بیومتریک هم فعال می‌شود</small></span></label>
+        <div id="securityMethodHint" class="hint"></div>
       </div>
     </div>
 
     <div class="item accordion-card page-accordion settings-group upgrade-card" id="stgGroup-backup" data-acc-id="stg-backup">
       <button class="accordion-head settings-acc-head" type="button" aria-expanded="false" onclick="toggleAccordion(this,event)">
-        <div class="settings-group-head"><span>🚀</span><div><h3 data-i18n="stg.backup.title">پشتیبان‌گیری خودکار</h3><p class="hint">هر ۶ ساعت یک فایل پشتیبان واقعی ساخته می‌شود.</p></div></div>
+        <div class="settings-group-head"><span>🚀</span><div><h3 data-i18n="stg.backup.title">پشتیبان‌گیری خودکار <span class="settings-dot" id="dotBackup"></span></h3><p class="hint">هر ۶ ساعت یک فایل پشتیبان واقعی ساخته می‌شود.</p></div></div>
         <span class="acc-arrow">⌄</span>
       </button>
       <div class="accordion-body">
@@ -287,9 +259,19 @@
       </div>
     </div>
 
+    <div class="item accordion-card page-accordion settings-group" id="stgGroup-notif" data-acc-id="stg-notif">
+      <button class="accordion-head settings-acc-head" type="button" aria-expanded="false" onclick="toggleAccordion(this,event)">
+        <div class="settings-group-head"><span>🔔</span><div><h3 data-i18n="stg.notif.title">اعلان‌ها <span class="settings-dot" id="dotNotif"></span></h3><p class="hint">اعلان‌های یادآوری را فعال یا آزمایش کن.</p></div></div>
+        <span class="acc-arrow">⌄</span>
+      </button>
+      <div class="accordion-body">
+        <div class="settings-actions"><button onclick="requestNotifications()">🔔 فعال‌سازی اعلان‌ها</button><button onclick="testNotifications()">🧪 تست اعلان</button></div>
+      </div>
+    </div>
+
     <div class="item accordion-card page-accordion settings-group sync-box" id="stgGroup-sync" data-acc-id="stg-sync">
       <button class="accordion-head settings-acc-head" type="button" aria-expanded="false" onclick="toggleAccordion(this,event)">
-        <div class="settings-group-head"><span>☁️</span><div><h3 data-i18n="stg.sync.title">همگام‌سازی دو گوشی</h3><p class="hint">همین حساب را روی دو گوشی وارد کن تا اطلاعات مشترک باشند.</p></div></div>
+        <div class="settings-group-head"><span>☁️</span><div><h3 data-i18n="stg.sync.title">همگام‌سازی دو گوشی <span class="settings-dot" id="dotSync"></span></h3><p class="hint">همین حساب را روی دو گوشی وارد کن تا اطلاعات مشترک باشند.</p></div></div>
         <span class="acc-arrow">⌄</span>
       </button>
       <div class="accordion-body">
@@ -309,16 +291,56 @@
       </div>
     </div>
 
-    <div class="item accordion-card page-accordion settings-group security-group" id="stgGroup-security" data-acc-id="stg-security">
+    <div class="item accordion-card page-accordion settings-group" id="stgGroup-theme" data-acc-id="stg-theme">
       <button class="accordion-head settings-acc-head" type="button" aria-expanded="false" onclick="toggleAccordion(this,event)">
-        <div class="settings-group-head"><span>🔐</span><div><h3 data-i18n="stg.security.title">امنیت ورود</h3><p class="hint">رمز عددی یا الگو را برای قفل برنامه تنظیم کن؛ اگر گوشی اثرانگشت یا Face ID دارد می‌توانی آن را هم فعال کنی.</p></div></div>
+        <div class="settings-group-head"><span>🎨</span><div><h3>تم رنگی</h3><p class="hint">رنگ اصلی برنامه و فاکتور را انتخاب کن.</p></div></div>
         <span class="acc-arrow">⌄</span>
       </button>
       <div class="accordion-body">
-        <div class="settings-actions"><button onclick="setPin()">🔢 گذاشتن / تغییر رمز عددی</button><button onclick="openPatternSetup()">🔗 گذاشتن / تغییر رمز الگو</button></div>
-        <div class="settings-actions"><button class="danger" onclick="removePin()">🔓 حذف رمز ورود</button></div>
-        <label class="feature-row"><input id="biometricToggle" type="checkbox" onchange="setBiometricEnabled(this.checked)"><span><b>ورود با اثرانگشت / Face ID</b><small>در صورت پشتیبانی گوشی، علاوه بر رمز، امکان ورود سریع با بیومتریک هم فعال می‌شود</small></span></label>
-        <div id="securityMethodHint" class="hint"></div>
+        <div id="colorThemeSwatches" class="color-theme-swatches"></div>
+      </div>
+    </div>
+
+    <div class="item accordion-card page-accordion settings-group" id="stgGroup-branding" data-acc-id="stg-branding">
+      <button class="accordion-head settings-acc-head" type="button" aria-expanded="false" onclick="toggleAccordion(this,event)">
+        <div class="settings-group-head"><span>🏪</span><div><h3 data-i18n="stg.branding.title">ظاهر فروشگاه و فاکتور <span class="settings-dot" id="dotBranding"></span></h3><p class="hint">نام فروشگاه، لوگو، مهر و امضا برای فاکتور.</p></div></div>
+        <span class="acc-arrow">⌄</span>
+      </button>
+      <div class="accordion-body">
+        <input id="brandStore" placeholder="نام فروشگاه"/>
+        <label class="file-label">🖼 لوگوی فروشگاه<input id="brandLogo" type="file" accept="image/*" onchange="previewBrandFile(this,'logo')"></label>
+        <div id="brandLogoPreview"></div>
+        <label class="file-label">🔴 مهر فروشگاه<input id="brandStamp" type="file" accept="image/*" onchange="previewBrandFile(this,'stamp')"></label>
+        <div id="brandStampPreview"></div>
+        <label class="file-label">✍️ امضا<input id="brandSignature" type="file" accept="image/*" onchange="previewBrandFile(this,'signature')"></label>
+        <div id="brandSignaturePreview"></div>
+        <div class="settings-actions"><button class="primary" onclick="saveBranding()">💾 ذخیره مشخصات فاکتور</button><button onclick="clearBranding()">🧹 حذف لوگو، مهر و امضا</button></div>
+      </div>
+    </div>
+
+    <div class="item accordion-card page-accordion settings-group" id="stgGroup-year" data-acc-id="stg-year">
+      <button class="accordion-head settings-acc-head" type="button" aria-expanded="false" onclick="toggleAccordion(this,event)">
+        <div class="settings-group-head"><span>📅</span><div><h3 data-i18n="stg.year.title">سال مالی</h3><p class="hint">بستن سال فقط وضعیت سال را ثبت می‌کند؛ بدهی و طلب پاک نمی‌شود.</p></div></div>
+        <span class="acc-arrow">⌄</span>
+      </button>
+      <div class="accordion-body">
+        <div id="yearSettlementBox"></div>
+        <button onclick="settleCurrentYear()">☑️ تسویه کامل سال</button>
+      </div>
+    </div>
+
+    <div class="item accordion-card page-accordion settings-group" id="stgGroup-ai" data-acc-id="stg-ai">
+      <button class="accordion-head settings-acc-head" type="button" aria-expanded="false" onclick="toggleAccordion(this,event)">
+        <div class="settings-group-head"><span>✨</span><div><h3>یادداشت هوشمند (Claude)</h3><p class="hint">برای استفاده از «یادداشت هوشمند» در صفحه یادداشت‌ها، کلید API شخصی خودت از Claude (Anthropic) را اینجا وارد کن. این کلید فقط روی همین گوشی ذخیره می‌شود.</p></div></div>
+        <span class="acc-arrow">⌄</span>
+      </button>
+      <div class="accordion-body">
+        <div id="anthropicKeyStatus" class="hint"></div>
+        <input id="anthropicKeyInput" type="password" placeholder="sk-ant-..." autocomplete="off">
+        <div class="settings-actions">
+          <button class="primary" onclick="saveAnthropicKey()">💾 ذخیره کلید</button>
+          <button class="danger" onclick="clearAnthropicKey()">🗑 حذف کلید</button>
+        </div>
       </div>
     </div>
 
@@ -327,13 +349,20 @@
   <p class="hint">تغییرات روی این گوشی ذخیره می‌شود و در صورت اتصال به Firebase با گوشی دوم ادغام می‌گردد.</p>
 </section>
 
-</main>
+<nav class="bottom-nav" id="bottomNav" aria-label="ناوبری پایین">
+  <button class="nav bottom-nav-btn active" data-page="home"><span class="bn-icon">⌂</span><span>خانه</span></button>
+  <button class="nav bottom-nav-btn" data-page="transactions"><span class="bn-icon">☷</span><span>تراکنش</span></button>
+  <button class="nav bottom-nav-btn" data-page="invoices"><span class="bn-icon">🧾</span><span>فاکتور</span></button>
+  <button class="nav bottom-nav-btn" data-page="reports"><span class="bn-icon">◔</span><span>گزارش</span></button>
+  <button type="button" class="bottom-nav-btn" onclick="openMenu()"><span class="bn-icon">⋯</span><span>منو</span></button>
+</nav>
 </div>
 
 <div id="menuModal" class="modal menu-modal hidden">
   <div class="sheet menu-sheet">
     <div class="menu-head"><h2 data-i18n="menu.title">منو</h2><button class="close" onclick="closeMenu()">×</button></div>
-    <div class="menu-groups">
+    <input id="menuSearchInput" class="menu-search" placeholder="جستجو در منو... (مثلاً «چک» یا «انبار»)" oninput="filterMenu()" onkeydown="if(event.key==='Enter')menuSearchEnter()">
+    <div class="menu-groups" id="menuGroups">
       <div class="menu-group">
         <div class="menu-group-title" data-i18n="menu.main">اصلی</div>
         <div class="menu-grid">
@@ -363,6 +392,7 @@
       <div class="menu-group">
         <div class="menu-group-title" data-i18n="menu.other">دیگر</div>
         <div class="menu-grid">
+          <button class="nav" data-page="trash">🗑<span>زباله‌دان</span></button>
           <button class="nav" data-page="settings">⚙<span data-i18n="nav.settings">تنظیمات</span></button>
         </div>
       </div>

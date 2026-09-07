@@ -37,7 +37,7 @@ img,svg,canvas{max-width:100%}
 /* Nothing in the app should ever be wide enough to need a horizontal drag —
    every page and every sheet clips instead of scrolling sideways. */
 .app,main,.page,.sheet,.modal{overflow-x:hidden}
-.app{max-width:600px;margin:0 auto;min-height:100vh;height:auto;padding-bottom:calc(var(--safe-b) + 32px);width:100%;}
+.app{max-width:600px;margin:0 auto;min-height:100vh;height:auto;padding-bottom:calc(var(--safe-b) + 78px);width:100%;}
 
 /* ===== Top bar ===== */
 .top-bar{
@@ -388,9 +388,14 @@ body:not(.dark) .sheet .close{background:#E5E5EA}
 .menu-sheet .close{position:static;width:30px;height:30px}
 .menu-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
 .menu-head h2{font-size:19px}
+.menu-search{width:100%;padding:11px 14px;border-radius:var(--radius-sm);border:.5px solid var(--sep);background:var(--bg3);color:var(--label);font-size:14px;margin-bottom:12px}
 .menu-groups{display:flex;flex-direction:column;gap:16px;margin-top:4px}
-.menu-group-title{font-size:11.5px;font-weight:700;color:var(--label2);margin-bottom:6px;padding-inline-start:4px}
-.menu-grid{display:flex;flex-direction:column;gap:2px}
+.menu-group-title{font-size:11.5px;font-weight:700;color:var(--label2);margin-bottom:6px;padding-inline-start:4px;display:flex;align-items:center;justify-content:space-between;padding:8px 4px;border-radius:10px}
+.menu-group-title:active{background:var(--bg3)}
+.menu-group-arrow{font-size:12px;transition:transform .18s ease;color:var(--label3)}
+.menu-group.open .menu-group-arrow{transform:rotate(180deg)}
+.menu-grid{display:none;flex-direction:column;gap:2px}
+.menu-group.open .menu-grid{display:flex}
 .menu-grid .nav{
   display:flex;flex-direction:row;align-items:center;gap:12px;width:100%;text-align:start;
   padding:11px 10px;border:none;border-radius:var(--radius-sm);background:transparent;
@@ -468,6 +473,37 @@ body:not(.dark) .report-summary{background:var(--bg3)}
 .report-row small{display:block;color:var(--label2);font-size:10.5px;margin-top:2px}
 .report-card{margin-top:12px}
 .report-card h3{font-size:13.5px;margin-bottom:8px}
+.report-sub-title{font-size:12.5px;font-weight:700;color:var(--label2);margin:12px 0 4px;padding-top:8px;border-top:.5px solid var(--sep)}
+.report-sub-title:first-child{margin-top:0;padding-top:0;border-top:none}
+.gs-results{margin-top:10px}
+.gs-group{margin-bottom:14px}
+.gs-group-title{font-size:12px;font-weight:700;color:var(--label2);margin-bottom:6px}
+.gs-row{cursor:pointer}
+.gs-row:active{background:var(--bg3)}
+/* ---- v3.12: نشانگر قرمز بخش‌های غیرفعال تنظیمات ---- */
+.settings-dot{display:none;width:8px;height:8px;border-radius:50%;background:var(--red);margin-inline-start:6px;vertical-align:middle;box-shadow:0 0 0 3px color-mix(in srgb, var(--red) 22%, transparent)}
+.settings-dot.show{display:inline-block}
+/* ---- v3.12: تم رنگی قابل انتخاب ---- */
+.color-theme-swatches{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.theme-swatch-btn{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:var(--radius-sm);border:1.5px solid var(--sep);background:var(--bg3);color:var(--label);font-size:12.5px;font-weight:600}
+.theme-swatch-btn.active{border-color:var(--swatch);box-shadow:0 0 0 2px color-mix(in srgb, var(--swatch) 35%, transparent)}
+.theme-swatch-dot{width:18px;height:18px;border-radius:50%;background:var(--swatch);flex:none;box-shadow:inset 0 0 0 2px rgba(0,0,0,.08)}
+body[data-accent="blue"]{--blue:#2563EB}
+body.dark[data-accent="blue"]{--blue:#60A5FA}
+body[data-accent="purple"]{--blue:#7C3AED}
+body.dark[data-accent="purple"]{--blue:#A78BFA}
+body[data-accent="rose"]{--blue:#DB2777}
+body.dark[data-accent="rose"]{--blue:#F472B6}
+body[data-accent="amber"]{--blue:#B45309}
+body.dark[data-accent="amber"]{--blue:#FBBF24}
+body[data-accent="emerald"]{--blue:#059669}
+body.dark[data-accent="emerald"]{--blue:#34D399}
+body[data-accent="indigo"]{--blue:#4338CA}
+body.dark[data-accent="indigo"]{--blue:#818CF8}
+body[data-accent="crimson"]{--blue:#B91C1C}
+body.dark[data-accent="crimson"]{--blue:#F87171}
+body[data-accent="gold"]{--blue:#A16207}
+body.dark[data-accent="gold"]{--blue:#FACC15}
 canvas#chart{width:100%!important;height:auto!important}
 
 /* audit */
@@ -645,7 +681,7 @@ html,body{width:100%;height:100%;min-height:100%;margin:0;overflow:hidden!import
  * re-initializing from its first page (home), i.e. exactly the "سفید میشه و
  * با تاخیر میره خانه" bug. Keeping it pan-y here too closes that gap. */
 body{touch-action:pan-y;-webkit-user-select:none;user-select:none}
-.app{width:100%;max-width:600px;height:100vh;min-height:100vh;margin:0 auto;display:block;overflow-x:hidden!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;touch-action:pan-y;padding-bottom:calc(var(--safe-b) + 32px)}
+.app{width:100%;max-width:600px;height:100vh;min-height:100vh;margin:0 auto;display:block;overflow-x:hidden!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;touch-action:pan-y;padding-bottom:calc(var(--safe-b) + 78px)}
 main{width:100%;min-height:0;height:auto;display:block;overflow:visible!important;padding:0;touch-action:pan-y}
 .page{min-height:0;height:auto;touch-action:pan-y}
 .page.active{display:block}
@@ -665,3 +701,22 @@ button,.nav,a,input,select,textarea{touch-action:manipulation}
  #invoicePreview,#invoicePreview *{visibility:visible}
  #invoicePreview{position:absolute;inset:0;margin:0;box-shadow:none;border:none}
 }
+
+/* ===== v3.11: نوار پایین ثابت ===== */
+.bottom-nav{
+  position:fixed;bottom:0;left:50%;transform:translateX(-50%);
+  width:100%;max-width:600px;display:flex;justify-content:space-between;
+  padding:8px 6px calc(6px + var(--safe-b));z-index:29;
+  background:color-mix(in srgb, var(--bg) 88%, transparent);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);
+  border-top:.5px solid var(--sep);
+}
+.bottom-nav-btn{
+  flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;
+  border:none;background:none;color:var(--label2);font-size:10.5px;font-weight:600;
+  padding:4px 2px;border-radius:12px;
+}
+.bottom-nav-btn .bn-icon{font-size:20px;line-height:1}
+.bottom-nav-btn.active{color:var(--blue)}
+.bottom-nav-btn:active{background:var(--bg3)}
+@media print{.bottom-nav{display:none}}
