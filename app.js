@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="3.12";
+const APP_VERSION="1.2";
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v1";
 const AUTO_BACKUP_MS=6*60*60*1000;
@@ -879,7 +879,13 @@ function showWhatsNewOnce(){
   <h2>🎉 به حساب‌یار خوش آمدی</h2>
   <p class="hint">این صفحه فقط یک‌بار در اولین اجرای این نسخه نمایش داده می‌شود.</p>
   <div class="whats-new-section">
-   <h3>🛠 تغییرات این نسخه (۳.۱۲)</h3>
+   <h3>🛠 تغییرات این نسخه (۱.۲)</h3>
+   <ul>
+    <li>جداکننده هزارگان: در همه‌ی فیلدهای مبلغی برنامه (تراکنش، چک، فاکتور، کالا، بدهکار/بستانکار، حساب، بودجه، یادآوری و...) هنگام تایپ، هر ۳ رقم یک ویرگول می‌گیرد تا میلیون از هزار راحت تشخیص داده شود.</li>
+   </ul>
+  </div>
+  <div class="whats-new-section">
+   <h3>🛠 تغییرات نسخه قبل (۳.۱۲)</h3>
    <ul>
     <li>هشدار سررسید چک: چک‌های نزدیک به سررسید (یا گذشته) بالای لیست چک‌ها می‌آیند و برای هرکدام یک یادآوری خودکار با اعلان ساخته می‌شود.</li>
     <li>زباله‌دان: حذف تراکنش، فاکتور یا چک از این پس ۳۰ روز قابل بازگردانی است (منو ← دیگر ← زباله‌دان).</li>
@@ -1054,8 +1060,35 @@ $("menuModal").addEventListener("click",e=>{if(e.target.id==="menuModal")closeMe
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeMenu()});
 
 const modal=$("modal"),modalBody=$("modalBody");
-function openModal(html){modalBody.innerHTML=html;modal.classList.remove("hidden")}
+function openModal(html){modalBody.innerHTML=html;modal.classList.remove("hidden");bindAmountInputs(modalBody)}
 function closeModal(){modal.classList.add("hidden")}
+/* ---- v3.12: جداکننده هزارگان در تمام فیلدهای عددی مبلغی ----
+ * هر فیلدی که کلاس amt-input داشته باشد، هنگام تایپ خودکار هر ۳ رقم یک
+ * ویرگول می‌گیرد (۱٬۲۵۰٬۰۰۰) تا میلیون از هزار به‌راحتی تشخیص داده شود؛
+ * مقدار واقعی برای ذخیره‌سازی همیشه با parseMoney() (که از قبل در همه‌ی
+ * توابع ذخیره استفاده می‌شد) از روی همین متن با ویرگول درست خوانده
+ * می‌شود، چون parseMoney هر چیزی جز رقم را حذف می‌کند. این فیلدها از
+ * type="number" به type="text" تغییر کردند چون مرورگر روی نوع number
+ * اجازه نمایش ویرگول را نمی‌دهد. */
+function groupThousandsStr(digitsOnly){return digitsOnly.replace(/\B(?=(\d{3})+(?!\d))/g,",")}
+function fmtAmtValue(n){n=Math.round(Number(n)||0);return n?groupThousandsStr(String(n)):""}
+function formatAmountInputEl(el){
+ const start=el.selectionStart,before=el.value.length;
+ const digits=String(el.value||"").replace(/[^\d]/g,"");
+ const grouped=groupThousandsStr(digits);
+ if(el.value===grouped)return;
+ el.value=grouped;
+ const diff=grouped.length-before;
+ try{const pos=Math.max(0,(start||grouped.length)+diff);el.setSelectionRange(pos,pos)}catch(e){}
+}
+function bindAmountInputs(root){
+ (root||document).querySelectorAll(".amt-input").forEach(el=>{
+  if(el.dataset.amtBound)return;
+  el.dataset.amtBound="1";
+  el.addEventListener("input",()=>formatAmountInputEl(el));
+  formatAmountInputEl(el);
+ });
+}
 
 /* ---- v3.11: جستجوی سراسری ----
  * یک ذره‌بین بالای صفحه که هم‌زمان در تراکنش، مشتری، کالا، چک و فاکتور
@@ -1138,8 +1171,8 @@ function touch(r){r.updatedAt=new Date().toISOString();r.updatedBy=sync.user?.ui
 function markDeleted(type,id){data._sync??={tombstones:{}};data._sync.tombstones??={};data._sync.tombstones[type]??={};const dt=new Date().toISOString();data._sync.tombstones[type][id]=dt;markDirty(type,id,true,{id},dt)}
 function removeRecord(type,id){const i=data[type].findIndex(x=>x.id===id);if(i<0)return;data[type].splice(i,1);markDeleted(type,id);save()}
 function accountSelect(id="acc",selected=""){return `<select id="${id}">${data.accounts.map(a=>`<option value="${a.id}" ${a.id===selected?"selected":""}>${esc(a.name)}${a.bank?" • "+esc(a.bank):""}</option>`).join("")}</select>`}
-function openAccount(id=null){const a=id&&data.accounts.find(x=>x.id===id);openModal(`<h2>${a?"ویرایش حساب":"افزودن حساب"}</h2><div class="form"><input id="an" placeholder="نام حساب" value="${esc(a?.name||"")}"><input id="bank" placeholder="نام بانک" value="${esc(a?.bank||"")}"><input id="sender" placeholder="شماره فرستنده پیامک بانک" value="${esc(a?.sender||"")}"><input id="card" placeholder="شماره کارت (اختیاری)" value="${esc(a?.card||"")}"><input id="ab" type="number" placeholder="موجودی اولیه" value="${Number(a?.balance)||0}"><button class="primary" onclick="saveAccount('${a?.id||""}')">${a?"ذخیره تغییرات":"ذخیره"}</button></div>`)}
-function saveAccount(id){if(!$("an").value.trim())return alert("نام حساب را وارد کنید");const o={name:$("an").value.trim(),bank:$("bank").value.trim(),sender:$("sender").value.trim(),card:$("card").value.trim(),balance:Number($("ab").value)||0};if(id){const a=data.accounts.find(x=>x.id===id);Object.assign(a,o);touch(a);markDirty("accounts",a.id,false,a,a.updatedAt)}else{const a=touch({id:uid(),...o});data.accounts.push(a);markDirty("accounts",a.id,false,a,a.updatedAt)}save();logEvent(id?"ویرایش حساب":"ایجاد حساب",o.name,id?"edit":"create");closeModal()}
+function openAccount(id=null){const a=id&&data.accounts.find(x=>x.id===id);openModal(`<h2>${a?"ویرایش حساب":"افزودن حساب"}</h2><div class="form"><input id="an" placeholder="نام حساب" value="${esc(a?.name||"")}"><input id="bank" placeholder="نام بانک" value="${esc(a?.bank||"")}"><input id="sender" placeholder="شماره فرستنده پیامک بانک" value="${esc(a?.sender||"")}"><input id="card" placeholder="شماره کارت (اختیاری)" value="${esc(a?.card||"")}"><input id="ab" type="text" inputmode="numeric" class="amt-input" placeholder="موجودی اولیه" value="${fmtAmtValue(a?.balance)}"><button class="primary" onclick="saveAccount('${a?.id||""}')">${a?"ذخیره تغییرات":"ذخیره"}</button></div>`)}
+function saveAccount(id){if(!$("an").value.trim())return alert("نام حساب را وارد کنید");const o={name:$("an").value.trim(),bank:$("bank").value.trim(),sender:$("sender").value.trim(),card:$("card").value.trim(),balance:parseMoney($("ab").value)||0};if(id){const a=data.accounts.find(x=>x.id===id);Object.assign(a,o);touch(a);markDirty("accounts",a.id,false,a,a.updatedAt)}else{const a=touch({id:uid(),...o});data.accounts.push(a);markDirty("accounts",a.id,false,a,a.updatedAt)}save();logEvent(id?"ویرایش حساب":"ایجاد حساب",o.name,id?"edit":"create");closeModal()}
 async function copyCardNumber(id){
  const a=data.accounts.find(x=>x.id===id);
  const card=String(a?.card||"").trim();
@@ -1190,7 +1223,7 @@ function categoryButtons(type,selected=""){
   }).join("")}</div><button type="button" class="cat-manage-link" onclick="openCategory()">⚙ مدیریت کامل دسته‌ها و زیرمجموعه‌ها</button>`;
 }
 function toggleCategoryExpand(type,id){catExpand[type]=catExpand[type]===id?null:id;refreshCategoryButtonsInTxForm(type)}
-function openTx(id=null){if(!data.accounts.length)return alert("اول از بخش حساب‌ها یک حساب اضافه کنید");const t=id&&data.transactions.find(x=>x.id===id);if(t?.type==="transfer")return openTransfer(id);const typ=t?.type||"expense";catExpand={expense:null,income:null};openModal(`<h2>${t?"ویرایش تراکنش":"ثبت تراکنش"}</h2><div class="form"><div class="type-switch"><button type="button" id="expBtn" class="${typ==="expense"?"chosen":""}" onclick="txType('expense')">💸 هزینه</button><button type="button" id="incBtn" class="${typ==="income"?"chosen":""}" onclick="txType('income')">💰 دریافت</button></div><input id="txKind" type="hidden" value="${typ}"><input id="title" placeholder="عنوان" value="${esc(t?.title||"")}"><input id="amount" type="number" placeholder="مبلغ" value="${Number(t?.amount)||""}"><div id="expensePanel" style="display:${typ==="expense"?"block":"none"}"><div class="cat-head-row"><b id="catLabel">${t?.category?"دسته: "+esc(t.category):"دسته را انتخاب کنید"}</b><div class="cat-toolbar"><button type="button" title="افزودن دسته" onclick="quickAddCategory('expense')">＋</button><button type="button" title="ویرایش دسته انتخاب‌شده" onclick="quickEditCategory('expense')">✏️</button><button type="button" title="حذف دسته انتخاب‌شده" class="danger-icon" onclick="quickDeleteCategory('expense')">🗑</button></div></div><div id="expenseCatButtons">${categoryButtons("expense",typ==="expense"?t?.category:"")}</div><input id="cat" type="hidden" value="${esc(typ==="expense"?t?.category||"":"")}"></div><div id="incomePanel" style="display:${typ==="income"?"block":"none"}"><div class="cat-head-row"><b id="incatLabel">${t?.category?"دسته: "+esc(t.category):"دسته را انتخاب کنید"}</b><div class="cat-toolbar"><button type="button" title="افزودن دسته" onclick="quickAddCategory('income')">＋</button><button type="button" title="ویرایش دسته انتخاب‌شده" onclick="quickEditCategory('income')">✏️</button><button type="button" title="حذف دسته انتخاب‌شده" class="danger-icon" onclick="quickDeleteCategory('income')">🗑</button></div></div><div id="incomeCatButtons">${categoryButtons("income",typ==="income"?t?.category:"")}</div><input id="incat" type="hidden" value="${esc(typ==="income"?t?.category||"":"")}"></div>${accountSelect("acc",t?.accountID||"")}<label class="hint" style="display:block;margin-top:8px">🔁 تکرار خودکار</label><select id="txRecur"><option value="none" ${!t?.recurring||t?.recurring==="none"?"selected":""}>بدون تکرار</option><option value="weekly" ${t?.recurring==="weekly"?"selected":""}>هفتگی</option><option value="monthly" ${t?.recurring==="monthly"?"selected":""}>ماهانه</option></select><label class="file-label">📎 تصویر پیوست (اختیاری)<input id="txImage" type="file" accept="image/*" onchange="previewTxImage(this)"></label>${t?.image?`<div class="attachment-preview"><img src="${t.image}" alt="پیوست"></div>`:""}<div id="txImagePreview"></div><button class="primary" onclick="saveTx('${t?.id||""}')">${t?"ذخیره تغییرات":"ثبت تراکنش"}</button></div>`)}
+function openTx(id=null){if(!data.accounts.length)return alert("اول از بخش حساب‌ها یک حساب اضافه کنید");const t=id&&data.transactions.find(x=>x.id===id);if(t?.type==="transfer")return openTransfer(id);const typ=t?.type||"expense";catExpand={expense:null,income:null};openModal(`<h2>${t?"ویرایش تراکنش":"ثبت تراکنش"}</h2><div class="form"><div class="type-switch"><button type="button" id="expBtn" class="${typ==="expense"?"chosen":""}" onclick="txType('expense')">💸 هزینه</button><button type="button" id="incBtn" class="${typ==="income"?"chosen":""}" onclick="txType('income')">💰 دریافت</button></div><input id="txKind" type="hidden" value="${typ}"><input id="title" placeholder="عنوان" value="${esc(t?.title||"")}"><input id="amount" type="text" inputmode="numeric" class="amt-input" placeholder="مبلغ" value="${fmtAmtValue(t?.amount)}"><div id="expensePanel" style="display:${typ==="expense"?"block":"none"}"><div class="cat-head-row"><b id="catLabel">${t?.category?"دسته: "+esc(t.category):"دسته را انتخاب کنید"}</b><div class="cat-toolbar"><button type="button" title="افزودن دسته" onclick="quickAddCategory('expense')">＋</button><button type="button" title="ویرایش دسته انتخاب‌شده" onclick="quickEditCategory('expense')">✏️</button><button type="button" title="حذف دسته انتخاب‌شده" class="danger-icon" onclick="quickDeleteCategory('expense')">🗑</button></div></div><div id="expenseCatButtons">${categoryButtons("expense",typ==="expense"?t?.category:"")}</div><input id="cat" type="hidden" value="${esc(typ==="expense"?t?.category||"":"")}"></div><div id="incomePanel" style="display:${typ==="income"?"block":"none"}"><div class="cat-head-row"><b id="incatLabel">${t?.category?"دسته: "+esc(t.category):"دسته را انتخاب کنید"}</b><div class="cat-toolbar"><button type="button" title="افزودن دسته" onclick="quickAddCategory('income')">＋</button><button type="button" title="ویرایش دسته انتخاب‌شده" onclick="quickEditCategory('income')">✏️</button><button type="button" title="حذف دسته انتخاب‌شده" class="danger-icon" onclick="quickDeleteCategory('income')">🗑</button></div></div><div id="incomeCatButtons">${categoryButtons("income",typ==="income"?t?.category:"")}</div><input id="incat" type="hidden" value="${esc(typ==="income"?t?.category||"":"")}"></div>${accountSelect("acc",t?.accountID||"")}<label class="hint" style="display:block;margin-top:8px">🔁 تکرار خودکار</label><select id="txRecur"><option value="none" ${!t?.recurring||t?.recurring==="none"?"selected":""}>بدون تکرار</option><option value="weekly" ${t?.recurring==="weekly"?"selected":""}>هفتگی</option><option value="monthly" ${t?.recurring==="monthly"?"selected":""}>ماهانه</option></select><label class="file-label">📎 تصویر پیوست (اختیاری)<input id="txImage" type="file" accept="image/*" onchange="previewTxImage(this)"></label>${t?.image?`<div class="attachment-preview"><img src="${t.image}" alt="پیوست"></div>`:""}<div id="txImagePreview"></div><button class="primary" onclick="saveTx('${t?.id||""}')">${t?"ذخیره تغییرات":"ثبت تراکنش"}</button></div>`)}
 function txType(t){$("txKind").value=t;$("expBtn").classList.toggle("chosen",t==="expense");$("incBtn").classList.toggle("chosen",t==="income");$("expensePanel").style.display=t==="expense"?"block":"none";$("incomePanel").style.display=t==="income"?"block":"none"}
 function pickCategory(type,id){const c=(type==="expense"?data.expenseCats:data.incomeCats).find(x=>x.id===id);if(!c)return;setCategoryValue(type,c.name)}
 function pickSubCategory(type,catId,childId){const c=(type==="expense"?data.expenseCats:data.incomeCats).find(x=>x.id===catId);const ch=c?.children?.find(x=>x.id===childId);if(!c||!ch)return;setCategoryValue(type,c.name+" - "+ch.name)}
@@ -1332,7 +1365,7 @@ function openBankMessage(){
   openModal(`<h2>🏦 تشخیص پیامک بانکی</h2><div class="form">
     <select id="bma">${data.accounts.map(a=>`<option value="${a.id}">${esc(a.name)}${a.bank?" • "+esc(a.bank):""}</option>`).join("")}</select>
     <select id="bmt"><option value="income">دریافتی / واریز</option><option value="expense">پرداخت / برداشت</option></select>
-    <input id="bmaAmount" type="number" min="0" placeholder="مبلغ تراکنش">
+    <input id="bmaAmount" type="text" inputmode="numeric" class="amt-input" min="0" placeholder="مبلغ تراکنش">
     <input id="bt" placeholder="عنوان / شرح پیامک">
     <textarea id="bms" placeholder="متن پیامک بانک (اختیاری)"></textarea>
     <select id="bc"><option value="بانکی">بانکی</option>${data.expenseCats.map(c=>`<option value="${esc(c.name)}">${esc(c.name)}</option>`).join("")}</select>
@@ -1367,7 +1400,7 @@ function openTransfer(id=null){
    <input id="otherCard" inputmode="numeric" maxlength="16" placeholder="شماره کارت گیرنده (۱۶ رقم)" value="${esc(t?.otherCard||"")}" style="display:${method==="card"?"block":"none"}">
    <input id="otherSheba" inputmode="numeric" maxlength="26" placeholder="شماره شبا گیرنده (IR + ۲۴ رقم)" value="${esc(t?.otherSheba||"")}" style="display:${method==="sheba"?"block":"none"}">
  </div>
- <input id="tam" type="number" placeholder="مبلغ" value="${Number(t?.amount)||""}"><input id="tnote" placeholder="توضیحات" value="${esc(t?.title||"")}"><button class="primary" onclick="saveTransfer('${t?.id||""}')">${t?"ذخیره تغییرات":"ثبت انتقال"}</button></div>`)
+ <input id="tam" type="text" inputmode="numeric" class="amt-input" placeholder="مبلغ" value="${fmtAmtValue(t?.amount)}"><input id="tnote" placeholder="توضیحات" value="${esc(t?.title||"")}"><button class="primary" onclick="saveTransfer('${t?.id||""}')">${t?"ذخیره تغییرات":"ثبت انتقال"}</button></div>`)
 }
 function transferMode(mode){$("transferMode").value=mode;$("selfTransferBtn").classList.toggle("chosen",mode==="self");$("otherTransferBtn").classList.toggle("chosen",mode==="other");$("selfTransferPanel").style.display=mode==="self"?"block":"none";$("otherTransferPanel").style.display=mode==="other"?"block":"none"}
 function otherTransferMethod(method){$("otherMethod").value=method;$("otherMethodCardBtn").classList.toggle("chosen",method==="card");$("otherMethodShebaBtn").classList.toggle("chosen",method==="sheba");$("otherCard").style.display=method==="card"?"block":"none";$("otherSheba").style.display=method==="sheba"?"block":"none"}
@@ -1389,7 +1422,7 @@ function saveTransfer(id){
 function deleteTx(id){if(confirm("این تراکنش حذف شود؟")){const t=data.transactions.find(x=>x.id===id);removeRecordToTrash("transactions",id);logEvent("حذف تراکنش",t?.title||id,"delete")}}
 function categoryManageRow(type,c){
   const kids=c.children||[];
-  const budgetRow=type==="expense"?`<div class="cat-budget-row"><span class="hint">💰 بودجه ماهانه:</span><input type="number" value="${Number(c.budget)||""}" placeholder="بدون سقف" onchange="setCategoryBudget('${c.id}',this.value)"></div>`:"";
+  const budgetRow=type==="expense"?`<div class="cat-budget-row"><span class="hint">💰 بودجه ماهانه:</span><input type="text" inputmode="numeric" class="amt-input" value="${fmtAmtValue(c.budget)}" placeholder="بدون سقف" onchange="setCategoryBudget('${c.id}',this.value)"></div>`:"";
   return `<div class="cat-manage-row">
     <div class="cat-manage-head"><b>${esc(c.name)}</b><div class="actions"><button title="افزودن زیرمجموعه" onclick="addSubCatPrompt('${type}','${c.id}')">🏷➕</button><button onclick="editCategory('${type}','${c.id}')">✏️</button><button class="danger-icon" onclick="removeCategory('${type}','${c.id}')">🗑</button></div></div>
     ${budgetRow}
@@ -1425,15 +1458,15 @@ function openProduct(id=null){const p=id&&data.products.find(x=>x.id===id);openM
  ${invField("نام کالا یا خدمت","",`<input id="prdName" placeholder="مثلاً: کیف چرمی مدل ۱" value="${esc(p?.name||"")}">`)}
  ${invField("کد کالا","اختیاری؛ برای پیدا کردن سریع‌تر",`<input id="prdCode" placeholder="مثلاً: A-102" value="${esc(p?.code||"")}">`)}
  <div class="two-fields">
- ${invField("قیمت خرید","تومان",`<input id="prdBuy" type="number" min="0" inputmode="numeric" placeholder="۰" value="${Number(p?.buyPrice)||""}">`)}
- ${invField("قیمت فروش","تومان",`<input id="prdPrice" type="number" min="0" inputmode="numeric" placeholder="۰" value="${Number(p?.price)||""}">`)}
+ ${invField("قیمت خرید","تومان",`<input id="prdBuy" type="text" inputmode="numeric" class="amt-input" placeholder="۰" value="${fmtAmtValue(p?.buyPrice)}">`)}
+ ${invField("قیمت فروش","تومان",`<input id="prdPrice" type="text" inputmode="numeric" class="amt-input" placeholder="۰" value="${fmtAmtValue(p?.price)}">`)}
  </div>
  <div class="two-fields">
  ${invField("موجودی فعلی","تعداد در انبار",`<input id="prdStock" type="number" min="0" inputmode="numeric" placeholder="۰" value="${Number(p?.stock)||""}">`)}
  ${invField("حداقل موجودی","برای هشدار موجودی کم",`<input id="prdMin" type="number" min="0" inputmode="numeric" placeholder="۰" value="${Number(p?.minStock)||""}">`)}
  </div>
  <button class="primary" onclick="saveProduct('${p?.id||""}')">💾 ذخیره</button></div>`)}
-function saveProduct(id){const name=$("prdName").value.trim();if(!name)return alert("نام کالا را وارد کن");const o={name,code:$("prdCode").value.trim(),buyPrice:Number($("prdBuy").value)||0,price:Number($("prdPrice").value)||0,stock:Number($("prdStock").value)||0,minStock:Number($("prdMin").value)||0};if(id){const p=data.products.find(x=>x.id===id);Object.assign(p,o);touch(p);markDirty("products",p.id,false,p,p.updatedAt)}else{const p=touch({id:uid(),...o});data.products.unshift(p);markDirty("products",p.id,false,p,p.updatedAt)}save();logEvent(id?"ویرایش کالا":"افزودن کالا",name,id?"edit":"create");closeModal()}
+function saveProduct(id){const name=$("prdName").value.trim();if(!name)return alert("نام کالا را وارد کن");const o={name,code:$("prdCode").value.trim(),buyPrice:parseMoney($("prdBuy").value),price:parseMoney($("prdPrice").value),stock:Number($("prdStock").value)||0,minStock:Number($("prdMin").value)||0};if(id){const p=data.products.find(x=>x.id===id);Object.assign(p,o);touch(p);markDirty("products",p.id,false,p,p.updatedAt)}else{const p=touch({id:uid(),...o});data.products.unshift(p);markDirty("products",p.id,false,p,p.updatedAt)}save();logEvent(id?"ویرایش کالا":"افزودن کالا",name,id?"edit":"create");closeModal()}
 function deleteProduct(id){if(!confirm("این کالا حذف شود؟"))return;const p=data.products.find(x=>x.id===id);removeRecord("products",id);logEvent("حذف کالا",p?.name||id,"delete")}
 /* v2.3 fix: renderProducts() existed but was never wired into render()'s
    per-page dispatch (every other page — customers, invoices, checks... —
@@ -1567,7 +1600,7 @@ async function shareCustomerStatement(id){
 }
 function exportAllCustomersExcel(){const rows=data.customers.map(c=>{const st=customerStats(c);return [c.name,c.phone||"",st.count,st.total,st.paid,st.due]});exportXLS('همه-مشتریان',['نام مشتری','شماره تماس','تعداد فاکتور','مجموع خرید','مجموع پرداخت','مانده'],rows)}
 
-function openPerson(id=null){const p=id&&data.people.find(x=>x.id===id);const instCount=p?.installments?.count||1;openModal(`<h2>${p?"ویرایش بدهکار/بستانکار":"بدهکار / بستانکار"}</h2><div class="form"><select id="pt"><option value="debt" ${p?.type==="debt"?"selected":""}>من بدهکارم</option><option value="credit" ${p?.type==="credit"?"selected":""}>من طلبکارم</option></select><input id="pn" placeholder="نام شخص" value="${esc(p?.name||"")}"><input id="pa" type="number" placeholder="مبلغ کل" value="${Number(p?.amount)||""}">${simpleDateField("pd",jalaliInputValue(p?.due||""))}${invField("تعداد اقساط","اگر پرداخت قسطی است عددی بزرگ‌تر از ۱ بگذار؛ برای پرداخت یکجا همان ۱ بماند",`<input id="pInstCount" type="number" min="1" value="${instCount}">`)}<textarea id="pnote" placeholder="توضیحات">${esc(p?.note||"")}</textarea><button class="primary" onclick="savePerson('${p?.id||""}')">${p?"ذخیره تغییرات":"ذخیره"}</button></div>`)}
+function openPerson(id=null){const p=id&&data.people.find(x=>x.id===id);const instCount=p?.installments?.count||1;openModal(`<h2>${p?"ویرایش بدهکار/بستانکار":"بدهکار / بستانکار"}</h2><div class="form"><select id="pt"><option value="debt" ${p?.type==="debt"?"selected":""}>من بدهکارم</option><option value="credit" ${p?.type==="credit"?"selected":""}>من طلبکارم</option></select><input id="pn" placeholder="نام شخص" value="${esc(p?.name||"")}"><input id="pa" type="text" inputmode="numeric" class="amt-input" placeholder="مبلغ کل" value="${fmtAmtValue(p?.amount)}">${simpleDateField("pd",jalaliInputValue(p?.due||""))}${invField("تعداد اقساط","اگر پرداخت قسطی است عددی بزرگ‌تر از ۱ بگذار؛ برای پرداخت یکجا همان ۱ بماند",`<input id="pInstCount" type="number" min="1" value="${instCount}">`)}<textarea id="pnote" placeholder="توضیحات">${esc(p?.note||"")}</textarea><button class="primary" onclick="savePerson('${p?.id||""}')">${p?"ذخیره تغییرات":"ذخیره"}</button></div>`)}
 function generateInstallments(amount,count,startISO){
   count=Math.max(1,Math.floor(count)||1);
   const base=Math.floor(amount/count);
@@ -1611,7 +1644,7 @@ function openPersonPayment(id){
   const remaining=Math.max(0,(Number(p.amount)||0)-(Number(p.paid)||0));
   const accLabel=p.type==="credit"?"واریز به حساب":"پرداخت از حساب";
   const defAcc=data.accounts.find(a=>a.default)?.id||data.accounts[0].id;
-  openModal(`<h2>💳 تسویه ${esc(p.name)}</h2><div class="form"><p class="hint">مانده فعلی: ${money(remaining)}</p><input id="ppAmount" type="number" placeholder="مبلغ تسویه" value="${remaining||""}">${invField(accLabel,"این تسویه در این حساب ثبت می‌شود",accountSelect("ppAccount",defAcc))}<label class="file-label">📎 عکس رسید ${p.type==="credit"?"دریافتی":"واریزی"} (اختیاری)<input id="ppImage" type="file" accept="image/*" onchange="previewPersonPaymentImage(this)"></label><div id="ppImagePreview"></div><button class="primary" onclick="confirmPersonPayment('${p.id}')">✅ ثبت تسویه</button></div>`);
+  openModal(`<h2>💳 تسویه ${esc(p.name)}</h2><div class="form"><p class="hint">مانده فعلی: ${money(remaining)}</p><input id="ppAmount" type="text" inputmode="numeric" class="amt-input" placeholder="مبلغ تسویه" value="${fmtAmtValue(remaining)}">${invField(accLabel,"این تسویه در این حساب ثبت می‌شود",accountSelect("ppAccount",defAcc))}<label class="file-label">📎 عکس رسید ${p.type==="credit"?"دریافتی":"واریزی"} (اختیاری)<input id="ppImage" type="file" accept="image/*" onchange="previewPersonPaymentImage(this)"></label><div id="ppImagePreview"></div><button class="primary" onclick="confirmPersonPayment('${p.id}')">✅ ثبت تسویه</button></div>`);
 }
 function previewPersonPaymentImage(input){
   const f=input?.files?.[0],box=$("ppImagePreview");if(!box||!f)return;
@@ -1864,7 +1897,7 @@ function toggleAccordion(btn,event){
 }
 
 
-function openReminder(id=null){const r=id&&data.reminders.find(x=>x.id===id);openModal(`<h2>${r?"ویرایش یادآوری":"یادآوری"}</h2><div class="form"><input id="rt" placeholder="عنوان" value="${esc(r?.title||"")}"><input id="ra" type="number" placeholder="مبلغ" value="${Number(r?.amount)||""}">${pickerBox("rdPicker","rtPicker",r?.date||new Date().toISOString())}<select id="rr"><option value="once" ${r?.repeat==="once"?"selected":""}>یک‌بار</option><option value="monthly" ${r?.repeat==="monthly"?"selected":""}>ماهانه</option><option value="weekly" ${r?.repeat==="weekly"?"selected":""}>هفتگی</option></select><select id="rb"><option value="expense" ${r?.type==="expense"?"selected":""}>پرداخت</option><option value="income" ${r?.type==="income"?"selected":""}>دریافت</option></select><button class="primary" onclick="saveReminder('${r?.id||""}')">${r?"ذخیره تغییرات":"ذخیره"}</button></div>`)}
+function openReminder(id=null){const r=id&&data.reminders.find(x=>x.id===id);openModal(`<h2>${r?"ویرایش یادآوری":"یادآوری"}</h2><div class="form"><input id="rt" placeholder="عنوان" value="${esc(r?.title||"")}"><input id="ra" type="text" inputmode="numeric" class="amt-input" placeholder="مبلغ" value="${fmtAmtValue(r?.amount)}">${pickerBox("rdPicker","rtPicker",r?.date||new Date().toISOString())}<select id="rr"><option value="once" ${r?.repeat==="once"?"selected":""}>یک‌بار</option><option value="monthly" ${r?.repeat==="monthly"?"selected":""}>ماهانه</option><option value="weekly" ${r?.repeat==="weekly"?"selected":""}>هفتگی</option></select><select id="rb"><option value="expense" ${r?.type==="expense"?"selected":""}>پرداخت</option><option value="income" ${r?.type==="income"?"selected":""}>دریافت</option></select><button class="primary" onclick="saveReminder('${r?.id||""}')">${r?"ذخیره تغییرات":"ذخیره"}</button></div>`)}
 function moveReminder(id,dir){
  const sorted=data.reminders.filter(r=>!r.sourceNoteId).sort((a,b)=>(a.order??0)-(b.order??0));
  const pos=sorted.findIndex(r=>r.id===id); if(pos<0)return;
@@ -1887,7 +1920,7 @@ function openCheck(id=null){
  const c=id&&data.checks.find(x=>x.id===id);
  const locked=!!c?.settled;
  const lockNote=locked?`<p class="hint">این چک «نشسته» است؛ نوع، مبلغ و حساب قابل ویرایش نیستند. برای تغییرشان، اول از لیست چک‌ها وضعیت را به «در انتظار» برگردان.</p>`:"";
- openModal(`<h2>${c?"ویرایش چک":"ثبت چک"}</h2><div class="form">${lockNote}<select id="ct" ${locked?"disabled":""}><option value="receive" ${c?.type==="receive"?"selected":""}>چک دریافتی</option><option value="pay" ${c?.type==="pay"?"selected":""}>چک پرداختی</option></select><input id="cn" placeholder="نام شخص" value="${esc(c?.name||"")}"><input id="cnid" inputmode="numeric" maxlength="10" placeholder="کد ملی (اختیاری)" value="${esc(c?.nationalCode||"")}"><input id="camount" type="number" placeholder="مبلغ" value="${Number(c?.amount)||""}" ${locked?"disabled":""}>${simpleDateField("cdate",jalaliInputValue(c?.date||""))}<input id="cnum" placeholder="شماره چک" value="${esc(c?.number||"")}"><input id="cbank" placeholder="بانک" value="${esc(c?.bank||"")}">${invField("حساب مرتبط","با «نشستن» چک، مبلغ از/به همین حساب کم یا زیاد و در تراکنش‌ها ثبت می‌شود",accountSelect("cacc",c?.accountID||""))}<textarea id="cnote" placeholder="توضیحات">${esc(c?.note||"")}</textarea><button class="primary" onclick="saveCheck('${c?.id||""}')">${c?"ذخیره تغییرات":"ذخیره"}</button></div>`);
+ openModal(`<h2>${c?"ویرایش چک":"ثبت چک"}</h2><div class="form">${lockNote}<select id="ct" ${locked?"disabled":""}><option value="receive" ${c?.type==="receive"?"selected":""}>چک دریافتی</option><option value="pay" ${c?.type==="pay"?"selected":""}>چک پرداختی</option></select><input id="cn" placeholder="نام شخص" value="${esc(c?.name||"")}"><input id="cnid" inputmode="numeric" maxlength="10" placeholder="کد ملی (اختیاری)" value="${esc(c?.nationalCode||"")}"><input id="camount" type="text" inputmode="numeric" class="amt-input" placeholder="مبلغ" value="${fmtAmtValue(c?.amount)}" ${locked?"disabled":""}>${simpleDateField("cdate",jalaliInputValue(c?.date||""))}<input id="cnum" placeholder="شماره چک" value="${esc(c?.number||"")}"><input id="cbank" placeholder="بانک" value="${esc(c?.bank||"")}">${invField("حساب مرتبط","با «نشستن» چک، مبلغ از/به همین حساب کم یا زیاد و در تراکنش‌ها ثبت می‌شود",accountSelect("cacc",c?.accountID||""))}<textarea id="cnote" placeholder="توضیحات">${esc(c?.note||"")}</textarea><button class="primary" onclick="saveCheck('${c?.id||""}')">${c?"ذخیره تغییرات":"ذخیره"}</button></div>`);
  if(!data.accounts.length)setTimeout(()=>alert("برای اتصال چک به حساب، اول از بخش حساب‌ها یک حساب اضافه کن."),0);
 }
 function saveCheck(id){
@@ -2041,6 +2074,7 @@ function renderSmartNoteResults(){
   const box=$("smartNoteResults");if(!box)return;
   if(!smartNoteItems.length){box.innerHTML=`<div class="card hint">هیچ مورد قابل تشخیصی در متن پیدا نشد.</div>`;return}
   box.innerHTML=`<div class="section-head"><h3>موارد پیدا‌شده</h3></div>${smartNoteItems.map((it,i)=>smartNoteItemRow(it,i)).join("")}<button type="button" class="primary" onclick="addSmartNoteSelected()">✅ افزودن موارد انتخاب‌شده</button>`;
+  bindAmountInputs(box);
 }
 
 function smartNoteItemRow(it,i){
@@ -2050,7 +2084,7 @@ function smartNoteItemRow(it,i){
       <select onchange="smartNoteItems[${i}].kind=this.value">${Object.entries(SMART_NOTE_KIND_LABEL).map(([k,l])=>`<option value="${k}" ${it.kind===k?"selected":""}>${l}</option>`).join("")}</select>
       <input placeholder="نام شخص (اختیاری)" value="${esc(it.person)}" oninput="smartNoteItems[${i}].person=this.value">
       <input placeholder="عنوان" value="${esc(it.title)}" oninput="smartNoteItems[${i}].title=this.value">
-      <input type="number" placeholder="مبلغ" value="${it.amount||""}" oninput="smartNoteItems[${i}].amount=parseMoney(this.value)">
+      <input type="text" inputmode="numeric" class="amt-input" placeholder="مبلغ" value="${fmtAmtValue(it.amount)}" oninput="smartNoteItems[${i}].amount=parseMoney(this.value)">
       <input placeholder="تاریخ شمسی مثل ۱۴۰۵/۰۶/۱۰ (اختیاری)" value="${esc(it.date)}" oninput="smartNoteItems[${i}].date=this.value">
     </div>
   </div>`;
@@ -2127,8 +2161,9 @@ function addQuickRow(pref={}){
   const box=$("quickRows");if(!box)return;
   const cats=quickTxType==="expense"?data.expenseCats:data.incomeCats;
   const row=document.createElement("div");row.className="quick-row";
-  row.innerHTML=`<div class="quick-fields"><input class="quick-title" placeholder="${quickTxType==="expense"?"نام هزینه":"نام دریافتی"}" value="${esc(pref.title||"")}"><input class="quick-amount" type="number" inputmode="decimal" placeholder="مبلغ" value="${pref.amount||""}"><select class="quick-cat">${cats.map(c=>`<option value="${esc(c.name)}" ${pref.category===c.name?"selected":""}>${esc(c.name)}</option>`).join("")}</select><select class="quick-account">${data.accounts.map(a=>`<option value="${a.id}" ${a.id===(pref.accountID||data.accounts[0]?.id)?"selected":""}>${esc(a.name)}</option>`).join("")}</select></div><button type="button" class="danger-icon quick-remove" onclick="this.parentElement.remove()">🗑</button>`;
+  row.innerHTML=`<div class="quick-fields"><input class="quick-title" placeholder="${quickTxType==="expense"?"نام هزینه":"نام دریافتی"}" value="${esc(pref.title||"")}"><input class="quick-amount amt-input" type="text" inputmode="numeric" placeholder="مبلغ" value="${fmtAmtValue(pref.amount)}"><select class="quick-cat">${cats.map(c=>`<option value="${esc(c.name)}" ${pref.category===c.name?"selected":""}>${esc(c.name)}</option>`).join("")}</select><select class="quick-account">${data.accounts.map(a=>`<option value="${a.id}" ${a.id===(pref.accountID||data.accounts[0]?.id)?"selected":""}>${esc(a.name)}</option>`).join("")}</select></div><button type="button" class="danger-icon quick-remove" onclick="this.parentElement.remove()">🗑</button>`;
   box.appendChild(row);
+  bindAmountInputs(row);
 }
 function saveQuickRows(){
   const rows=[...document.querySelectorAll("#quickRows .quick-row")];if(!rows.length)return alert("حداقل یک مورد اضافه کن");
@@ -2158,8 +2193,8 @@ function empty(s){return `<div class="card" style="text-align:center">${s}</div>
 
 function invoiceDateLabel(v){return jalaliLabel(v)}
 function invField(label,hint,inner){return `<div class="field"><span class="field-cap">${esc(label)}</span>${inner}${hint?`<small class="field-hint">${esc(hint)}</small>`:""}</div>`}
-function invoiceRowHTML(item,i){return `<div class="invoice-row"><input type="hidden" class="inv-product" value="${esc(item?.productId||"")}"><div class="inv-desc-wrap"><input class="inv-desc" autocomplete="off" placeholder="نام کالا یا خدمت (تایپ کن تا از انبار پیشنهاد بیاید)" value="${esc(item?.desc||"")}" oninput="onInvDescInput(this)" onfocus="onInvDescInput(this)" onblur="hideInvSuggestions(this)"><div class="inv-suggest"></div></div><input class="inv-qty" oninput="updateInvoiceLiveTotal()" type="number" min="0" step="any" placeholder="تعداد" value="${Number(item?.qty)||""}"><input class="inv-price" oninput="this.dataset.userEdited='1';updateInvoiceLiveTotal()" type="number" min="0" step="any" placeholder="قیمت هر واحد" value="${Number(item?.price)||""}"><button type="button" class="danger-icon" title="حذف ردیف" onclick="this.parentElement.remove();updateInvoiceLiveTotal()">🗑</button></div>`}
-function addInvoiceRow(pref={}){const box=$("invoiceRows");if(!box)return;const div=document.createElement("div");div.innerHTML=invoiceRowHTML(pref,box.children.length);box.appendChild(div.firstElementChild)}
+function invoiceRowHTML(item,i){return `<div class="invoice-row"><input type="hidden" class="inv-product" value="${esc(item?.productId||"")}"><div class="inv-desc-wrap"><input class="inv-desc" autocomplete="off" placeholder="نام کالا یا خدمت (تایپ کن تا از انبار پیشنهاد بیاید)" value="${esc(item?.desc||"")}" oninput="onInvDescInput(this)" onfocus="onInvDescInput(this)" onblur="hideInvSuggestions(this)"><div class="inv-suggest"></div></div><input class="inv-qty" oninput="updateInvoiceLiveTotal()" type="number" min="0" step="any" placeholder="تعداد" value="${Number(item?.qty)||""}"><input class="inv-price amt-input" oninput="this.dataset.userEdited='1';updateInvoiceLiveTotal()" type="text" inputmode="numeric" placeholder="قیمت هر واحد" value="${fmtAmtValue(item?.price)}"><button type="button" class="danger-icon" title="حذف ردیف" onclick="this.parentElement.remove();updateInvoiceLiveTotal()">🗑</button></div>`}
+function addInvoiceRow(pref={}){const box=$("invoiceRows");if(!box)return;const div=document.createElement("div");div.innerHTML=invoiceRowHTML(pref,box.children.length);const el=div.firstElementChild;box.appendChild(el);bindAmountInputs(el)}
 /* v3.3: جایگزین select کالا شد با سرچ زنده روی همون فیلد «توضیحات» —
  * هرچی تایپ کنی، لیست کالاهای انبار (از طریق <datalist>) فیلتر و پیشنهاد
  * می‌شود؛ با زدن روی یک پیشنهاد، قیمت واحد و productId (برای کسر از
@@ -2241,13 +2276,13 @@ function openInvoice(id=null){
  </div>
  <div class="two-fields">
  ${invField("وضعیت پرداخت","بر اساس مبلغ دریافتی به‌صورت خودکار هم به‌روزرسانی می‌شود",`<select id="invStatus"><option value="unpaid" ${inv?.status!=="paid"&&inv?.status!=="partial"?"selected":""}>🔴 پرداخت نشده</option><option value="partial" ${inv?.status==="partial"?"selected":""}>🟡 پرداخت بخشی</option><option value="paid" ${inv?.status==="paid"?"selected":""}>🟢 پرداخت کامل</option></select>`)}
- ${invField("مبلغ دریافت‌شده","تا امروز از مشتری چقدر گرفته‌ای (تومان)",`<input id="invPaid" oninput="updateInvoiceLiveTotal()" type="number" min="0" placeholder="۰" value="${Number(inv?.paid)||0}">`)}
+ ${invField("مبلغ دریافت‌شده","تا امروز از مشتری چقدر گرفته‌ای (تومان)",`<input id="invPaid" oninput="updateInvoiceLiveTotal()" type="text" inputmode="numeric" class="amt-input" placeholder="۰" value="${fmtAmtValue(inv?.paid)}">`)}
  </div>
  </div>
  ${invField("تسویه به حساب",invType==="daily"?"مبلغ فاکتور تسویه‌شده در نظر گرفته می‌شود و در این حساب ثبت می‌شود":"این مبلغ دریافتی در این حساب ثبت می‌شود و به تراکنش‌ها اضافه می‌گردد",accountSelect("invSettleAccount",defAcc))}
  <div class="inv-hide-daily" style="${hideDaily}">
  <div class="two-fields">
- ${invField("تخفیف مبلغی","مبلغ ثابتی که از جمع کل کم می‌شود (تومان)",`<input id="invDiscount" oninput="updateInvoiceLiveTotal()" type="number" min="0" placeholder="۰" value="${Number(inv?.discount)||0}">`)}
+ ${invField("تخفیف مبلغی","مبلغ ثابتی که از جمع کل کم می‌شود (تومان)",`<input id="invDiscount" oninput="updateInvoiceLiveTotal()" type="text" inputmode="numeric" class="amt-input" placeholder="۰" value="${fmtAmtValue(inv?.discount)}">`)}
  ${invField("تخفیف درصدی","درصدی که بعد از تخفیف مبلغی کم می‌شود (٪)",`<input id="invDiscountPercent" oninput="updateInvoiceLiveTotal()" type="number" min="0" max="100" placeholder="۰" value="${Number(inv?.discountPercent)||0}">`)}
  </div>
  ${invField("مالیات بر ارزش‌افزوده","درصدی که بعد از کسر تخفیف به قیمت اضافه می‌شود (٪)",`<input id="invTax" oninput="updateInvoiceLiveTotal()" type="number" min="0" placeholder="۰" value="${Number(inv?.taxRate)||0}">`)}
@@ -2266,8 +2301,8 @@ function invoiceTotal(inv){const sub=invoiceSubtotal(inv),discountAmount=Math.mi
 function invoiceRemaining(inv){return Math.max(0,invoiceTotal(inv)-(Number(inv.paid)||0))}
 function updateInvoiceLiveTotal(){
  const rows=[...document.querySelectorAll("#invoiceRows .invoice-row")];let sub=0;
- rows.forEach(r=>sub+=(Number(r.querySelector(".inv-qty")?.value)||0)*(Number(r.querySelector(".inv-price")?.value)||0));
- const da=Math.min(sub,Math.max(0,Number($("invDiscount")?.value)||0)),dp=Math.min(100,Math.max(0,Number($("invDiscountPercent")?.value)||0)),dpAmt=Math.min(sub-da,Math.round((sub-da)*dp/100)),dis=da+dpAmt,tax=Math.max(0,Math.round((sub-dis)*(Number($("invTax")?.value)||0)/100)),total=Math.max(0,sub-dis+tax);
+ rows.forEach(r=>sub+=(Number(r.querySelector(".inv-qty")?.value)||0)*(parseMoney(r.querySelector(".inv-price")?.value)));
+ const da=Math.min(sub,Math.max(0,parseMoney($("invDiscount")?.value))),dp=Math.min(100,Math.max(0,Number($("invDiscountPercent")?.value)||0)),dpAmt=Math.min(sub-da,Math.round((sub-da)*dp/100)),dis=da+dpAmt,tax=Math.max(0,Math.round((sub-dis)*(Number($("invTax")?.value)||0)/100)),total=Math.max(0,sub-dis+tax);
  if($("invLiveSubtotal"))$("invLiveSubtotal").textContent=money(sub);if($("invLiveAdjust"))$("invLiveAdjust").textContent=money(tax-dis);if($("invLiveTotal"))$("invLiveTotal").textContent=money(total)
 }
 /* --- تغییر نوع فاکتور بین «فاکتور مشتری» و «فاکتور روزانه» ---
@@ -2284,9 +2319,9 @@ function setInvoiceType(type){
 function saveInvoice(id){
  const type=$("invType")?.value==="daily"?"daily":"customer";
  const name=$("invName").value.trim()||(type==="daily"?"فاکتور روزانه":"فاکتور جدید"), seller=$("invSeller").value.trim(),date=jalaliToISO($("invDate").value)||new Date().toISOString().slice(0,10),number=$("invNo").value.trim();
- const items=[...document.querySelectorAll("#invoiceRows .invoice-row")].map(r=>({productId:r.querySelector(".inv-product")?.value||"",desc:r.querySelector(".inv-desc")?.value.trim()||"",qty:Number(r.querySelector(".inv-qty")?.value)||0,price:Number(r.querySelector(".inv-price")?.value)||0})).filter(x=>x.desc||x.qty||x.price);
+ const items=[...document.querySelectorAll("#invoiceRows .invoice-row")].map(r=>({productId:r.querySelector(".inv-product")?.value||"",desc:r.querySelector(".inv-desc")?.value.trim()||"",qty:Number(r.querySelector(".inv-qty")?.value)||0,price:parseMoney(r.querySelector(".inv-price")?.value)})).filter(x=>x.desc||x.qty||x.price);
  if(!items.length)return alert("حداقل یک ردیف فاکتور وارد کن");
- const discount=Math.max(0,Number($("invDiscount").value)||0),discountPercent=Math.min(100,Math.max(0,Number($("invDiscountPercent").value)||0)),taxRate=Math.max(0,Number($("invTax").value)||0);let paid=Math.max(0,Number($("invPaid").value)||0);
+ const discount=Math.max(0,parseMoney($("invDiscount").value)),discountPercent=Math.min(100,Math.max(0,Number($("invDiscountPercent").value)||0)),taxRate=Math.max(0,Number($("invTax").value)||0);let paid=Math.max(0,parseMoney($("invPaid").value));
  const customerName=$("invCustomerName")?.value.trim()||"";
  const phone=$("invPhone")?.value.trim()||"";
  const settleAccountId=$("invSettleAccount")?.value||"";
