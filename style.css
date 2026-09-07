@@ -37,7 +37,7 @@ img,svg,canvas{max-width:100%}
 /* Nothing in the app should ever be wide enough to need a horizontal drag —
    every page and every sheet clips instead of scrolling sideways. */
 .app,main,.page,.sheet,.modal{overflow-x:hidden}
-.app{max-width:600px;margin:0 auto;min-height:100vh;height:auto;padding-bottom:calc(var(--safe-b) + 78px);width:100%;}
+.app{max-width:600px;margin:0 auto;min-height:100vh;height:auto;padding-bottom:calc(var(--safe-b) + 32px);width:100%;}
 
 /* ===== Top bar ===== */
 .top-bar{
@@ -681,7 +681,7 @@ html,body{width:100%;height:100%;min-height:100%;margin:0;overflow:hidden!import
  * re-initializing from its first page (home), i.e. exactly the "سفید میشه و
  * با تاخیر میره خانه" bug. Keeping it pan-y here too closes that gap. */
 body{touch-action:pan-y;-webkit-user-select:none;user-select:none}
-.app{width:100%;max-width:600px;height:100vh;min-height:100vh;margin:0 auto;display:block;overflow-x:hidden!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;touch-action:pan-y;padding-bottom:calc(var(--safe-b) + 78px)}
+.app{width:100%;max-width:600px;height:100vh;min-height:100vh;margin:0 auto;display:block;overflow-x:hidden!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;touch-action:pan-y;padding-bottom:calc(var(--safe-b) + 32px)}
 main{width:100%;min-height:0;height:auto;display:block;overflow:visible!important;padding:0;touch-action:pan-y}
 .page{min-height:0;height:auto;touch-action:pan-y}
 .page.active{display:block}
@@ -701,22 +701,3 @@ button,.nav,a,input,select,textarea{touch-action:manipulation}
  #invoicePreview,#invoicePreview *{visibility:visible}
  #invoicePreview{position:absolute;inset:0;margin:0;box-shadow:none;border:none}
 }
-
-/* ===== v3.11: نوار پایین ثابت ===== */
-.bottom-nav{
-  position:fixed;bottom:0;left:50%;transform:translateX(-50%);
-  width:100%;max-width:600px;display:flex;justify-content:space-between;
-  padding:8px 6px calc(6px + var(--safe-b));z-index:29;
-  background:color-mix(in srgb, var(--bg) 88%, transparent);
-  -webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);
-  border-top:.5px solid var(--sep);
-}
-.bottom-nav-btn{
-  flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;
-  border:none;background:none;color:var(--label2);font-size:10.5px;font-weight:600;
-  padding:4px 2px;border-radius:12px;
-}
-.bottom-nav-btn .bn-icon{font-size:20px;line-height:1}
-.bottom-nav-btn.active{color:var(--blue)}
-.bottom-nav-btn:active{background:var(--bg3)}
-@media print{.bottom-nav{display:none}}
