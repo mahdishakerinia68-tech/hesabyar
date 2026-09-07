@@ -1012,7 +1012,7 @@ $("theme").onclick=()=>{const dark=document.body.classList.toggle("dark");logEve
 function openMenu(){
  const m=$("menuModal");if(!m)return;m.classList.remove("hidden");$("menuBtn")?.setAttribute("aria-expanded","true");
  const si=$("menuSearchInput");if(si){si.value="";filterMenu()}
- document.querySelectorAll("#menuGroups .menu-group").forEach(g=>g.classList.remove("open"));
+ document.querySelectorAll("#menuGroups .menu-group").forEach(g=>g.classList.toggle("open",g.classList.contains("main-menu-group")));
  logEvent("باز کردن منو","منوی اصلی","nav");setTimeout(()=>si?.focus(),150)
 }
 function closeMenu(){const m=$("menuModal");if(!m)return;m.classList.add("hidden");$("menuBtn")?.setAttribute("aria-expanded","false")}
@@ -1042,7 +1042,7 @@ function filterMenu(){
    if(match)anyVisible=true;
   });
   g.style.display=anyVisible?"":"none";
-  g.classList.toggle("open",q?anyVisible:false);
+  g.classList.toggle("open",q?anyVisible:g.classList.contains("main-menu-group"));
  });
 }
 function menuSearchEnter(){
