@@ -702,3 +702,15 @@ button,.nav,a,input,select,textarea{touch-action:manipulation}
  #invoicePreview,#invoicePreview *{visibility:visible}
  #invoicePreview{position:absolute;inset:0;margin:0;box-shadow:none;border:none}
 }
+
+/* --- v3.9: اسکنر بارکد و چند شعبه‌ای --- */
+.barcode-scan-box{position:relative;width:100%;aspect-ratio:4/3;background:#000;border-radius:var(--radius,14px);overflow:hidden;margin:8px 0}
+.barcode-scan-box video{width:100%;height:100%;object-fit:cover;display:block}
+.barcode-input-row{display:flex;gap:8px;align-items:center}
+.barcode-input-row input{flex:1}
+.barcode-input-row .ghost-btn{padding:10px 14px;white-space:nowrap}
+.product-search-row{display:flex;gap:8px;align-items:center}
+.product-search-row .search{flex:1}
+.product-search-row .ghost-btn{padding:10px 14px}
+.ghost-icon{background:var(--card);border:.5px solid var(--sep);border-radius:var(--radius-sm,10px);color:var(--blue);padding:8px 10px;font-size:15px}
+#activeBranchSelect{margin-top:6px}

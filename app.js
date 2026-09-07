@@ -1,11 +1,14 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="1.2";
+const APP_VERSION="1.3";
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v1";
 const AUTO_BACKUP_MS=6*60*60*1000;
 const APP_MODE_KEY="hesabdar-app-mode-v1";
+const ACTIVE_BRANCH_KEY="hesabdar-active-branch-v1";
+function activeBranchId(){return localStorage.getItem(ACTIVE_BRANCH_KEY)||""}
+function setActiveBranchId(id){localStorage.setItem(ACTIVE_BRANCH_KEY,id||"")}
 function appMode(){return localStorage.getItem(APP_MODE_KEY)||"business"}
 /* --- رمز ادمین قفل حالت فروشگاه (v2.5) ---
  * جدا از رمز ورود به برنامه (PIN/الگو) نگه‌داری می‌شود و در localStorage
@@ -207,7 +210,7 @@ function maybeAutoBackup(reason){
 }
 function getAutoBackupFileInfo(){try{return JSON.parse(localStorage.getItem(AUTO_BACKUP_LAST_FILE_KEY)||"null")}catch{return null}}
 function restoreLatestAutoBackup(){try{const list=JSON.parse(localStorage.getItem(AUTO_BACKUP_KEY)||"[]"); if(!list.length)return alert("هنوز پشتیبان خودکاری وجود ندارد."); if(!confirm("آخرین پشتیبان خودکار جایگزین اطلاعات فعلی شود؟"))return; data=list[0].data; normalizeData(); save(); logEvent("بازیابی پشتیبان خودکار",new Date(list[0].at).toLocaleString("fa-IR"),"settings"); alert("آخرین پشتیبان خودکار بازیابی شد.")}catch(e){alert("پشتیبان خودکار قابل بازیابی نیست.")}}
-function normalizeData(){data=data||blankData(); for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats","audit","trash"]){data[k]??=[];} data.pin=typeof data.pin==="string"?data.pin:""; data.pinHash=typeof data.pinHash==="string"?data.pinHash:""; data.pinSalt=typeof data.pinSalt==="string"?data.pinSalt:""; data.patternHash=typeof data.patternHash==="string"?data.patternHash:""; data.patternSalt=typeof data.patternSalt==="string"?data.patternSalt:""; data.lockMethod=(data.lockMethod==="pattern")?"pattern":"pin"; data.biometricEnabled=!!data.biometricEnabled; data.webauthnCredId=typeof data.webauthnCredId==="string"?data.webauthnCredId:""; data.lang=(data.lang==="en")?"en":"fa"; data.branding??={storeName:"",logo:"",stamp:"",signature:""}; data.yearSettlements??={}; data._sync??={tombstones:{}}; data._sync.tombstones??={}; for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats"]){for(const r of data[k]){r.id??=uid();r.updatedAt??=new Date().toISOString();}} for(const c of [...data.expenseCats,...data.incomeCats]){c.children??=[];for(const ch of c.children){ch.id??=uid();}} data.notes.forEach((n,i)=>{if(typeof n.order!=="number")n.order=i;}); data.reminders.forEach((r,i)=>{if(typeof r.order!=="number")r.order=i;});}
+function normalizeData(){data=data||blankData(); for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats","audit","trash","branches"]){data[k]??=[];} data.pin=typeof data.pin==="string"?data.pin:""; data.pinHash=typeof data.pinHash==="string"?data.pinHash:""; data.pinSalt=typeof data.pinSalt==="string"?data.pinSalt:""; data.patternHash=typeof data.patternHash==="string"?data.patternHash:""; data.patternSalt=typeof data.patternSalt==="string"?data.patternSalt:""; data.lockMethod=(data.lockMethod==="pattern")?"pattern":"pin"; data.biometricEnabled=!!data.biometricEnabled; data.webauthnCredId=typeof data.webauthnCredId==="string"?data.webauthnCredId:""; data.lang=(data.lang==="en")?"en":"fa"; data.branding??={storeName:"",logo:"",stamp:"",signature:""}; data.yearSettlements??={}; data._sync??={tombstones:{}}; data._sync.tombstones??={}; for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats","branches"]){for(const r of data[k]){r.id??=uid();r.updatedAt??=new Date().toISOString();}} for(const c of [...data.expenseCats,...data.incomeCats]){c.children??=[];for(const ch of c.children){ch.id??=uid();}} data.notes.forEach((n,i)=>{if(typeof n.order!=="number")n.order=i;}); data.reminders.forEach((r,i)=>{if(typeof r.order!=="number")r.order=i;});}
 /* ---- Language switch (v5.9) -------------------------------------------
  * Translates the app's static "chrome" — menu, page section headers, and
  * settings group titles — between Persian and English, and switches
@@ -482,7 +485,7 @@ function renderDueSoon(){
   box.innerHTML=`🔔 ${overdue?`<b>${fa(overdue)} یادآوری دیرشده</b> • `:""}${fa(todayCount)} یادآوری در ۲۴ ساعت آینده`;
 }
 
-const blankData=()=>({accounts:[],transactions:[],people:[],reminders:[],notes:[],checks:[],invoices:[],customers:[],products:[],audit:[],trash:[],expenseCats:defaultsExpense.map((name,i)=>({id:"e"+i,name,children:[]})),incomeCats:defaultsIncome.map((name,i)=>({id:"i"+i,name,children:[]})),pin:"",patternHash:"",patternSalt:"",lockMethod:"pin",biometricEnabled:false,webauthnCredId:"",lang:"fa",branding:{storeName:"",logo:"",stamp:"",signature:""},yearSettlements:{}});
+const blankData=()=>({accounts:[],transactions:[],people:[],reminders:[],notes:[],checks:[],invoices:[],customers:[],products:[],branches:[],audit:[],trash:[],expenseCats:defaultsExpense.map((name,i)=>({id:"e"+i,name,children:[]})),incomeCats:defaultsIncome.map((name,i)=>({id:"i"+i,name,children:[]})),pin:"",patternHash:"",patternSalt:"",lockMethod:"pin",biometricEnabled:false,webauthnCredId:"",lang:"fa",branding:{storeName:"",logo:"",stamp:"",signature:""},yearSettlements:{}});
 window.addEventListener("error",e=>{console.error(e.error||e.message)});
 window.addEventListener("unhandledrejection",e=>{console.error(e.reason)});
 window.addEventListener("online",async()=>{if(sync.db)sync.db.enableNetwork().catch(console.error);setSyncStatus("🌐 اینترنت برقرار شد؛ در حال بررسی اتصال دو گوشی..."); if(!sync.auth)await initSync(); if(sync.dirty&&sync.dirty.size)syncSave(); await verifyTwoPhoneConnection(true);});
@@ -507,7 +510,7 @@ data=data||blankData();
 normalizeData();
 data.accounts??=[];
 if(!data.accounts.some(a=>String(a.name||"").trim()==="کیف پول نقدی")){const cash=touch({id:uid(),name:"کیف پول نقدی",bank:"",sender:"",card:"",balance:0,default:true});data.accounts.unshift(cash);localStorage.setItem(KEY,JSON.stringify(data));}
-data.transactions??=[];data.people??=[];data.customers??=[];data.products??=[];data.reminders??=[];data.notes??=[];data.checks??=[];data.invoices??=[];data.audit??=[];data.trash??=[];data.expenseCats??=defaultsExpense.map((name,i)=>({id:"e"+i,name,children:[]}));data.incomeCats??=defaultsIncome.map((name,i)=>({id:"i"+i,name,children:[]}));data.pin=typeof data.pin==="string"?data.pin:"";data.pinHash=typeof data.pinHash==="string"?data.pinHash:"";data.pinSalt=typeof data.pinSalt==="string"?data.pinSalt:"";data.patternHash=typeof data.patternHash==="string"?data.patternHash:"";data.patternSalt=typeof data.patternSalt==="string"?data.patternSalt:"";data.lockMethod=(data.lockMethod==="pattern")?"pattern":"pin";data.biometricEnabled=!!data.biometricEnabled;data.webauthnCredId=typeof data.webauthnCredId==="string"?data.webauthnCredId:"";data.lang=(data.lang==="en")?"en":"fa";data.branding??={storeName:"",logo:"",stamp:"",signature:""};data.branding.storeName??="";data.branding.logo??="";data.branding.stamp??="";data.branding.signature??="";data.yearSettlements??={};data._sync??={tombstones:{}};data._sync.tombstones??={};for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats"]){for(const r of data[k]){r.id??=uid();r.updatedAt??=new Date().toISOString()}}for(const c of [...data.expenseCats,...data.incomeCats]){c.children??=[];for(const ch of c.children){ch.id??=uid()}}
+data.transactions??=[];data.people??=[];data.customers??=[];data.products??=[];data.branches??=[];data.reminders??=[];data.notes??=[];data.checks??=[];data.invoices??=[];data.audit??=[];data.trash??=[];data.expenseCats??=defaultsExpense.map((name,i)=>({id:"e"+i,name,children:[]}));data.incomeCats??=defaultsIncome.map((name,i)=>({id:"i"+i,name,children:[]}));data.pin=typeof data.pin==="string"?data.pin:"";data.pinHash=typeof data.pinHash==="string"?data.pinHash:"";data.pinSalt=typeof data.pinSalt==="string"?data.pinSalt:"";data.patternHash=typeof data.patternHash==="string"?data.patternHash:"";data.patternSalt=typeof data.patternSalt==="string"?data.patternSalt:"";data.lockMethod=(data.lockMethod==="pattern")?"pattern":"pin";data.biometricEnabled=!!data.biometricEnabled;data.webauthnCredId=typeof data.webauthnCredId==="string"?data.webauthnCredId:"";data.lang=(data.lang==="en")?"en":"fa";data.branding??={storeName:"",logo:"",stamp:"",signature:""};data.branding.storeName??="";data.branding.logo??="";data.branding.stamp??="";data.branding.signature??="";data.yearSettlements??={};data._sync??={tombstones:{}};data._sync.tombstones??={};for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats","branches"]){for(const r of data[k]){r.id??=uid();r.updatedAt??=new Date().toISOString()}}for(const c of [...data.expenseCats,...data.incomeCats]){c.children??=[];for(const ch of c.children){ch.id??=uid()}}
 // Normalize older people records so saved debtors/creditors always render correctly.
 for(const p of data.people){if(p.type==="debtor"||p.type==="debtors"||p.type==="بدهکار")p.type="debt";if(p.type==="creditor"||p.type==="creditors"||p.type==="طلبکار"||p.type==="بستانکار")p.type="credit";if(p.type!=="debt"&&p.type!=="credit")p.type="debt";p.amount=Number(p.amount)||0;p.paid=Number(p.paid)||0;p.name=String(p.name||"").trim()} 
 // v3.10: older checks از قبل از اتصال چک به حساب — مقادیر پیش‌فرض بگیرند تا خطا ندهند.
@@ -1061,7 +1064,84 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeMenu()});
 
 const modal=$("modal"),modalBody=$("modalBody");
 function openModal(html){modalBody.innerHTML=html;modal.classList.remove("hidden");bindAmountInputs(modalBody)}
-function closeModal(){modal.classList.add("hidden")}
+function closeModal(){modal.classList.add("hidden");stopBarcodeCamera()}
+/* --- اسکنر بارکد (v3.9) ---
+ * از دوربین گوشی و BarcodeDetector مرورگر استفاده می‌کند؛ روی مرورگرهایی
+ * که این API را ندارند (مثلاً سافاری)، به‌جای گیر کردن، همان‌جا یک ورودی
+ * دستی برای تایپ شماره بارکد نشان داده می‌شود. */
+let bcStream=null,bcDetectHandle=null,bcCallback=null;
+function barcodeDetectorSupported(){try{return "BarcodeDetector" in window}catch(e){return false}}
+function openBarcodeScanner(onResult,title="📷 اسکن بارکد"){
+  bcCallback=onResult;
+  openModal(`<h2>${title}</h2>
+    <div class="barcode-scan-box"><video id="bcVideo" autoplay playsinline muted></video></div>
+    <p id="bcHint" class="hint">دوربین را روبه‌روی بارکد نگه دار...</p>
+    <div class="form">
+      <input id="bcManual" placeholder="یا شماره بارکد را دستی تایپ کن" inputmode="numeric" onkeydown="if(event.key==='Enter')confirmManualBarcode()">
+      <button class="primary" type="button" onclick="confirmManualBarcode()">✅ ثبت شماره</button>
+    </div>`);
+  startBarcodeCamera();
+}
+async function startBarcodeCamera(){
+  const video=$("bcVideo"),hint=$("bcHint");
+  if(!navigator.mediaDevices?.getUserMedia){if(hint)hint.textContent="دوربین در دسترس نیست؛ شماره را دستی وارد کن.";return}
+  try{
+    bcStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
+    if(!video)return;
+    video.srcObject=bcStream;
+    if(!barcodeDetectorSupported()){if(hint)hint.textContent="اسکن خودکار روی این مرورگر پشتیبانی نمی‌شود؛ شماره را دستی وارد کن.";return}
+    const detector=new BarcodeDetector({formats:["ean_13","ean_8","code_128","code_39","upc_a","upc_e","itf","qr_code"]});
+    const tick=async()=>{
+      if(!bcStream)return;
+      try{const codes=await detector.detect(video);if(codes&&codes.length){finishBarcodeScan(codes[0].rawValue);return}}catch(e){}
+      bcDetectHandle=requestAnimationFrame(tick);
+    };
+    bcDetectHandle=requestAnimationFrame(tick);
+  }catch(e){if(hint)hint.textContent="اجازه دسترسی به دوربین داده نشد؛ شماره را دستی وارد کن."}
+}
+function stopBarcodeCamera(){
+  if(bcDetectHandle)cancelAnimationFrame(bcDetectHandle);bcDetectHandle=null;
+  if(bcStream){bcStream.getTracks().forEach(t=>t.stop());bcStream=null}
+}
+function finishBarcodeScan(code){
+  stopBarcodeCamera();
+  const cb=bcCallback;bcCallback=null;
+  closeModal();
+  if(cb)cb(String(code||"").trim());
+}
+function confirmManualBarcode(){
+  const v=($("bcManual")?.value||"").trim();
+  if(!v)return alert("شماره بارکد را وارد کن");
+  finishBarcodeScan(v);
+}
+function findProductByBarcode(code){
+  if(!code)return null;
+  const c=String(code).trim();
+  return data.products.find(p=>p.barcode&&String(p.barcode).trim()===c)||data.products.find(p=>p.code&&String(p.code).trim()===c)||null;
+}
+function scanProductBarcodeField(){
+  openBarcodeScanner(code=>{const el=$("prdBarcode");if(el)el.value=code;});
+}
+function scanProductSearch(){
+  openBarcodeScanner(code=>{
+    const p=findProductByBarcode(code);
+    if(p){openProduct(p.id)}
+    else if(confirm("کالایی با این بارکد پیدا نشد. می‌خواهی کالای جدیدی با همین بارکد بسازی؟")){openProduct();setTimeout(()=>{const el=$("prdBarcode");if(el)el.value=code},50)}
+  },"📷 اسکن بارکد کالا");
+}
+function scanInvoiceRow(btn){
+  const row=btn.closest(".invoice-row");if(!row)return;
+  openBarcodeScanner(code=>{
+    const p=findProductByBarcode(code);
+    if(!p)return alert("کالایی با این بارکد در انبار پیدا نشد.");
+    const input=row.querySelector(".inv-desc"),hidden=row.querySelector(".inv-product"),priceEl=row.querySelector(".inv-price"),qtyEl=row.querySelector(".inv-qty");
+    if(input)input.value=p.name;
+    if(hidden)hidden.value=p.id;
+    if(priceEl&&!priceEl.dataset.userEdited)priceEl.value=p.price||0;
+    if(qtyEl&&!Number(qtyEl.value))qtyEl.value=1;
+    updateInvoiceLiveTotal();
+  },"📷 اسکن بارکد کالا");
+}
 /* ---- v3.12: جداکننده هزارگان در تمام فیلدهای عددی مبلغی ----
  * هر فیلدی که کلاس amt-input داشته باشد، هنگام تایپ خودکار هر ۳ رقم یک
  * ویرگول می‌گیرد (۱٬۲۵۰٬۰۰۰) تا میلیون از هزار به‌راحتی تشخیص داده شود؛
@@ -1171,6 +1251,55 @@ function touch(r){r.updatedAt=new Date().toISOString();r.updatedBy=sync.user?.ui
 function markDeleted(type,id){data._sync??={tombstones:{}};data._sync.tombstones??={};data._sync.tombstones[type]??={};const dt=new Date().toISOString();data._sync.tombstones[type][id]=dt;markDirty(type,id,true,{id},dt)}
 function removeRecord(type,id){const i=data[type].findIndex(x=>x.id===id);if(i<0)return;data[type].splice(i,1);markDeleted(type,id);save()}
 function accountSelect(id="acc",selected=""){return `<select id="${id}">${data.accounts.map(a=>`<option value="${a.id}" ${a.id===selected?"selected":""}>${esc(a.name)}${a.bank?" • "+esc(a.bank):""}</option>`).join("")}</select>`}
+/* --- چند شعبه‌ای بودن فروشگاه (v3.9) ---
+ * هر تراکنش/فاکتور می‌تواند به یک «شعبه» وصل شود. اگر هنوز هیچ شعبه‌ای
+ * تعریف نشده باشد، این بخش‌ها کاملاً مخفی می‌مانند تا برای کاربرهای
+ * تک‌شعبه‌ای هیچ چیز اضافه‌ای دیده نشود. */
+function branchLabel(id){if(!id)return "";const b=data.branches.find(x=>x.id===id);return b?b.name:""}
+function branchSelect(id="txBranch",selected=""){
+  if(!data.branches.length)return "";
+  const sel=selected||activeBranchId();
+  return `<select id="${id}"><option value="">بدون شعبه مشخص</option>${data.branches.map(b=>`<option value="${b.id}" ${b.id===sel?"selected":""}>🏬 ${esc(b.name)}</option>`).join("")}</select>`;
+}
+function branchFieldForForm(id,selected=""){
+  if(!data.branches.length)return "";
+  return invField("شعبه","این رکورد به کدام شعبه فروشگاه مربوط است",branchSelect(id,selected));
+}
+function branchFilterOptionsHTML(){return '<option value="">همه شعبه‌ها</option>'+data.branches.map(b=>`<option value="${esc(b.id)}">${esc(b.name)}</option>`).join("")}
+function openBranch(id=null){
+  const b=id&&data.branches.find(x=>x.id===id);
+  openModal(`<h2>${b?"ویرایش شعبه":"شعبه جدید"}</h2><div class="form">
+    <input id="brName" placeholder="نام شعبه (مثلاً: شعبه مرکزی)" value="${esc(b?.name||"")}">
+    <input id="brAddress" placeholder="آدرس (اختیاری)" value="${esc(b?.address||"")}">
+    <input id="brPhone" inputmode="tel" placeholder="تلفن (اختیاری)" value="${esc(b?.phone||"")}">
+    <button class="primary" onclick="saveBranch('${b?.id||""}')">${b?"ذخیره تغییرات":"ذخیره"}</button>
+  </div>`);
+}
+function saveBranch(id){
+  const name=$("brName").value.trim();if(!name)return alert("نام شعبه را وارد کن");
+  const o={name,address:$("brAddress").value.trim(),phone:$("brPhone").value.trim()};
+  if(id){const b=data.branches.find(x=>x.id===id);Object.assign(b,o);touch(b);markDirty("branches",b.id,false,b,b.updatedAt)}
+  else{const b=touch({id:uid(),...o});data.branches.push(b);markDirty("branches",b.id,false,b,b.updatedAt);if(!activeBranchId())setActiveBranchId(b.id)}
+  save();logEvent(id?"ویرایش شعبه":"افزودن شعبه",name,"settings");renderBranchSettings();render();closeModal();
+}
+function deleteBranch(id){
+  if(!confirm("این شعبه حذف شود؟ تراکنش‌ها و فاکتورهای قبلی این شعبه پاک نمی‌شوند، فقط دیگر به شعبه‌ای وصل نیستند."))return;
+  data.transactions.forEach(t=>{if(t.branchId===id){t.branchId="";touch(t);markDirty("transactions",t.id,false,t,t.updatedAt)}});
+  data.invoices.forEach(v=>{if(v.branchId===id){v.branchId="";touch(v);markDirty("invoices",v.id,false,v,v.updatedAt)}});
+  removeRecord("branches",id);
+  if(activeBranchId()===id)setActiveBranchId("");
+  logEvent("حذف شعبه",id,"settings");renderBranchSettings();render();
+}
+function renderBranchSettings(){
+  const box=$("branchListSettings");if(!box)return;
+  box.innerHTML=data.branches.map(b=>`<div class="item"><div><b>🏬 ${esc(b.name)}</b><div class="meta">${b.address?esc(b.address):""}${b.phone?" • "+esc(b.phone):""}</div></div><div class="actions">${actionButtons("openBranch","deleteBranch",b.id)}</div></div>`).join("")||empty("هنوز شعبه‌ای اضافه نشده؛ اگر فقط یک فروشگاه داری لازم نیست چیزی اضافه کنی");
+  const sel=$("activeBranchSelect");
+  if(sel){
+    sel.innerHTML='<option value="">بدون شعبه فعال (پیش‌فرض)</option>'+data.branches.map(b=>`<option value="${b.id}" ${b.id===activeBranchId()?"selected":""}>${esc(b.name)}</option>`).join("");
+    sel.value=activeBranchId();
+  }
+}
+function setActiveBranch(sel){setActiveBranchId(sel.value);render()}
 function openAccount(id=null){const a=id&&data.accounts.find(x=>x.id===id);openModal(`<h2>${a?"ویرایش حساب":"افزودن حساب"}</h2><div class="form"><input id="an" placeholder="نام حساب" value="${esc(a?.name||"")}"><input id="bank" placeholder="نام بانک" value="${esc(a?.bank||"")}"><input id="sender" placeholder="شماره فرستنده پیامک بانک" value="${esc(a?.sender||"")}"><input id="card" placeholder="شماره کارت (اختیاری)" value="${esc(a?.card||"")}"><input id="ab" type="text" inputmode="numeric" class="amt-input" placeholder="موجودی اولیه" value="${fmtAmtValue(a?.balance)}"><button class="primary" onclick="saveAccount('${a?.id||""}')">${a?"ذخیره تغییرات":"ذخیره"}</button></div>`)}
 function saveAccount(id){if(!$("an").value.trim())return alert("نام حساب را وارد کنید");const o={name:$("an").value.trim(),bank:$("bank").value.trim(),sender:$("sender").value.trim(),card:$("card").value.trim(),balance:parseMoney($("ab").value)||0};if(id){const a=data.accounts.find(x=>x.id===id);Object.assign(a,o);touch(a);markDirty("accounts",a.id,false,a,a.updatedAt)}else{const a=touch({id:uid(),...o});data.accounts.push(a);markDirty("accounts",a.id,false,a,a.updatedAt)}save();logEvent(id?"ویرایش حساب":"ایجاد حساب",o.name,id?"edit":"create");closeModal()}
 async function copyCardNumber(id){
@@ -1223,7 +1352,7 @@ function categoryButtons(type,selected=""){
   }).join("")}</div><button type="button" class="cat-manage-link" onclick="openCategory()">⚙ مدیریت کامل دسته‌ها و زیرمجموعه‌ها</button>`;
 }
 function toggleCategoryExpand(type,id){catExpand[type]=catExpand[type]===id?null:id;refreshCategoryButtonsInTxForm(type)}
-function openTx(id=null){if(!data.accounts.length)return alert("اول از بخش حساب‌ها یک حساب اضافه کنید");const t=id&&data.transactions.find(x=>x.id===id);if(t?.type==="transfer")return openTransfer(id);const typ=t?.type||"expense";catExpand={expense:null,income:null};openModal(`<h2>${t?"ویرایش تراکنش":"ثبت تراکنش"}</h2><div class="form"><div class="type-switch"><button type="button" id="expBtn" class="${typ==="expense"?"chosen":""}" onclick="txType('expense')">💸 هزینه</button><button type="button" id="incBtn" class="${typ==="income"?"chosen":""}" onclick="txType('income')">💰 دریافت</button></div><input id="txKind" type="hidden" value="${typ}"><input id="title" placeholder="عنوان" value="${esc(t?.title||"")}"><input id="amount" type="text" inputmode="numeric" class="amt-input" placeholder="مبلغ" value="${fmtAmtValue(t?.amount)}"><div id="expensePanel" style="display:${typ==="expense"?"block":"none"}"><div class="cat-head-row"><b id="catLabel">${t?.category?"دسته: "+esc(t.category):"دسته را انتخاب کنید"}</b><div class="cat-toolbar"><button type="button" title="افزودن دسته" onclick="quickAddCategory('expense')">＋</button><button type="button" title="ویرایش دسته انتخاب‌شده" onclick="quickEditCategory('expense')">✏️</button><button type="button" title="حذف دسته انتخاب‌شده" class="danger-icon" onclick="quickDeleteCategory('expense')">🗑</button></div></div><div id="expenseCatButtons">${categoryButtons("expense",typ==="expense"?t?.category:"")}</div><input id="cat" type="hidden" value="${esc(typ==="expense"?t?.category||"":"")}"></div><div id="incomePanel" style="display:${typ==="income"?"block":"none"}"><div class="cat-head-row"><b id="incatLabel">${t?.category?"دسته: "+esc(t.category):"دسته را انتخاب کنید"}</b><div class="cat-toolbar"><button type="button" title="افزودن دسته" onclick="quickAddCategory('income')">＋</button><button type="button" title="ویرایش دسته انتخاب‌شده" onclick="quickEditCategory('income')">✏️</button><button type="button" title="حذف دسته انتخاب‌شده" class="danger-icon" onclick="quickDeleteCategory('income')">🗑</button></div></div><div id="incomeCatButtons">${categoryButtons("income",typ==="income"?t?.category:"")}</div><input id="incat" type="hidden" value="${esc(typ==="income"?t?.category||"":"")}"></div>${accountSelect("acc",t?.accountID||"")}<label class="hint" style="display:block;margin-top:8px">🔁 تکرار خودکار</label><select id="txRecur"><option value="none" ${!t?.recurring||t?.recurring==="none"?"selected":""}>بدون تکرار</option><option value="weekly" ${t?.recurring==="weekly"?"selected":""}>هفتگی</option><option value="monthly" ${t?.recurring==="monthly"?"selected":""}>ماهانه</option></select><label class="file-label">📎 تصویر پیوست (اختیاری)<input id="txImage" type="file" accept="image/*" onchange="previewTxImage(this)"></label>${t?.image?`<div class="attachment-preview"><img src="${t.image}" alt="پیوست"></div>`:""}<div id="txImagePreview"></div><button class="primary" onclick="saveTx('${t?.id||""}')">${t?"ذخیره تغییرات":"ثبت تراکنش"}</button></div>`)}
+function openTx(id=null){if(!data.accounts.length)return alert("اول از بخش حساب‌ها یک حساب اضافه کنید");const t=id&&data.transactions.find(x=>x.id===id);if(t?.type==="transfer")return openTransfer(id);const typ=t?.type||"expense";catExpand={expense:null,income:null};openModal(`<h2>${t?"ویرایش تراکنش":"ثبت تراکنش"}</h2><div class="form"><div class="type-switch"><button type="button" id="expBtn" class="${typ==="expense"?"chosen":""}" onclick="txType('expense')">💸 هزینه</button><button type="button" id="incBtn" class="${typ==="income"?"chosen":""}" onclick="txType('income')">💰 دریافت</button></div><input id="txKind" type="hidden" value="${typ}"><input id="title" placeholder="عنوان" value="${esc(t?.title||"")}"><input id="amount" type="text" inputmode="numeric" class="amt-input" placeholder="مبلغ" value="${fmtAmtValue(t?.amount)}"><div id="expensePanel" style="display:${typ==="expense"?"block":"none"}"><div class="cat-head-row"><b id="catLabel">${t?.category?"دسته: "+esc(t.category):"دسته را انتخاب کنید"}</b><div class="cat-toolbar"><button type="button" title="افزودن دسته" onclick="quickAddCategory('expense')">＋</button><button type="button" title="ویرایش دسته انتخاب‌شده" onclick="quickEditCategory('expense')">✏️</button><button type="button" title="حذف دسته انتخاب‌شده" class="danger-icon" onclick="quickDeleteCategory('expense')">🗑</button></div></div><div id="expenseCatButtons">${categoryButtons("expense",typ==="expense"?t?.category:"")}</div><input id="cat" type="hidden" value="${esc(typ==="expense"?t?.category||"":"")}"></div><div id="incomePanel" style="display:${typ==="income"?"block":"none"}"><div class="cat-head-row"><b id="incatLabel">${t?.category?"دسته: "+esc(t.category):"دسته را انتخاب کنید"}</b><div class="cat-toolbar"><button type="button" title="افزودن دسته" onclick="quickAddCategory('income')">＋</button><button type="button" title="ویرایش دسته انتخاب‌شده" onclick="quickEditCategory('income')">✏️</button><button type="button" title="حذف دسته انتخاب‌شده" class="danger-icon" onclick="quickDeleteCategory('income')">🗑</button></div></div><div id="incomeCatButtons">${categoryButtons("income",typ==="income"?t?.category:"")}</div><input id="incat" type="hidden" value="${esc(typ==="income"?t?.category||"":"")}"></div>${accountSelect("acc",t?.accountID||"")}${branchFieldForForm("txBranch",t?.branchId||"")}<label class="hint" style="display:block;margin-top:8px">🔁 تکرار خودکار</label><select id="txRecur"><option value="none" ${!t?.recurring||t?.recurring==="none"?"selected":""}>بدون تکرار</option><option value="weekly" ${t?.recurring==="weekly"?"selected":""}>هفتگی</option><option value="monthly" ${t?.recurring==="monthly"?"selected":""}>ماهانه</option></select><label class="file-label">📎 تصویر پیوست (اختیاری)<input id="txImage" type="file" accept="image/*" onchange="previewTxImage(this)"></label>${t?.image?`<div class="attachment-preview"><img src="${t.image}" alt="پیوست"></div>`:""}<div id="txImagePreview"></div><button class="primary" onclick="saveTx('${t?.id||""}')">${t?"ذخیره تغییرات":"ثبت تراکنش"}</button></div>`)}
 function txType(t){$("txKind").value=t;$("expBtn").classList.toggle("chosen",t==="expense");$("incBtn").classList.toggle("chosen",t==="income");$("expensePanel").style.display=t==="expense"?"block":"none";$("incomePanel").style.display=t==="income"?"block":"none"}
 function pickCategory(type,id){const c=(type==="expense"?data.expenseCats:data.incomeCats).find(x=>x.id===id);if(!c)return;setCategoryValue(type,c.name)}
 function pickSubCategory(type,catId,childId){const c=(type==="expense"?data.expenseCats:data.incomeCats).find(x=>x.id===catId);const ch=c?.children?.find(x=>x.id===childId);if(!c||!ch)return;setCategoryValue(type,c.name+" - "+ch.name)}
@@ -1301,17 +1430,18 @@ async function saveTx(id){
  const amount=parseMoney($("amount").value),type=$("txKind").value,category=type==="expense"?$("cat").value:$("incat").value;
  if(!amount)return alert("مبلغ را وارد کنید");if(!category)return alert("دسته را انتخاب کنید");
  const recur=$("txRecur")?.value||"none";
+ const branchId=$("txBranch")?.value||"";
  let image=null; const file=$("txImage")?.files?.[0];
  if(file){try{image=await compressImage(file,1000,.6)}catch(e){console.warn(e)}}
  let t;
  if(id){
   t=data.transactions.find(x=>x.id===id); if(!t)return;
-  Object.assign(t,{title:$("title").value.trim()||category,amount,type,category,accountID:$("acc").value});
+  Object.assign(t,{title:$("title").value.trim()||category,amount,type,category,accountID:$("acc").value,branchId});
   if(image)t.image=image;
   applyRecurSetting(t,recur);
   touch(t);markDirty("transactions",t.id,false,t,t.updatedAt);
  }else{
-  t=touch({id:uid(),title:$("title").value.trim()||category,amount,type,category,accountID:$("acc").value,date:new Date().toISOString(),source:"manual"});
+  t=touch({id:uid(),title:$("title").value.trim()||category,amount,type,category,accountID:$("acc").value,branchId,date:new Date().toISOString(),source:"manual"});
   if(image)t.image=image;
   applyRecurSetting(t,recur);
   data.transactions.unshift(t);markDirty("transactions",t.id,false,t,t.updatedAt);
@@ -1457,6 +1587,7 @@ function removeSubCategory(type,catId,childId){if(!confirm("این زیرمجم�
 function openProduct(id=null){const p=id&&data.products.find(x=>x.id===id);openModal(`<h2>${p?"ویرایش کالا":"کالای جدید"}</h2><div class="form">
  ${invField("نام کالا یا خدمت","",`<input id="prdName" placeholder="مثلاً: کیف چرمی مدل ۱" value="${esc(p?.name||"")}">`)}
  ${invField("کد کالا","اختیاری؛ برای پیدا کردن سریع‌تر",`<input id="prdCode" placeholder="مثلاً: A-102" value="${esc(p?.code||"")}">`)}
+ ${invField("بارکد","اختیاری؛ با اسکن بارکد کالا خودکار پر می‌شود",`<div class="barcode-input-row"><input id="prdBarcode" placeholder="شماره بارکد" value="${esc(p?.barcode||"")}"><button type="button" class="ghost-btn" onclick="scanProductBarcodeField()">📷 اسکن</button></div>`)}
  <div class="two-fields">
  ${invField("قیمت خرید","تومان",`<input id="prdBuy" type="text" inputmode="numeric" class="amt-input" placeholder="۰" value="${fmtAmtValue(p?.buyPrice)}">`)}
  ${invField("قیمت فروش","تومان",`<input id="prdPrice" type="text" inputmode="numeric" class="amt-input" placeholder="۰" value="${fmtAmtValue(p?.price)}">`)}
@@ -1466,7 +1597,7 @@ function openProduct(id=null){const p=id&&data.products.find(x=>x.id===id);openM
  ${invField("حداقل موجودی","برای هشدار موجودی کم",`<input id="prdMin" type="number" min="0" inputmode="numeric" placeholder="۰" value="${Number(p?.minStock)||""}">`)}
  </div>
  <button class="primary" onclick="saveProduct('${p?.id||""}')">💾 ذخیره</button></div>`)}
-function saveProduct(id){const name=$("prdName").value.trim();if(!name)return alert("نام کالا را وارد کن");const o={name,code:$("prdCode").value.trim(),buyPrice:parseMoney($("prdBuy").value),price:parseMoney($("prdPrice").value),stock:Number($("prdStock").value)||0,minStock:Number($("prdMin").value)||0};if(id){const p=data.products.find(x=>x.id===id);Object.assign(p,o);touch(p);markDirty("products",p.id,false,p,p.updatedAt)}else{const p=touch({id:uid(),...o});data.products.unshift(p);markDirty("products",p.id,false,p,p.updatedAt)}save();logEvent(id?"ویرایش کالا":"افزودن کالا",name,id?"edit":"create");closeModal()}
+function saveProduct(id){const name=$("prdName").value.trim();if(!name)return alert("نام کالا را وارد کن");const o={name,code:$("prdCode").value.trim(),barcode:$("prdBarcode")?.value.trim()||"",buyPrice:parseMoney($("prdBuy").value),price:parseMoney($("prdPrice").value),stock:Number($("prdStock").value)||0,minStock:Number($("prdMin").value)||0};if(id){const p=data.products.find(x=>x.id===id);Object.assign(p,o);touch(p);markDirty("products",p.id,false,p,p.updatedAt)}else{const p=touch({id:uid(),...o});data.products.unshift(p);markDirty("products",p.id,false,p,p.updatedAt)}save();logEvent(id?"ویرایش کالا":"افزودن کالا",name,id?"edit":"create");closeModal()}
 function deleteProduct(id){if(!confirm("این کالا حذف شود؟"))return;const p=data.products.find(x=>x.id===id);removeRecord("products",id);logEvent("حذف کالا",p?.name||id,"delete")}
 /* v2.3 fix: renderProducts() existed but was never wired into render()'s
    per-page dispatch (every other page — customers, invoices, checks... —
@@ -1489,8 +1620,8 @@ function renderProducts(){
  const invValue=all.reduce((s,p)=>s+(Number(p.stock)||0)*(Number(p.buyPrice)||0),0);
  const sumBox=$("productSummary");
  if(sumBox)sumBox.innerHTML=all.length?`<div class="inventory-summary"><div class="inv-stat"><span>تعداد کالا</span><b>${fa(all.length)}</b></div><div class="inv-stat"><span>ارزش انبار (قیمت خرید)</span><b>${money(invValue)}</b></div><div class="inv-stat${lowCount?" warn":""}"><span>کسری موجودی</span><b>${lowCount?"⚠️ "+fa(lowCount):"۰"}</b></div></div>`:"";
- const list=q?all.filter(p=>String(p.name||"").toLowerCase().includes(q)||String(p.code||"").toLowerCase().includes(q)):all;
- box.innerHTML=list.map(p=>`<div class="item${isLow(p)?" item-low":""}"><div><b>📦 ${esc(p.name)}</b><div class="meta">${p.code?"کد: "+esc(p.code)+" • ":""}خرید: ${money(p.buyPrice||0)} • فروش: ${money(p.price)}</div><div class="meta">موجودی: ${fa(p.stock)} ${isLow(p)?" • ⚠️ موجودی کم":""}</div></div><div class="actions"><button onclick="openProduct('${p.id}')">✏️</button><button onclick="deleteProduct('${p.id}')" class="danger-icon">🗑</button></div></div>`).join("")||empty(q?"کالایی با این جستجو پیدا نشد":"هنوز کالایی ثبت نشده است")
+ const list=q?all.filter(p=>String(p.name||"").toLowerCase().includes(q)||String(p.code||"").toLowerCase().includes(q)||String(p.barcode||"").toLowerCase().includes(q)):all;
+ box.innerHTML=list.map(p=>`<div class="item${isLow(p)?" item-low":""}"><div><b>📦 ${esc(p.name)}</b><div class="meta">${p.code?"کد: "+esc(p.code)+" • ":""}${p.barcode?"بارکد: "+esc(p.barcode)+" • ":""}خرید: ${money(p.buyPrice||0)} • فروش: ${money(p.price)}</div><div class="meta">موجودی: ${fa(p.stock)} ${isLow(p)?" • ⚠️ موجودی کم":""}</div></div><div class="actions"><button onclick="openProduct('${p.id}')">✏️</button><button onclick="deleteProduct('${p.id}')" class="danger-icon">🗑</button></div></div>`).join("")||empty(q?"کالایی با این جستجو پیدا نشد":"هنوز کالایی ثبت نشده است")
 }
 /* v3.8: quick stock top-up — search a product and bump its quantity with a
    single ＋ tap, instead of opening the full edit form just to change one
@@ -2187,13 +2318,13 @@ function transferItemHTML(t){
  }
  return `<div class="item"><div><b>↔ ${esc(t.title)}</b><div class="meta">از ${esc(data.accounts.find(a=>a.id===t.from)?.name||"")} ← ${destLabel}</div><div class="meta">${jalaliDateTimeInput(t.date)}</div></div><div><strong>${money(t.amount)}</strong>${actionButtons("openTransfer","deleteTx",t.id)}</div></div>`;
 }
-function txHTML(t){if(t.type==="transfer")return transferItemHTML(t);let a=data.accounts.find(x=>x.id===t.accountID),sign=t.type==="income"?"+":"−";const recurBadge=t.recurring&&t.recurring!=="none"?` • 🔁 ${t.recurring==="monthly"?"ماهانه":"هفتگی"}`:t.source==="recurring"?" • 🔁 خودکار":"";return `<div class="item"><div><b>${esc(t.title)}</b><div class="meta">${esc(t.category||"")} • ${a?esc(a.name):""} • ${t.source==="bank"?"بانکی":t.source==="recurring"?"تکرارشونده":"دستی"}${recurBadge}</div><div class="meta">${jalaliDateTimeInput(t.date)}</div>${t.image?`<img class="tx-thumb" src="${t.image}" alt="پیوست" onclick="viewImage('${t.id}')">`:""}</div><div><strong class="${t.type}">${sign}${money(t.amount)}</strong>${actionButtons("openTx","deleteTx",t.id)}</div></div>`}
+function txHTML(t){if(t.type==="transfer")return transferItemHTML(t);let a=data.accounts.find(x=>x.id===t.accountID),sign=t.type==="income"?"+":"−";const recurBadge=t.recurring&&t.recurring!=="none"?` • 🔁 ${t.recurring==="monthly"?"ماهانه":"هفتگی"}`:t.source==="recurring"?" • 🔁 خودکار":"";const branchBadge=t.branchId&&branchLabel(t.branchId)?` • 🏬 ${esc(branchLabel(t.branchId))}`:"";return `<div class="item"><div><b>${esc(t.title)}</b><div class="meta">${esc(t.category||"")} • ${a?esc(a.name):""} • ${t.source==="bank"?"بانکی":t.source==="recurring"?"تکرارشونده":"دستی"}${recurBadge}${branchBadge}</div><div class="meta">${jalaliDateTimeInput(t.date)}</div>${t.image?`<img class="tx-thumb" src="${t.image}" alt="پیوست" onclick="viewImage('${t.id}')">`:""}</div><div><strong class="${t.type}">${sign}${money(t.amount)}</strong>${actionButtons("openTx","deleteTx",t.id)}</div></div>`}
 function viewImage(id){const t=data.transactions.find(x=>x.id===id);if(!t?.image)return;openModal(`<h2>📎 تصویر پیوست</h2><div class="attachment-large"><img src="${t.image}" alt="پیوست"></div>`)}
 function empty(s){return `<div class="card" style="text-align:center">${s}</div>`}
 
 function invoiceDateLabel(v){return jalaliLabel(v)}
 function invField(label,hint,inner){return `<div class="field"><span class="field-cap">${esc(label)}</span>${inner}${hint?`<small class="field-hint">${esc(hint)}</small>`:""}</div>`}
-function invoiceRowHTML(item,i){return `<div class="invoice-row"><input type="hidden" class="inv-product" value="${esc(item?.productId||"")}"><div class="inv-desc-wrap"><input class="inv-desc" autocomplete="off" placeholder="نام کالا یا خدمت (تایپ کن تا از انبار پیشنهاد بیاید)" value="${esc(item?.desc||"")}" oninput="onInvDescInput(this)" onfocus="onInvDescInput(this)" onblur="hideInvSuggestions(this)"><div class="inv-suggest"></div></div><input class="inv-qty" oninput="updateInvoiceLiveTotal()" type="number" min="0" step="any" placeholder="تعداد" value="${Number(item?.qty)||""}"><input class="inv-price amt-input" oninput="this.dataset.userEdited='1';updateInvoiceLiveTotal()" type="text" inputmode="numeric" placeholder="قیمت هر واحد" value="${fmtAmtValue(item?.price)}"><button type="button" class="danger-icon" title="حذف ردیف" onclick="this.parentElement.remove();updateInvoiceLiveTotal()">🗑</button></div>`}
+function invoiceRowHTML(item,i){return `<div class="invoice-row"><input type="hidden" class="inv-product" value="${esc(item?.productId||"")}"><div class="inv-desc-wrap"><input class="inv-desc" autocomplete="off" placeholder="نام کالا یا خدمت (تایپ کن تا از انبار پیشنهاد بیاید)" value="${esc(item?.desc||"")}" oninput="onInvDescInput(this)" onfocus="onInvDescInput(this)" onblur="hideInvSuggestions(this)"><div class="inv-suggest"></div></div><input class="inv-qty" oninput="updateInvoiceLiveTotal()" type="number" min="0" step="any" placeholder="تعداد" value="${Number(item?.qty)||""}"><input class="inv-price amt-input" oninput="this.dataset.userEdited='1';updateInvoiceLiveTotal()" type="text" inputmode="numeric" placeholder="قیمت هر واحد" value="${fmtAmtValue(item?.price)}"><button type="button" class="ghost-icon" title="اسکن بارکد کالا" onclick="scanInvoiceRow(this)">📷</button><button type="button" class="danger-icon" title="حذف ردیف" onclick="this.parentElement.remove();updateInvoiceLiveTotal()">🗑</button></div>`}
 function addInvoiceRow(pref={}){const box=$("invoiceRows");if(!box)return;const div=document.createElement("div");div.innerHTML=invoiceRowHTML(pref,box.children.length);const el=div.firstElementChild;box.appendChild(el);bindAmountInputs(el)}
 /* v3.3: جایگزین select کالا شد با سرچ زنده روی همون فیلد «توضیحات» —
  * هرچی تایپ کنی، لیست کالاهای انبار (از طریق <datalist>) فیلتر و پیشنهاد
@@ -2280,6 +2411,7 @@ function openInvoice(id=null){
  </div>
  </div>
  ${invField("تسویه به حساب",invType==="daily"?"مبلغ فاکتور تسویه‌شده در نظر گرفته می‌شود و در این حساب ثبت می‌شود":"این مبلغ دریافتی در این حساب ثبت می‌شود و به تراکنش‌ها اضافه می‌گردد",accountSelect("invSettleAccount",defAcc))}
+ ${branchFieldForForm("invBranch",inv?.branchId||"")}
  <div class="inv-hide-daily" style="${hideDaily}">
  <div class="two-fields">
  ${invField("تخفیف مبلغی","مبلغ ثابتی که از جمع کل کم می‌شود (تومان)",`<input id="invDiscount" oninput="updateInvoiceLiveTotal()" type="text" inputmode="numeric" class="amt-input" placeholder="۰" value="${fmtAmtValue(inv?.discount)}">`)}
@@ -2325,7 +2457,8 @@ function saveInvoice(id){
  const customerName=$("invCustomerName")?.value.trim()||"";
  const phone=$("invPhone")?.value.trim()||"";
  const settleAccountId=$("invSettleAccount")?.value||"";
- const o={type,name,seller,date,number,items,customerId:$("invCustomer")?.value||"",customerName,phone,address:$("invAddress").value.trim(),discount,discountPercent,taxRate,paid,settleAccountId,status:$("invStatus").value,total:0};o.total=invoiceTotal(o);
+ const branchId=$("invBranch")?.value||"";
+ const o={type,name,seller,date,number,items,customerId:$("invCustomer")?.value||"",customerName,phone,address:$("invAddress").value.trim(),discount,discountPercent,taxRate,paid,settleAccountId,branchId,status:$("invStatus").value,total:0};o.total=invoiceTotal(o);
  /* فاکتور روزانه (ساده) فیلد جدا برای وضعیت پرداخت/مبلغ دریافتی ندارد؛
     چون این نوع فاکتور برای فروش نقدی و همان‌لحظه است، کل مبلغ به‌صورت
     خودکار «تسویه‌شده» در نظر گرفته می‌شود تا انتخاب «تسویه به حساب» واقعاً
@@ -2406,7 +2539,7 @@ function invoiceHTML(inv){
  const accName=inv.settleAccountId?data.accounts.find(a=>a.id===inv.settleAccountId)?.name:"";
  const settleMeta=(Number(inv.paid)>0&&accName)?` • واریز به: ${esc(accName)}`:"";
  const dailyBadge=inv.type==="daily"?`<span class="daily-badge">روزانه</span>`:"";
- return `<div class="item invoice-item"><div><b>🧾 ${esc(inv.name||"فاکتور")}</b>${dailyBadge}<div class="meta">${esc(inv.seller||"فروشنده ثبت نشده")}${custName?" • مشتری: "+esc(custName):""} • ${invoiceDateLabel(inv.date)}${inv.number?" • شماره "+esc(inv.number):""}</div><div class="meta">جمع کل: ${money(total)} • ${inv.status==="paid"?"🟢 پرداخت کامل":inv.status==="partial"?"🟡 پرداخت بخشی":"🔴 پرداخت نشده"} • مانده: ${money(invoiceRemaining(inv))}${settleMeta}</div></div><div class="actions"><button onclick="openInvoice('${inv.id}')">✏️</button><button onclick="previewInvoice('${inv.id}')">👁</button><button onclick="duplicateInvoice('${inv.id}')">📄</button><button onclick="shareInvoice('${inv.id}')">📤</button><button onclick="shareInvoiceImage('${inv.id}')">🖼</button><button class="danger-icon" onclick="deleteInvoice('${inv.id}')">🗑</button></div></div>`
+ return `<div class="item invoice-item"><div><b>🧾 ${esc(inv.name||"فاکتور")}</b>${dailyBadge}<div class="meta">${esc(inv.seller||"فروشنده ثبت نشده")}${custName?" • مشتری: "+esc(custName):""} • ${invoiceDateLabel(inv.date)}${inv.number?" • شماره "+esc(inv.number):""}${inv.branchId&&branchLabel(inv.branchId)?" • 🏬 "+esc(branchLabel(inv.branchId)):""}</div><div class="meta">جمع کل: ${money(total)} • ${inv.status==="paid"?"🟢 پرداخت کامل":inv.status==="partial"?"🟡 پرداخت بخشی":"🔴 پرداخت نشده"} • مانده: ${money(invoiceRemaining(inv))}${settleMeta}</div></div><div class="actions"><button onclick="openInvoice('${inv.id}')">✏️</button><button onclick="previewInvoice('${inv.id}')">👁</button><button onclick="duplicateInvoice('${inv.id}')">📄</button><button onclick="shareInvoice('${inv.id}')">📤</button><button onclick="shareInvoiceImage('${inv.id}')">🖼</button><button class="danger-icon" onclick="deleteInvoice('${inv.id}')">🗑</button></div></div>`
 }
 function previewInvoice(id){
  const inv=data.invoices.find(x=>x.id===id);if(!inv)return; const cust=inv.customerId?data.customers.find(c=>c.id===inv.customerId):null;
@@ -2833,10 +2966,12 @@ function render(){
  if($("accountList")&&pageActive("accounts"))$("accountList").innerHTML=data.accounts.map(a=>`<div class="item account-item"><div class="account-main"><b>${esc(a.name)}</b><div class="meta">${esc(a.bank||"حساب شخصی")}${a.sender?" • فرستنده: "+esc(a.sender):""}</div>${cardActions(a)}</div><div><strong>${money(accountBalance(a.id))}</strong>${actionButtons("openAccount","deleteAccount",a.id)}<button type="button" title="گزارش Excel" onclick="exportAccountExcel('${a.id}')">📊</button></div></div>`).join("")||empty("هنوز حسابی اضافه نشده");
  if($("transferList")&&pageActive("accounts"))$("transferList").innerHTML=data.transactions.filter(t=>t.type==="transfer").map(transferItemHTML).join("")||empty("هنوز انتقالی ثبت نشده");
  if($("productList")&&pageActive("products"))renderProducts();
- const q=$("search")?.value?.trim()||"",ft=$("filterType")?.value||"",fc=$("filterCat")?.value||"";
+ const q=$("search")?.value?.trim()||"",ft=$("filterType")?.value||"",fc=$("filterCat")?.value||"",fb=$("filterBranch")?.value||"";
  if($("reportAccount")&&pageActive("reports")){const rv=$("reportAccount").value;$("reportAccount").innerHTML='<option value="">همه حساب‌ها</option>'+data.accounts.map(a=>`<option value="${esc(a.id)}">${esc(a.name)}</option>`).join("");$("reportAccount").value=rv;}
+ if($("reportBranch")&&pageActive("reports")){$("reportBranch").style.display=data.branches.length?"":"none";if(data.branches.length){const rbv=$("reportBranch").value;$("reportBranch").innerHTML=branchFilterOptionsHTML();$("reportBranch").value=rbv;}}
  if($("filterCat")&&pageActive("transactions")){let opts='<option value="">همه دسته‌ها</option>'+[...data.expenseCats,...data.incomeCats].map(c=>`<option value="${esc(c.name)}">${esc(c.name)}</option>`).join("");$("filterCat").innerHTML=opts;$("filterCat").value=fc}
- if($("txList")&&pageActive("transactions"))$("txList").innerHTML=data.transactions.filter(t=>(!q||String(t.title).includes(q)||String(t.category||"").includes(q))&&(!ft||t.type===ft)&&(!fc||t.category===fc)).map(txHTML).join("")||empty("تراکنشی پیدا نشد");
+ if($("filterBranch")&&pageActive("transactions")){$("filterBranch").style.display=data.branches.length?"":"none";if(data.branches.length){$("filterBranch").innerHTML=branchFilterOptionsHTML();$("filterBranch").value=fb}}
+ if($("txList")&&pageActive("transactions"))$("txList").innerHTML=data.transactions.filter(t=>(!q||String(t.title).includes(q)||String(t.category||"").includes(q))&&(!ft||t.type===ft)&&(!fc||t.category===fc)&&(!fb||t.branchId===fb)).map(txHTML).join("")||empty("تراکنشی پیدا نشد");
  if($("customerList")&&pageActive("customers"))renderCustomers();
  if($("peopleList")&&pageActive("people"))$("peopleList").innerHTML=data.people.filter(p=>(p.type||"debt")===peopleMode).map(p=>{const total=Number(p.amount)||0,paid=Math.min(Number(p.paid)||0,total),remaining=Math.max(0,total-paid);const inst=p.installments;const instMeta=inst?`<div class="meta">🧾 اقساط: ${fa(inst.items.filter(x=>x.paid).length)} از ${fa(inst.count)} پرداخت‌شده</div>`:"";const instBtn=inst?`<button type="button" onclick="openInstallments('${p.id}')">اقساط</button>`:`<button type="button" onclick="payPerson('${p.id}')">تسویه</button>`;const invBadge=p.source==="invoice"?`<div class="meta">🧾 مانده فاکتور</div>`:"";return `<div class="item"><div><b>${esc(p.name)}</b>${invBadge}<div class="meta">${p.due?"سررسید: "+p.due:""}${p.note?" • "+esc(p.note):""}</div><div class="meta">کل: ${money(total)} • تسویه: ${money(paid)}</div>${instMeta}</div><div><strong>${money(remaining)}</strong><div class="actions">${instBtn}${actionButtons("openPerson","deletePerson",p.id)}</div></div></div>`}).join("")||empty(peopleMode==="debt"?"هنوز بدهکاری ثبت نشده":"هنوز طلبی ثبت نشده");
  if($("reminderList")&&pageActive("reminders")){const normalReminders=data.reminders.filter(r=>!r.sourceNoteId).sort((a,b)=>(a.order??0)-(b.order??0)); const noteAlarms=data.reminders.filter(r=>r.sourceNoteId); const normal=normalReminders.map((r,i)=>{const accId="rem-"+r.id;const isOpen=openAccordions.has(accId);return `<div class="item accordion-card${isOpen?' open':''}" data-acc-id="${accId}"><button class="accordion-head" type="button" aria-expanded="${isOpen}" onclick="toggleAccordion(this,event)"><span>🔔 <b>${esc(r.title)}</b></span><span>⌄</span></button><div class="accordion-body"><div class="meta">${jalaliLabel(r.date)} • ${r.repeat==="once"?"یک‌بار":r.repeat==="weekly"?"هفتگی":"ماهانه"}</div><div class="accordion-actions"><strong>${r.amount?money(r.amount):""}</strong><div class="reorder-btns"><button type="button" title="انتقال به بالا" ${i===0?"disabled":""} onclick="event.stopPropagation();moveReminder('${r.id}',-1)">▲</button><button type="button" title="انتقال به پایین" ${i===normalReminders.length-1?"disabled":""} onclick="event.stopPropagation();moveReminder('${r.id}',1)">▼</button></div>${actionButtons("openReminder","deleteReminder",r.id)}</div></div></div>`}).join(""); $("reminderList").innerHTML=`<div class="section-label">🔔 یادآوری‌های مستقل</div>${normal||empty("یادآوری مستقلی ندارید")}${noteAlarms.length?`<div class="section-label">📝⏰ آلارم یادداشت‌ها</div>`+noteAlarms.map(r=>{const accId="remnote-"+r.id;const isOpen=openAccordions.has(accId);return `<div class="item accordion-card${isOpen?' open':''}" data-acc-id="${accId}"><button class="accordion-head" type="button" aria-expanded="${isOpen}" onclick="toggleAccordion(this,event)"><span>📝 <b>${esc(r.title)}</b></span><span>⌄</span></button><div class="accordion-body"><div class="meta">${jalaliLabel(r.date)} • ${r.repeat==="once"?"یک‌بار":r.repeat==="weekly"?"هفتگی":"ماهانه"}</div></div></div>`}).join(""):``}`;}
@@ -2852,14 +2987,15 @@ function render(){
    if($("reportStats")){const now=new Date(),m=now.getMonth(),y=now.getFullYear();const mt=data.transactions.filter(t=>{const d=new Date(t.date);return !isNaN(d)&&d.getMonth()===m&&d.getFullYear()===y});const mi=mt.filter(t=>t.type==="income").reduce((s,t)=>s+Number(t.amount||0),0),me=mt.filter(t=>t.type==="expense").reduce((s,t)=>s+Number(t.amount||0),0);const cats={};mt.filter(t=>t.type==="expense").forEach(t=>cats[t.category||"سایر"]=(cats[t.category||"سایر"]||0)+Number(t.amount||0));const top=Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,5);$("reportStats").innerHTML=`<div class="grid"><div class="card"><span>تعداد تراکنش</span><b>${fa(data.transactions.length)}</b></div><div class="card"><span>تعداد چک</span><b>${fa(data.checks.length)}</b></div><div class="card"><span>درآمد این ماه</span><b class="income">${money(mi)}</b></div><div class="card"><span>هزینه این ماه</span><b class="expense">${money(me)}</b></div></div><div class="card report-card"><h3>📊 بیشترین دسته‌های هزینه این ماه</h3>${top.map((x,i)=>`<div class="report-row"><span>${fa(i+1)}. ${esc(x[0])}</span><strong>${money(x[1])}</strong></div>`).join("")||`<p class="hint">هنوز هزینه‌ای در این ماه ثبت نشده.</p>`}</div><div class="card report-card"><h3>🏦 مانده حساب‌ها</h3>${data.accounts.map(a=>`<div class="report-row"><span>${esc(a.name)}</span><strong>${money(accountBalance(a.id))}</strong></div>`).join("")||`<p class="hint">حسابی ثبت نشده.</p>`}</div>`;}
    drawChart(inc,exp);renderAudit();renderAdvancedReport();renderBudgets();renderProductProfit();
  }
- renderYearSettlement();renderDueSoon();if($("settings" )?.classList.contains("active"))renderBrandingInSettings();if(pageActive("trash"))renderTrash()}
+ renderYearSettlement();renderDueSoon();if($("settings" )?.classList.contains("active")){renderBrandingInSettings();renderBranchSettings()}if(pageActive("trash"))renderTrash()}
 const renderDebounced=debounce(render,120);
 function renderAdvancedReport(){
  const box=$("advancedReport"); if(!box)return;
- const type=$("reportType")?.value||"all", account=$("reportAccount")?.value||"", from=$("reportFrom")?.value||"", to=$("reportTo")?.value||"";
+ const type=$("reportType")?.value||"all", account=$("reportAccount")?.value||"", branchF=$("reportBranch")?.value||"", from=$("reportFrom")?.value||"", to=$("reportTo")?.value||"";
  let rows=data.transactions.filter(t=>t.type!=="transfer" || type==="transfer");
  if(type!=="all" && type!=="transfer") rows=rows.filter(t=>t.type===type);
  if(account) rows=rows.filter(t=>t.accountID===account || t.from===account || t.to===account);
+ if(branchF) rows=rows.filter(t=>t.branchId===branchF);
  const fiISO=from?jalaliToISO(from):"", tiISO=to?jalaliToISO(to):"";
  if(fiISO)rows=rows.filter(t=>String(t.date||"")>=fiISO); if(tiISO)rows=rows.filter(t=>String(t.date||"")<=tiISO+"T23:59:59");
  const income=rows.filter(t=>t.type==="income").reduce((s,t)=>s+Number(t.amount||0),0), expense=rows.filter(t=>t.type==="expense").reduce((s,t)=>s+Number(t.amount||0),0);
@@ -2962,4 +3098,4 @@ async function importData(e){
   alert(msg)}
 }
 function clearData(){if(confirm("همه اطلاعات حذف شود؟")){const pin=data.pin,pinHash=data.pinHash,pinSalt=data.pinSalt,patternHash=data.patternHash,patternSalt=data.patternSalt,lockMethod=data.lockMethod,biometricEnabled=data.biometricEnabled,webauthnCredId=data.webauthnCredId,lang=data.lang;data=blankData();data.pin=pin;data.pinHash=pinHash;data.pinSalt=pinSalt;data.patternHash=patternHash;data.patternSalt=patternSalt;data.lockMethod=lockMethod;data.biometricEnabled=biometricEnabled;data.webauthnCredId=webauthnCredId;data.lang=lang;save();logEvent("پاک کردن اطلاعات","اطلاعات برنامه پاک شد","delete");}}
-(async function initApp(){normalizeData();purgeOldTrash();applyAccentThemeOnLoad();await migratePinSecurity();showLock();render();applyDashboardConfig();applyAppMode();renderBrandingInSettings();renderSettingsFeatures();applyLanguage();maybeAutoBackup("اجرای برنامه");processRecurringTransactions();logEvent("اجرای برنامه","برنامه حسابدار اجرا شد","system");await initSync();if(!sync.auth){[4000,12000,30000].forEach(ms=>setTimeout(()=>{if(!sync.auth)initSync()},ms))}syncAllNotesToReminders().catch(console.error);syncAllChecksToReminders().catch(console.error);rescheduleAllNativeReminders().catch(console.error);startUpdateChecker();startReminderChecker();if(!hasLockCode())setTimeout(showWhatsNewOnce,320);})();
+(async function initApp(){normalizeData();purgeOldTrash();applyAccentThemeOnLoad();await migratePinSecurity();showLock();render();applyDashboardConfig();applyAppMode();renderBrandingInSettings();renderBranchSettings();renderSettingsFeatures();applyLanguage();maybeAutoBackup("اجرای برنامه");processRecurringTransactions();logEvent("اجرای برنامه","برنامه حسابدار اجرا شد","system");await initSync();if(!sync.auth){[4000,12000,30000].forEach(ms=>setTimeout(()=>{if(!sync.auth)initSync()},ms))}syncAllNotesToReminders().catch(console.error);syncAllChecksToReminders().catch(console.error);rescheduleAllNativeReminders().catch(console.error);startUpdateChecker();startReminderChecker();if(!hasLockCode())setTimeout(showWhatsNewOnce,320);})();

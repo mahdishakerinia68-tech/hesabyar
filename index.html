@@ -117,6 +117,7 @@
       <option value="">همه</option><option value="income">درآمد</option><option value="expense">هزینه</option>
     </select>
     <select id="filterCat" onchange="render()"><option value="">همه دسته‌ها</option></select>
+    <select id="filterBranch" onchange="render()" style="display:none"><option value="">همه شعبه‌ها</option></select>
   </div>
   <div id="txList"></div>
 </section>
@@ -124,7 +125,7 @@
 <section id="products" class="page">
   <div class="section-head"><h2 data-i18n="page.products">📦 کالا و انبار</h2><div class="actions"><button onclick="openStockAdjust()" title="افزایش موجودی کالا">📈</button><button onclick="openProduct()">＋</button></div></div>
   <div class="card hint">موجودی کالا، قیمت فروش و هشدار موجودی کم. فاکتورهای فروش موجودی را خودکار کم می‌کنند.</div>
-  <input id="productSearchInput" class="search" type="text" placeholder="🔍 جستجوی کالا..." oninput="renderProducts()">
+  <div class="product-search-row"><input id="productSearchInput" class="search" type="text" placeholder="🔍 جستجوی کالا (نام، کد یا بارکد)..." oninput="renderProducts()"><button type="button" class="ghost-btn" onclick="scanProductSearch()" title="اسکن بارکد کالا">📷</button></div>
   <div id="productSummary"></div>
   <div id="productList"></div>
 </section>
@@ -180,6 +181,7 @@
         <option value="all">همه تراکنش‌ها</option><option value="income">دریافت‌ها</option><option value="expense">هزینه‌ها</option>
       </select>
       <select id="reportAccount" onchange="renderAdvancedReport()"><option value="">همه حساب‌ها</option></select>
+      <select id="reportBranch" onchange="renderAdvancedReport()" style="display:none"><option value="">همه شعبه‌ها</option></select>
       <input id="reportFrom" inputmode="numeric" placeholder="از تاریخ شمسی" oninput="renderAdvancedReport()">
       <input id="reportTo" inputmode="numeric" placeholder="تا تاریخ شمسی" oninput="renderAdvancedReport()">
     </div>
@@ -315,6 +317,19 @@
         <label class="file-label">✍️ امضا<input id="brandSignature" type="file" accept="image/*" onchange="previewBrandFile(this,'signature')"></label>
         <div id="brandSignaturePreview"></div>
         <div class="settings-actions"><button class="primary" onclick="saveBranding()">💾 ذخیره مشخصات فاکتور</button><button onclick="clearBranding()">🧹 حذف لوگو، مهر و امضا</button></div>
+      </div>
+    </div>
+
+    <div class="item accordion-card page-accordion settings-group" id="stgGroup-branches" data-acc-id="stg-branches">
+      <button class="accordion-head settings-acc-head" type="button" aria-expanded="false" onclick="toggleAccordion(this,event)">
+        <div class="settings-group-head"><span>🏬</span><div><h3>شعبه‌های فروشگاه</h3><p class="hint">اگر بیش از یک شعبه داری، اینجا اضافه کن تا در تراکنش‌ها و فاکتورها قابل انتخاب باشد.</p></div></div>
+        <span class="acc-arrow">⌄</span>
+      </button>
+      <div class="accordion-body">
+        <div class="settings-actions"><button class="primary" onclick="openBranch()">＋ افزودن شعبه</button></div>
+        <div id="branchListSettings"></div>
+        <label class="hint" style="display:block;margin-top:10px">شعبه فعال پیش‌فرض (برای تراکنش/فاکتور جدید)</label>
+        <select id="activeBranchSelect" onchange="setActiveBranch(this)"><option value="">بدون شعبه فعال (پیش‌فرض)</option></select>
       </div>
     </div>
 
