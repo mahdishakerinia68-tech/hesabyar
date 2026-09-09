@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="1.4";
+const APP_VERSION="1.5";
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v1";
 const AUTO_BACKUP_MS=6*60*60*1000;
@@ -881,7 +881,13 @@ function showWhatsNewOnce(){
   <h2>🎉 به حساب‌یار خوش آمدی</h2>
   <p class="hint">این صفحه فقط یک‌بار در اولین اجرای این نسخه نمایش داده می‌شود.</p>
   <div class="whats-new-section">
-   <h3>🛠 تغییرات این نسخه (۱.۴)</h3>
+   <h3>🛠 تغییرات این نسخه (۱.۵)</h3>
+   <ul>
+    <li>رفع باگ «پشتیبان‌گیری دستی»: دکمه‌ی 📤 پشتیبان‌گیری در تنظیمات فقط تلاش می‌کرد فایل را از طریق مرورگر دانلود کند؛ روی خیلی از گوشی‌های اندرویدی این روش بی‌صدا شکست می‌خورد و پیام «فایل ساخته شد» نشان داده می‌شد در حالی که هیچ فایلی داخل Download ساخته نمی‌شد. حالا پشتیبان‌گیری دستی از همان روش مطمئنِ پشتیبان خودکار (ذخیره‌ی مستقیم در پوشه Download/حسابداری) استفاده می‌کند و اگر واقعاً شکست بخورد، پیام خطای درست نشان می‌دهد.</li>
+   </ul>
+  </div>
+  <div class="whats-new-section">
+   <h3>🛠 تغییرات نسخه قبل (۱.۴)</h3>
    <ul>
     <li>رفع مشکل «جدول هفتگی نمایش داده نمی‌شد»: در بعضی گوشی‌های اندرویدی، برنامه به‌خاطر کش قدیمی (Service Worker) نسخه‌ی قبلی فایل‌ها را نشان می‌داد و تب جدول ظاهر نمی‌شد؛ حالا کش برنامه به‌روزرسانی شده و با باز کردن مجدد برنامه، آخرین نسخه به‌صورت خودکار جایگزین می‌شود.</li>
    </ul>
@@ -2970,11 +2976,26 @@ function renderProductProfit(){
  box.innerHTML=`<div class="report-sub-title">🥇 پرسودترین کالاها</div>${top.map(rowHTML).join("")}<div class="report-sub-title">🥶 کم‌سودترین کالاها</div>${bottom.map(rowHTML).join("")}`;
 }
 function backupPayload(){return {format:"hesabdar-backup",version:2,appVersion:APP_VERSION,createdAt:new Date().toISOString(),data:JSON.parse(JSON.stringify(data))}}
-function exportData(){
- const json=JSON.stringify(backupPayload(),null,2),blob=new Blob([json],{type:"application/json;charset=utf-8"});
- const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="hesabdar-backup.json";document.body.appendChild(a);a.click();a.remove();
- setTimeout(()=>URL.revokeObjectURL(a.href),5000);logEvent("پشتیبان‌گیری","فایل پشتیبان JSON صادر شد","settings");
- alert("فایل پشتیبان ساخته شد. آن را به گوشی دیگر منتقل کن و از گزینه بازیابی انتخابش کن.");
+/* Bug fix: this used to only do the browser <a download> trick, which
+ * relies on the WebView actually handing the click off to Android's
+ * download manager. On a Capacitor native build that hand-off is
+ * unreliable — on many devices/WebView versions the click fires with no
+ * error and the "بازیابی با موفقیت..." alert form ("فایل ساخته شد")
+ * still shows, but no file ever actually lands in Downloads, so a
+ * restore later fails with "file not found". The auto-backup routine
+ * already solved this correctly (native Filesystem plugin first, browser
+ * download only as a fallback) — manual backup now goes through the same
+ * path so the button either genuinely saves a file, or clearly reports
+ * failure instead of lying about success. */
+async function exportData(){
+ const res=await writeAutoBackupFile(backupPayload());
+ if(res?.ok){
+  logEvent("پشتیبان‌گیری","فایل پشتیبان JSON صادر شد • "+res.filename,"settings");
+  const where=res.method==="filesystem"?`در پوشه ${res.where} با نام ${res.filename} `:"";
+  alert(`فایل پشتیبان ${where}ساخته شد. آن را به گوشی دیگر منتقل کن و از گزینه بازیابی انتخابش کن.`);
+ }else{
+  alert("پشتیبان‌گیری انجام نشد. دوباره تلاش کن؛ اگر باز هم نشد، از «بازیابی آخرین بکاپ خودکار» به‌عنوان جایگزین استفاده کن.");
+ }
 }
 function stripBom(s){return s&&s.charCodeAt(0)===0xFEFF?s.slice(1):s}
 async function readBackupFile(file){
