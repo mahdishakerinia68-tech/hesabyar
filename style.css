@@ -386,11 +386,12 @@ body:not(.dark) .sheet .close{background:#E5E5EA}
 .week-table td{padding:10px 4px;vertical-align:top}
 .week-day-cell{width:84px;flex-shrink:0;white-space:nowrap}
 .week-day-cell b{font-size:13px;font-weight:700}
-.week-notes-cell{display:flex;flex-wrap:wrap;gap:6px;padding-right:8px}
+.week-notes-cell{padding-right:8px}
+.week-notes-cell .week-note-chip{display:inline-block;margin:0 0 6px 6px}
 .week-table tr.week-today .week-day-cell b{color:var(--blue)}
-.week-table tr.week-today{background:color-mix(in srgb, var(--blue) 7%, transparent)}
+.week-table tr.week-today{background:rgba(15,155,142,.07);background:color-mix(in srgb, var(--blue) 7%, transparent)}
 .week-note-chip{border:none;border-radius:999px;background:var(--bg3);color:var(--label);font-size:12px;font-weight:600;padding:6px 10px;max-width:100%;overflow-wrap:break-word;word-break:break-word;text-align:right}
-.week-note-chip:active{background:color-mix(in srgb, var(--blue) 18%, var(--bg3))}
+.week-note-chip:active{background:rgba(15,155,142,.18);background:color-mix(in srgb, var(--blue) 18%, var(--bg3))}
 
 /* side menu drawer */
 .menu-modal{align-items:stretch;justify-content:flex-start}

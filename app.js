@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="1.3";
+const APP_VERSION="1.4";
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v1";
 const AUTO_BACKUP_MS=6*60*60*1000;
@@ -881,7 +881,13 @@ function showWhatsNewOnce(){
   <h2>🎉 به حساب‌یار خوش آمدی</h2>
   <p class="hint">این صفحه فقط یک‌بار در اولین اجرای این نسخه نمایش داده می‌شود.</p>
   <div class="whats-new-section">
-   <h3>🛠 تغییرات این نسخه (۱.۳)</h3>
+   <h3>🛠 تغییرات این نسخه (۱.۴)</h3>
+   <ul>
+    <li>رفع مشکل «جدول هفتگی نمایش داده نمی‌شد»: در بعضی گوشی‌های اندرویدی، برنامه به‌خاطر کش قدیمی (Service Worker) نسخه‌ی قبلی فایل‌ها را نشان می‌داد و تب جدول ظاهر نمی‌شد؛ حالا کش برنامه به‌روزرسانی شده و با باز کردن مجدد برنامه، آخرین نسخه به‌صورت خودکار جایگزین می‌شود.</li>
+   </ul>
+  </div>
+  <div class="whats-new-section">
+   <h3>🛠 تغییرات نسخه قبل (۱.۳)</h3>
    <ul>
     <li>جدول هفتگی یادداشت‌ها: در صفحه «یادداشت‌ها» یک تب «📅 جدول» اضافه شد که ۷ روز هفته (شمسی) را نشان می‌دهد و یادداشت هر روز را زیر همان روز می‌گذارد؛ با فلش‌ها می‌توان بین هفته‌ها جابه‌جا شد.</li>
    </ul>

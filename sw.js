@@ -1,4 +1,11 @@
-const CACHE="hesabdar-1-2-offline-v1";
+/* ---- Bump this whenever any of the cached ASSETS files change (new
+ * version release, or the table page you're reading this for). Without
+ * a bump, the "activate" cleanup below has nothing to clean up — old
+ * devices keep serving the previously-cached app.js/index.html forever,
+ * which is exactly why a shipped feature can be invisible on some
+ * phones: they're just still running the old cached copy. Tie it to
+ * APP_VERSION mentally — same number as in app.js. */
+const CACHE="hesabdar-1-4-offline-v1";
 const ASSETS=["./","./index.html","./style.css","./app.js","./manifest.json","./logo.png","./capacitor-local-notifications-bridge.js","./capacitor-filesystem-bridge.js","./capacitor-biometric-bridge.js"];
 self.addEventListener("install",e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting()))});
 self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
