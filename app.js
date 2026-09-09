@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="1.2";
+const APP_VERSION="1.3";
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v1";
 const AUTO_BACKUP_MS=6*60*60*1000;
@@ -513,6 +513,8 @@ for(const p of data.people){if(p.type==="debtor"||p.type==="debtors"||p.type==="
 // v3.10: older checks از قبل از اتصال چک به حساب — مقادیر پیش‌فرض بگیرند تا خطا ندهند.
 for(const c of data.checks){c.settled=!!c.settled;c.accountID=typeof c.accountID==="string"?c.accountID:"";c.txId=c.txId||null}
 let peopleMode="debt";
+let notesMode="list";
+let notesWeekOffset=0;
 const AUDIT_LIMIT=1000;
 /* v5.9 perf fix: logEvent() used to write the ENTIRE app data blob to
  * localStorage and trigger a full render()+syncSave() synchronously,
@@ -879,7 +881,13 @@ function showWhatsNewOnce(){
   <h2>🎉 به حساب‌یار خوش آمدی</h2>
   <p class="hint">این صفحه فقط یک‌بار در اولین اجرای این نسخه نمایش داده می‌شود.</p>
   <div class="whats-new-section">
-   <h3>🛠 تغییرات این نسخه (۱.۲)</h3>
+   <h3>🛠 تغییرات این نسخه (۱.۳)</h3>
+   <ul>
+    <li>جدول هفتگی یادداشت‌ها: در صفحه «یادداشت‌ها» یک تب «📅 جدول» اضافه شد که ۷ روز هفته (شمسی) را نشان می‌دهد و یادداشت هر روز را زیر همان روز می‌گذارد؛ با فلش‌ها می‌توان بین هفته‌ها جابه‌جا شد.</li>
+   </ul>
+  </div>
+  <div class="whats-new-section">
+   <h3>🛠 تغییرات نسخه قبل (۱.۲)</h3>
    <ul>
     <li>جداکننده هزارگان: در همه‌ی فیلدهای مبلغی برنامه (تراکنش، چک، فاکتور، کالا، بدهکار/بستانکار، حساب، بودجه، یادآوری و...) هنگام تایپ، هر ۳ رقم یک ویرگول می‌گیرد تا میلیون از هزار راحت تشخیص داده شود.</li>
    </ul>
@@ -1850,6 +1858,54 @@ async function moveNoteItem(noteId,itemId,dir){
  const swapIdx=idx+dir; if(swapIdx<0||swapIdx>=n.items.length)return;
  [n.items[idx],n.items[swapIdx]]=[n.items[swapIdx],n.items[idx]];
  touch(n); markDirty("notes",n.id,false,n,n.updatedAt); save();
+}
+/* ---- Weekly (7-day) Jalali table view for notes ---- */
+function setNotesMode(mode){
+  notesMode=mode==="table"?"table":"list";
+  notesWeekOffset=0;
+  render();
+}
+function changeNotesWeek(dir){
+  notesWeekOffset=dir===0?0:notesWeekOffset+dir;
+  render();
+}
+function notesWeekStart(offset){
+  const t=new Date();t.setHours(0,0,0,0);
+  const j=gregorianToJalali(t.getFullYear(),t.getMonth()+1,t.getDate());
+  const wd=jalaliWeekdayIndex(j[0],j[1],j[2]);
+  return new Date(t.getTime()-wd*86400000+offset*7*86400000);
+}
+function noteOccursOnDay(n,day){
+  if(!n.date)return false;
+  const base=localDateFromInput(n.date);if(!base)return false;
+  const b=new Date(base.getFullYear(),base.getMonth(),base.getDate());
+  const d=new Date(day.getFullYear(),day.getMonth(),day.getDate());
+  if(d.getTime()<b.getTime())return false;
+  const rep=n.repeat||"none";
+  if(rep==="none")return d.getTime()===b.getTime();
+  if(rep==="daily")return true;
+  if(rep==="weekly")return d.getDay()===b.getDay();
+  if(rep==="monthly")return d.getDate()===b.getDate();
+  return false;
+}
+const PERSIAN_WEEKDAY_NAMES=["شنبه","یکشنبه","دوشنبه","سه‌شنبه","چهارشنبه","پنجشنبه","جمعه"];
+function notesWeekTableHTML(){
+  const start=notesWeekStart(notesWeekOffset);
+  const t=new Date();t.setHours(0,0,0,0);
+  const j0=gregorianToJalali(start.getFullYear(),start.getMonth()+1,start.getDate());
+  const j6d=new Date(start.getTime()+6*86400000);
+  const j6=gregorianToJalali(j6d.getFullYear(),j6d.getMonth()+1,j6d.getDate());
+  const rangeLabel=`${toFaDigits(j0[2])} ${PERSIAN_MONTHS[j0[1]-1]} تا ${toFaDigits(j6[2])} ${PERSIAN_MONTHS[j6[1]-1]} ${toFaDigits(j6[0])}`;
+  const rows=[];
+  for(let i=0;i<7;i++){
+    const day=new Date(start.getTime()+i*86400000);
+    const jd=gregorianToJalali(day.getFullYear(),day.getMonth()+1,day.getDate());
+    const isToday=day.getTime()===t.getTime();
+    const dayNotes=data.notes.filter(n=>noteOccursOnDay(n,day)).sort((a,b)=>(a.order??0)-(b.order??0));
+    const chips=dayNotes.map(n=>`<button type="button" class="week-note-chip" onclick="openNote('${n.id}')">📝 ${esc(n.title)}</button>`).join("")||`<span class="meta">برنامه‌ای ثبت نشده</span>`;
+    rows.push(`<tr class="${isToday?"week-today":""}"><td class="week-day-cell"><b>${PERSIAN_WEEKDAY_NAMES[i]}</b><div class="meta">${toFaDigits(jd[2])} ${PERSIAN_MONTHS[jd[1]-1]}</div></td><td class="week-notes-cell">${chips}</td></tr>`);
+  }
+  return `<div class="week-table-wrap"><div class="week-table-head"><button type="button" class="cal-nav" onclick="changeNotesWeek(-1)" aria-label="هفته قبل">❮</button><div><b>جدول هفتگی</b><div class="meta">${rangeLabel}</div></div><button type="button" class="cal-nav" onclick="changeNotesWeek(1)" aria-label="هفته بعد">❯</button></div><table class="week-table"><tbody>${rows.join("")}</tbody></table><button type="button" class="cal-today-btn" onclick="changeNotesWeek(0)">هفته جاری</button></div>`;
 }
 const openAccordions=new Set();
 function noteHTML(n,pos){
@@ -2840,7 +2896,17 @@ function render(){
  if($("customerList")&&pageActive("customers"))renderCustomers();
  if($("peopleList")&&pageActive("people"))$("peopleList").innerHTML=data.people.filter(p=>(p.type||"debt")===peopleMode).map(p=>{const total=Number(p.amount)||0,paid=Math.min(Number(p.paid)||0,total),remaining=Math.max(0,total-paid);const inst=p.installments;const instMeta=inst?`<div class="meta">🧾 اقساط: ${fa(inst.items.filter(x=>x.paid).length)} از ${fa(inst.count)} پرداخت‌شده</div>`:"";const instBtn=inst?`<button type="button" onclick="openInstallments('${p.id}')">اقساط</button>`:`<button type="button" onclick="payPerson('${p.id}')">تسویه</button>`;const invBadge=p.source==="invoice"?`<div class="meta">🧾 مانده فاکتور</div>`:"";return `<div class="item"><div><b>${esc(p.name)}</b>${invBadge}<div class="meta">${p.due?"سررسید: "+p.due:""}${p.note?" • "+esc(p.note):""}</div><div class="meta">کل: ${money(total)} • تسویه: ${money(paid)}</div>${instMeta}</div><div><strong>${money(remaining)}</strong><div class="actions">${instBtn}${actionButtons("openPerson","deletePerson",p.id)}</div></div></div>`}).join("")||empty(peopleMode==="debt"?"هنوز بدهکاری ثبت نشده":"هنوز طلبی ثبت نشده");
  if($("reminderList")&&pageActive("reminders")){const normalReminders=data.reminders.filter(r=>!r.sourceNoteId).sort((a,b)=>(a.order??0)-(b.order??0)); const noteAlarms=data.reminders.filter(r=>r.sourceNoteId); const normal=normalReminders.map((r,i)=>{const accId="rem-"+r.id;const isOpen=openAccordions.has(accId);return `<div class="item accordion-card${isOpen?' open':''}" data-acc-id="${accId}"><button class="accordion-head" type="button" aria-expanded="${isOpen}" onclick="toggleAccordion(this,event)"><span>🔔 <b>${esc(r.title)}</b></span><span>⌄</span></button><div class="accordion-body"><div class="meta">${jalaliLabel(r.date)} • ${r.repeat==="once"?"یک‌بار":r.repeat==="weekly"?"هفتگی":"ماهانه"}</div><div class="accordion-actions"><strong>${r.amount?money(r.amount):""}</strong><div class="reorder-btns"><button type="button" title="انتقال به بالا" ${i===0?"disabled":""} onclick="event.stopPropagation();moveReminder('${r.id}',-1)">▲</button><button type="button" title="انتقال به پایین" ${i===normalReminders.length-1?"disabled":""} onclick="event.stopPropagation();moveReminder('${r.id}',1)">▼</button></div>${actionButtons("openReminder","deleteReminder",r.id)}</div></div></div>`}).join(""); $("reminderList").innerHTML=`<div class="section-label">🔔 یادآوری‌های مستقل</div>${normal||empty("یادآوری مستقلی ندارید")}${noteAlarms.length?`<div class="section-label">📝⏰ آلارم یادداشت‌ها</div>`+noteAlarms.map(r=>{const accId="remnote-"+r.id;const isOpen=openAccordions.has(accId);return `<div class="item accordion-card${isOpen?' open':''}" data-acc-id="${accId}"><button class="accordion-head" type="button" aria-expanded="${isOpen}" onclick="toggleAccordion(this,event)"><span>📝 <b>${esc(r.title)}</b></span><span>⌄</span></button><div class="accordion-body"><div class="meta">${jalaliLabel(r.date)} • ${r.repeat==="once"?"یک‌بار":r.repeat==="weekly"?"هفتگی":"ماهانه"}</div></div></div>`}).join(""):``}`;}
- if($("noteList")&&pageActive("notes")){const sortedNotes=[...data.notes].sort((a,b)=>(a.order??0)-(b.order??0));$("noteList").innerHTML=sortedNotes.map((n,i)=>noteHTML(n,{i,total:sortedNotes.length})).join("")||empty("یادداشتی ندارید");}
+ if($("noteList")&&pageActive("notes")){
+   document.querySelectorAll("#notesModeTabs button").forEach(b=>b.classList.toggle("active",b.dataset.mode===notesMode));
+   if(notesMode==="table"){
+     $("noteList").style.display="none";
+     if($("notesTableView")){$("notesTableView").style.display="";$("notesTableView").innerHTML=notesWeekTableHTML();}
+   }else{
+     $("noteList").style.display="";
+     if($("notesTableView")){$("notesTableView").style.display="none";$("notesTableView").innerHTML="";}
+     const sortedNotes=[...data.notes].sort((a,b)=>(a.order??0)-(b.order??0));$("noteList").innerHTML=sortedNotes.map((n,i)=>noteHTML(n,{i,total:sortedNotes.length})).join("")||empty("یادداشتی ندارید");
+   }
+ }
  if($("invoiceList")&&pageActive("invoices"))$("invoiceList").innerHTML=data.invoices.map(invoiceHTML).join("")||empty("هنوز فاکتوری ساخته نشده است");
  if($("checkList")&&pageActive("checks")){
    const sortedChecks=[...data.checks].sort((a,b)=>{const da=isCheckDueSoon(a)?0:1,db=isCheckDueSoon(b)?0:1;if(da!==db)return da-db;const ta=new Date(a.date).getTime()||0,tb=new Date(b.date).getTime()||0;return ta-tb});

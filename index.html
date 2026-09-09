@@ -153,7 +153,12 @@
   <div class="section-head"><h2 data-i18n="page.notes">📝 یادداشت‌ها</h2><div class="actions"><button onclick="openSmartNote()">✨</button><button onclick="openNote()">＋</button></div></div>
   <div class="card hint">مثل یک لیست کار بساز؛ برای یادداشت زمان بگذار و چند آیتم زیر آن اضافه کن. هر آیتم جداگانه قابل تیک‌زدن، حذف و ویرایش است.</div>
   <button class="tool-card smart-note-btn" onclick="openSmartNote()">✨<b>یادداشت هوشمند</b><small>یک متن آزاد بنویس تا هوش مصنوعی بدهی، طلب، یادآوری یا تراکنش را از آن پیدا کند</small></button>
+  <div class="tabs" id="notesModeTabs">
+    <button type="button" data-mode="list" class="active" onclick="setNotesMode('list')">لیست</button>
+    <button type="button" data-mode="table" onclick="setNotesMode('table')">📅 جدول</button>
+  </div>
   <div id="noteList"></div>
+  <div id="notesTableView" style="display:none"></div>
 </section>
 
 <section id="checks" class="page">
