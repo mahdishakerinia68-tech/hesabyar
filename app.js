@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="1.6";
+const APP_VERSION="2.0";
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v1";
 const AUTO_BACKUP_MS=6*60*60*1000;
@@ -881,9 +881,15 @@ function showWhatsNewOnce(){
   <h2>🎉 به حساب‌یار خوش آمدی</h2>
   <p class="hint">این صفحه فقط یک‌بار در اولین اجرای این نسخه نمایش داده می‌شود.</p>
   <div class="whats-new-section">
-   <h3>🛠 تغییرات این نسخه (۱.۶)</h3>
+   <h3>🛠 تغییرات این نسخه (۲.۰)</h3>
    <ul>
-    <li>چیدمان بالای صفحه: دکمه‌های تم تاریک/روشن، زبان، حالت اپ و جستجو از بالای صفحه به کنار دکمه‌ی «سفارشی‌سازی داشبورد» در صفحه‌ی خانه منتقل شدند و یک شورت‌کات «یادداشت جدید» هم کنارشان اضافه شد. جای خالی‌شان در بالای صفحه حالا تاریخ امروز (شمسی) را نشان می‌دهد.</li>
+    <li>شورت‌کات کنار «سفارشی‌سازی داشبورد» از یادداشت جدید به «📅 جدول هفتگی یادداشت‌ها» تغییر کرد؛ با یک ضربه مستقیم می‌روی صفحه‌ی یادداشت‌ها با نمایش جدول هفتگی باز شده.</li>
+   </ul>
+  </div>
+  <div class="whats-new-section">
+   <h3>🛠 تغییرات نسخه قبل (۱.۶)</h3>
+   <ul>
+    <li>چیدمان بالای صفحه: دکمه‌های تم تاریک/روشن، زبان، حالت اپ و جستجو از بالای صفحه به کنار دکمه‌ی «سفارشی‌سازی داشبورد» در صفحه‌ی خانه منتقل شدند. جای خالی‌شان در بالای صفحه حالا تاریخ امروز (شمسی) را نشان می‌دهد.</li>
    </ul>
   </div>
   <div class="whats-new-section">
@@ -1878,6 +1884,11 @@ async function moveNoteItem(noteId,itemId,dir){
  touch(n); markDirty("notes",n.id,false,n,n.updatedAt); save();
 }
 /* ---- Weekly (7-day) Jalali table view for notes ---- */
+function openNotesWeekTable(){
+ notesMode="table";
+ goToPage("notes");
+ render();
+}
 function setNotesMode(mode){
   notesMode=mode==="table"?"table":"list";
   notesWeekOffset=0;
