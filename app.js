@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="2.2.2";
+const APP_VERSION="2.2";
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v1";
 const AUTO_BACKUP_MS=6*60*60*1000;
@@ -106,7 +106,6 @@ function openAppModeSheet(){
   applyAppMode();
 }
 const ANTHROPIC_KEY_STORAGE="hesabdar-anthropic-key-v1";
-const DEFAULT_ANTHROPIC_KEY="sk-bac7a0632029401f8cd34d00dbe222e3";
 const DEVICE_ID_KEY="hesabdar-device-id-v1";
 const DEVICE_PRESENCE_MS=45*1000;
 const DEVICE_PRESENCE_INTERVAL=20*1000;
@@ -882,11 +881,10 @@ function showWhatsNewOnce(){
   <h2>🎉 به حساب‌یار خوش آمدی</h2>
   <p class="hint">این صفحه فقط یک‌بار در اولین اجرای این نسخه نمایش داده می‌شود.</p>
   <div class="whats-new-section">
-   <h3>🛠 تغییرات این نسخه (۲.۲.۱)</h3>
+   <h3>🛠 تغییرات این نسخه (۲.۲)</h3>
    <ul>
     <li>تاریخ سررسید در لیست بدهکار/طلبکار حالا مشخص می‌کند برای «پرداخت» است یا «واریز»: برای شخصی که به او بدهکاری «سررسید پرداخت» و برای شخصی که از او طلب داری «سررسید واریز» نوشته می‌شود.</li>
     <li>در لیست چک‌ها هم همین برچسب اضافه شد: چک پرداختی «سررسید پرداخت» و چک دریافتی «سررسید واریز» نشان می‌دهد.</li>
-    <li>بدهکارها و بستانکارهای دارای سررسید، حالا در جدول هفتگی هم زیر روز سررسید نمایش داده می‌شوند و مبلغ مانده یا وضعیت تسویه آن‌ها مشخص است.</li>
    </ul>
   </div>
   <div class="whats-new-section">
@@ -1956,27 +1954,6 @@ function reminderOccursOnDay(r,day){
   return false;
 }
 const PERSIAN_WEEKDAY_NAMES=["شنبه","یکشنبه","دوشنبه","سه‌شنبه","چهارشنبه","پنجشنبه","جمعه"];
-function personOccursOnDay(p,day){
-  if(!p?.due)return false;
-  const base=localDateFromInput(p.due);if(!base)return false;
-  const b=new Date(base.getFullYear(),base.getMonth(),base.getDate());
-  const d=new Date(day.getFullYear(),day.getMonth(),day.getDate());
-  if(d.getTime()<b.getTime())return false;
-  const rep=p.repeat||"once";
-  if(rep==="once")return d.getTime()===b.getTime();
-  if(rep==="daily")return true;
-  if(rep==="weekly")return d.getDay()===b.getDay();
-  if(rep==="monthly")return d.getDate()===b.getDate();
-  if(rep==="yearly")return d.getDate()===b.getDate()&&d.getMonth()===b.getMonth();
-  return false;
-}
-function personWeekItemsHTML(p){
-  const total=Number(p.amount)||0,paid=Math.min(Number(p.paid)||0,total),remaining=Math.max(0,total-paid);
-  const isCredit=p.type==="credit";
-  const label=isCredit?"طلب از":"بدهی به";
-  const amount=remaining>0?` • مانده: ${money(remaining)}`:" • تسویه شده";
-  return `<button type="button" class="week-note-chip week-person-chip" onclick="openPerson('${p.id}')">💰 ${esc(label)} ${esc(p.name)}${amount}</button>`;
-}
 function notesWeekTableHTML(){
   const start=notesWeekStart(notesWeekOffset);
   const t=new Date();t.setHours(0,0,0,0);
@@ -1991,11 +1968,9 @@ function notesWeekTableHTML(){
     const isToday=day.getTime()===t.getTime();
     const dayNotes=data.notes.filter(n=>noteOccursOnDay(n,day)).sort((a,b)=>(a.order??0)-(b.order??0));
     const dayReminders=(data.reminders||[]).filter(r=>!r.sourceNoteId&&r.date&&reminderOccursOnDay(r,day)).sort((a,b)=>(a.order??0)-(b.order??0));
-    const dayPeople=(data.people||[]).filter(p=>personOccursOnDay(p,day)).sort((a,b)=>(a.order??0)-(b.order??0));
     const noteChips=dayNotes.map(n=>`<button type="button" class="week-note-chip" onclick="openNote('${n.id}')">📝 ${esc(n.title)}</button>`).join("");
     const reminderChips=dayReminders.map(r=>`<button type="button" class="week-note-chip week-reminder-chip" onclick="openReminder('${r.id}')">🔔 ${esc(r.title)}</button>`).join("");
-    const personChips=dayPeople.map(personWeekItemsHTML).join("");
-    const chips=(noteChips+reminderChips+personChips)||`<span class="meta">برنامه‌ای ثبت نشده</span>`;
+    const chips=(noteChips+reminderChips)||`<span class="meta">برنامه‌ای ثبت نشده</span>`;
     rows.push(`<tr class="${isToday?"week-today":""}"><td class="week-day-cell"><b>${PERSIAN_WEEKDAY_NAMES[i]}</b><div class="meta">${toFaDigits(jd[2])} ${PERSIAN_MONTHS[jd[1]-1]}</div></td><td class="week-notes-cell">${chips}</td></tr>`);
   }
   return `<div class="week-table-wrap"><div class="week-table-head"><button type="button" class="cal-nav" onclick="changeNotesWeek(-1)" aria-label="هفته قبل">❮</button><div><b>جدول هفتگی</b><div class="meta">${rangeLabel}</div></div><button type="button" class="cal-nav" onclick="changeNotesWeek(1)" aria-label="هفته بعد">❯</button></div><table class="week-table"><tbody>${rows.join("")}</tbody></table><button type="button" class="cal-today-btn" onclick="changeNotesWeek(0)">هفته جاری</button></div>`;
@@ -2195,7 +2170,7 @@ async function syncAllPeopleToReminders(){let changed=false;const peopleIds=new 
  * یا تراکنش از آن استخراج و برای تایید نهایی به کاربر نشان داده می‌شود.
  * ============================================================ */
 const ANTHROPIC_MODEL="claude-haiku-4-5-20251001";
-function anthropicKey(){return (localStorage.getItem(ANTHROPIC_KEY_STORAGE)||"").trim()||DEFAULT_ANTHROPIC_KEY}
+function anthropicKey(){return (localStorage.getItem(ANTHROPIC_KEY_STORAGE)||"").trim()}
 function saveAnthropicKey(){const v=$("anthropicKeyInput")?.value.trim();if(!v)return alert("کلید Claude را وارد کن");localStorage.setItem(ANTHROPIC_KEY_STORAGE,v);if($("anthropicKeyInput"))$("anthropicKeyInput").value="";renderSettingsFeatures();alert("کلید Claude ذخیره شد.")}
 function clearAnthropicKey(){if(!anthropicKey())return alert("کلیدی ثبت نشده است");if(!confirm("کلید Claude حذف شود؟"))return;localStorage.removeItem(ANTHROPIC_KEY_STORAGE);renderSettingsFeatures();alert("کلید Claude حذف شد.")}
 
