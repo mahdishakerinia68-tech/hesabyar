@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="1.5";
+const APP_VERSION="1.6";
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v1";
 const AUTO_BACKUP_MS=6*60*60*1000;
@@ -881,7 +881,13 @@ function showWhatsNewOnce(){
   <h2>🎉 به حساب‌یار خوش آمدی</h2>
   <p class="hint">این صفحه فقط یک‌بار در اولین اجرای این نسخه نمایش داده می‌شود.</p>
   <div class="whats-new-section">
-   <h3>🛠 تغییرات این نسخه (۱.۵)</h3>
+   <h3>🛠 تغییرات این نسخه (۱.۶)</h3>
+   <ul>
+    <li>چیدمان بالای صفحه: دکمه‌های تم تاریک/روشن، زبان، حالت اپ و جستجو از بالای صفحه به کنار دکمه‌ی «سفارشی‌سازی داشبورد» در صفحه‌ی خانه منتقل شدند و یک شورت‌کات «یادداشت جدید» هم کنارشان اضافه شد. جای خالی‌شان در بالای صفحه حالا تاریخ امروز (شمسی) را نشان می‌دهد.</li>
+   </ul>
+  </div>
+  <div class="whats-new-section">
+   <h3>🛠 تغییرات نسخه قبل (۱.۵)</h3>
    <ul>
     <li>رفع باگ «پشتیبان‌گیری دستی»: دکمه‌ی 📤 پشتیبان‌گیری در تنظیمات فقط تلاش می‌کرد فایل را از طریق مرورگر دانلود کند؛ روی خیلی از گوشی‌های اندرویدی این روش بی‌صدا شکست می‌خورد و پیام «فایل ساخته شد» نشان داده می‌شد در حالی که هیچ فایلی داخل Download ساخته نمی‌شد. حالا پشتیبان‌گیری دستی از همان روش مطمئنِ پشتیبان خودکار (ذخیره‌ی مستقیم در پوشه Download/حسابداری) استفاده می‌کند و اگر واقعاً شکست بخورد، پیام خطای درست نشان می‌دهد.</li>
    </ul>
@@ -2888,7 +2894,15 @@ function renderBrandingInSettings(){loadBrandingSettings();renderYearSettlement(
    one currently shown; it still refreshes fully the moment the user navigates there
    (activatePage() calls render() again right after switching pages). */
 function pageActive(id){const el=$(id);return !!(el&&el.classList.contains("active"))}
+function renderTopBarDate(){
+ const el=$("topBarDate");if(!el)return;
+ const t=new Date();
+ const j=gregorianToJalali(t.getFullYear(),t.getMonth()+1,t.getDate());
+ const wd=jalaliWeekdayIndex(j[0],j[1],j[2]);
+ el.textContent=`${PERSIAN_WEEKDAY_NAMES[wd]} ${toFaDigits(j[2])} ${PERSIAN_MONTHS[j[1]-1]} ${toFaDigits(j[0])}`;
+}
 function render(){
+ renderTopBarDate();
  /* v2.2 fix: this used to show base(=sum of accounts' starting balance)+net(=income-expense)
     which ignores "انتقال به دیگران" (transfer to an external person/card). That amount leaves
     an account (accountBalance() subtracts it) but was never subtracted here, so the total on

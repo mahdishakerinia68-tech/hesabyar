@@ -27,10 +27,7 @@
     </div>
   </div>
   <div class="header-actions">
-    <button id="globalSearchBtn" onclick="openGlobalSearch()" aria-label="جستجوی سراسری" title="جستجو">🔍</button>
-    <button id="appModeToggle" onclick="openAppModeSheet()" aria-label="حالت اپ" title="حالت اپ">🧑‍💼</button>
-    <button id="langToggle" onclick="toggleAppLanguage()" aria-label="تغییر زبان برنامه">EN</button>
-    <button id="theme" aria-label="تغییر حالت روشن/تاریک">☾</button>
+    <div id="topBarDate" class="top-bar-date"></div>
   </div>
 </header>
 
@@ -41,7 +38,16 @@
 <main>
 
 <section id="home" class="page active">
-  <div class="section-head home-head"><h2 data-i18n="page.home">خانه</h2><button class="dash-customize-btn" onclick="openDashboardCustomize()">🎛</button></div>
+  <div class="section-head home-head"><h2 data-i18n="page.home">خانه</h2>
+    <div class="home-quick-actions">
+      <button id="theme" class="home-quick-btn" aria-label="تغییر حالت روشن/تاریک" title="تاریک/روشن">☾</button>
+      <button id="langToggle" class="home-quick-btn" onclick="toggleAppLanguage()" aria-label="تغییر زبان برنامه" title="زبان">EN</button>
+      <button id="appModeToggle" class="home-quick-btn" onclick="openAppModeSheet()" aria-label="حالت اپ" title="حالت اپ">🧑‍💼</button>
+      <button id="globalSearchBtn" class="home-quick-btn" onclick="openGlobalSearch()" aria-label="جستجوی سراسری" title="جستجو">🔍</button>
+      <button class="home-quick-btn" onclick="openNote()" aria-label="یادداشت جدید" title="یادداشت جدید">📝</button>
+      <button class="dash-customize-btn" onclick="openDashboardCustomize()" title="سفارشی‌سازی داشبورد">🎛</button>
+    </div>
+  </div>
 
   <div class="dash-widget" data-widget="hero">
     <button type="button" class="hero hero-clickable" onclick="goToPage('accounts')" aria-label="مشاهده حساب‌ها و موجودی">
