@@ -393,6 +393,9 @@ body:not(.dark) .sheet .close{background:#E5E5EA}
 .week-table tr.week-today{background:rgba(15,155,142,.07);background:color-mix(in srgb, var(--blue) 7%, transparent)}
 .week-note-chip{border:none;border-radius:999px;background:var(--bg3);color:var(--label);font-size:12px;font-weight:600;padding:6px 10px;max-width:100%;overflow-wrap:break-word;word-break:break-word;text-align:right}
 .week-note-chip:active{background:rgba(15,155,142,.18);background:color-mix(in srgb, var(--blue) 18%, var(--bg3))}
+.week-reminder-chip{background:rgba(255,159,10,.16);background:color-mix(in srgb, #FF9F0A 16%, var(--bg3));color:#B9700A}
+body.dark .week-reminder-chip{color:#FFB84D}
+.week-reminder-chip:active{background:rgba(255,159,10,.3);background:color-mix(in srgb, #FF9F0A 30%, var(--bg3))}
 
 /* side menu drawer */
 .menu-modal{align-items:stretch;justify-content:flex-start}

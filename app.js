@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="2.0";
+const APP_VERSION="2.1";
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v1";
 const AUTO_BACKUP_MS=6*60*60*1000;
@@ -881,7 +881,14 @@ function showWhatsNewOnce(){
   <h2>🎉 به حساب‌یار خوش آمدی</h2>
   <p class="hint">این صفحه فقط یک‌بار در اولین اجرای این نسخه نمایش داده می‌شود.</p>
   <div class="whats-new-section">
-   <h3>🛠 تغییرات این نسخه (۲.۰)</h3>
+   <h3>🛠 تغییرات این نسخه (۲.۱)</h3>
+   <ul>
+    <li>جدول هفتگی یادداشت‌ها حالا یادآوری‌ها را هم نشان می‌دهد: هر یادآوری‌ای که برایش تاریخ و ساعت تنظیم شده باشد، زیر همان روزِ هفته با یک برچسب نارنجی 🔔 کنار یادداشت‌های همان روز (📝) نمایش داده می‌شود.</li>
+    <li>دکمه‌ی 🔔 یادآوری در صفحه‌ی خانه حالا یک صفحه‌ی ثبت سریع باز می‌کند که دقیقاً مثل تب‌های «صدور فاکتور» دو تب بالا دارد: 📝 یادداشت و 🔔 یادآوری؛ همیشه اول تب یادداشت باز می‌شود و با یک ضربه می‌توان به فرم یادآوری رفت.</li>
+   </ul>
+  </div>
+  <div class="whats-new-section">
+   <h3>🛠 تغییرات نسخه قبل (۲.۰)</h3>
    <ul>
     <li>رفع باگ اصلیِ «آپدیت نیومدن»: آدرس ثبت Service Worker (فایل sw.js) با یک شماره‌ی ثابت (v=5) نوشته شده بود که هیچ‌وقت عوض نمی‌شد؛ همین باعث می‌شد بعضی گوشی‌ها همون نسخه‌ی خیلی قدیمی برنامه را برای همیشه از حافظه‌ی گوشی نشون بدن، نه فقط نسخه‌ی قبلی — به همین دلیل بود که چند تا آپدیت قبلی (جدول هفتگی، رفع باگ بکاپ، جابه‌جایی دکمه‌ها) اصلاً به دست بعضی گوشی‌ها نمی‌رسید و شماره نسخه هم عوض نمی‌شد. حالا این آدرس درست تنظیم شده تا مرورگر همیشه بررسی کند نسخه‌ی جدیدتری هست یا نه.</li>
     <li>شورت‌کات کنار «سفارشی‌سازی داشبورد» از یادداشت جدید به «📅 جدول هفتگی یادداشت‌ها» تغییر کرد؛ با یک ضربه مستقیم می‌روی صفحه‌ی یادداشت‌ها با نمایش جدول هفتگی باز شده.</li>
@@ -1851,10 +1858,13 @@ function renderCalModal(){
   box.innerHTML=`<div class="cal-head"><button type="button" class="cal-nav" onclick="calNav(-1)" aria-label="ماه قبل">❮</button><b>${PERSIAN_MONTHS[jm-1]} ${toFaDigits(jy)}</b><button type="button" class="cal-nav" onclick="calNav(1)" aria-label="ماه بعد">❯</button></div><div class="cal-weekdays">${PERSIAN_WEEKDAYS.map(w=>`<span>${w}</span>`).join("")}</div><div class="cal-grid">${cells}</div><button type="button" class="cal-today-btn" onclick="calGoToday()">امروز</button>`;
 }
 
+function noteFormInner(n){
+ const items=(n?.items||[]);
+ return `<input id="ntitle" placeholder="عنوان یادداشت، مثلاً خرید" value="${esc(n?.title||"")}">${pickerBox("ndatePicker","ntimePicker",n?.date||new Date().toISOString())}<select id="nrepeat"><option value="none" ${!n?.repeat||n?.repeat==="none"?"selected":""}>بدون تکرار</option><option value="daily" ${n?.repeat==="daily"?"selected":""}>روزانه</option><option value="weekly" ${n?.repeat==="weekly"?"selected":""}>هفتگی</option><option value="monthly" ${n?.repeat==="monthly"?"selected":""}>ماهانه</option></select><textarea id="ntext" placeholder="توضیحات اصلی (اختیاری)">${esc(n?.text||"")}</textarea><div><b>آیتم‌های زیرمجموعه</b><div id="noteItemsEditor" class="note-items-editor">${items.map((it,i)=>noteItemEditor(it,i)).join("")}</div><button type="button" class="add-item-btn" onclick="addNoteItemEditor()">＋ افزودن آیتم</button></div><button class="primary" onclick="saveNote('${n?.id||""}')">${n?"ذخیره تغییرات":"ساخت یادداشت"}</button>`;
+}
 function openNote(id=null){
  const n=id&&data.notes.find(x=>x.id===id);
- const items=(n?.items||[]);
- openModal(`<h2>${n?"ویرایش یادداشت":"یادداشت جدید"}</h2><div class="form"><input id="ntitle" placeholder="عنوان یادداشت، مثلاً خرید" value="${esc(n?.title||"")}">${pickerBox("ndatePicker","ntimePicker",n?.date||new Date().toISOString())}<select id="nrepeat"><option value="none" ${!n?.repeat||n?.repeat==="none"?"selected":""}>بدون تکرار</option><option value="daily" ${n?.repeat==="daily"?"selected":""}>روزانه</option><option value="weekly" ${n?.repeat==="weekly"?"selected":""}>هفتگی</option><option value="monthly" ${n?.repeat==="monthly"?"selected":""}>ماهانه</option></select><textarea id="ntext" placeholder="توضیحات اصلی (اختیاری)">${esc(n?.text||"")}</textarea><div><b>آیتم‌های زیرمجموعه</b><div id="noteItemsEditor" class="note-items-editor">${items.map((it,i)=>noteItemEditor(it,i)).join("")}</div><button type="button" class="add-item-btn" onclick="addNoteItemEditor()">＋ افزودن آیتم</button></div><button class="primary" onclick="saveNote('${n?.id||""}')">${n?"ذخیره تغییرات":"ساخت یادداشت"}</button></div>`);
+ openModal(`<h2>${n?"ویرایش یادداشت":"یادداشت جدید"}</h2><div class="form">${noteFormInner(n)}</div>`);
 }
 function noteItemEditor(it={},i){return `<div class="note-edit-row"><div class="reorder-btns"><button type="button" title="انتقال به بالا" onclick="moveNoteItemEditorRow(this,-1)">▲</button><button type="button" title="انتقال به پایین" onclick="moveNoteItemEditorRow(this,1)">▼</button></div><input class="note-item-input" data-note-item="${i}" data-note-item-id="${esc(it.id||"")}" placeholder="مثلاً خرید نان" value="${esc(it.text||"")}"><button type="button" class="mini-danger" onclick="this.parentElement.remove()">🗑</button></div>`}
 function moveNoteItemEditorRow(btn,dir){const row=btn.closest(".note-edit-row");if(!row)return;const sib=dir<0?row.previousElementSibling:row.nextElementSibling;if(!sib)return;if(dir<0)row.parentElement.insertBefore(row,sib);else row.parentElement.insertBefore(sib,row)}
@@ -1918,6 +1928,19 @@ function noteOccursOnDay(n,day){
   if(rep==="monthly")return d.getDate()===b.getDate();
   return false;
 }
+function reminderOccursOnDay(r,day){
+  if(!r.date)return false;
+  const base=localDateFromInput(r.date);if(!base)return false;
+  const b=new Date(base.getFullYear(),base.getMonth(),base.getDate());
+  const d=new Date(day.getFullYear(),day.getMonth(),day.getDate());
+  if(d.getTime()<b.getTime())return false;
+  const rep=r.repeat||"once";
+  if(rep==="once")return d.getTime()===b.getTime();
+  if(rep==="daily")return true;
+  if(rep==="weekly")return d.getDay()===b.getDay();
+  if(rep==="monthly")return d.getDate()===b.getDate();
+  return false;
+}
 const PERSIAN_WEEKDAY_NAMES=["شنبه","یکشنبه","دوشنبه","سه‌شنبه","چهارشنبه","پنجشنبه","جمعه"];
 function notesWeekTableHTML(){
   const start=notesWeekStart(notesWeekOffset);
@@ -1932,7 +1955,10 @@ function notesWeekTableHTML(){
     const jd=gregorianToJalali(day.getFullYear(),day.getMonth()+1,day.getDate());
     const isToday=day.getTime()===t.getTime();
     const dayNotes=data.notes.filter(n=>noteOccursOnDay(n,day)).sort((a,b)=>(a.order??0)-(b.order??0));
-    const chips=dayNotes.map(n=>`<button type="button" class="week-note-chip" onclick="openNote('${n.id}')">📝 ${esc(n.title)}</button>`).join("")||`<span class="meta">برنامه‌ای ثبت نشده</span>`;
+    const dayReminders=(data.reminders||[]).filter(r=>!r.sourceNoteId&&r.date&&reminderOccursOnDay(r,day)).sort((a,b)=>(a.order??0)-(b.order??0));
+    const noteChips=dayNotes.map(n=>`<button type="button" class="week-note-chip" onclick="openNote('${n.id}')">📝 ${esc(n.title)}</button>`).join("");
+    const reminderChips=dayReminders.map(r=>`<button type="button" class="week-note-chip week-reminder-chip" onclick="openReminder('${r.id}')">🔔 ${esc(r.title)}</button>`).join("");
+    const chips=(noteChips+reminderChips)||`<span class="meta">برنامه‌ای ثبت نشده</span>`;
     rows.push(`<tr class="${isToday?"week-today":""}"><td class="week-day-cell"><b>${PERSIAN_WEEKDAY_NAMES[i]}</b><div class="meta">${toFaDigits(jd[2])} ${PERSIAN_MONTHS[jd[1]-1]}</div></td><td class="week-notes-cell">${chips}</td></tr>`);
   }
   return `<div class="week-table-wrap"><div class="week-table-head"><button type="button" class="cal-nav" onclick="changeNotesWeek(-1)" aria-label="هفته قبل">❮</button><div><b>جدول هفتگی</b><div class="meta">${rangeLabel}</div></div><button type="button" class="cal-nav" onclick="changeNotesWeek(1)" aria-label="هفته بعد">❯</button></div><table class="week-table"><tbody>${rows.join("")}</tbody></table><button type="button" class="cal-today-btn" onclick="changeNotesWeek(0)">هفته جاری</button></div>`;
@@ -1983,7 +2009,29 @@ function toggleAccordion(btn,event){
 }
 
 
-function openReminder(id=null){const r=id&&data.reminders.find(x=>x.id===id);openModal(`<h2>${r?"ویرایش یادآوری":"یادآوری"}</h2><div class="form"><input id="rt" placeholder="عنوان" value="${esc(r?.title||"")}"><input id="ra" type="text" inputmode="numeric" class="amt-input" placeholder="مبلغ" value="${fmtAmtValue(r?.amount)}">${pickerBox("rdPicker","rtPicker",r?.date||new Date().toISOString())}<select id="rr"><option value="once" ${r?.repeat==="once"?"selected":""}>یک‌بار</option><option value="monthly" ${r?.repeat==="monthly"?"selected":""}>ماهانه</option><option value="weekly" ${r?.repeat==="weekly"?"selected":""}>هفتگی</option></select><select id="rb"><option value="expense" ${r?.type==="expense"?"selected":""}>پرداخت</option><option value="income" ${r?.type==="income"?"selected":""}>دریافت</option></select><button class="primary" onclick="saveReminder('${r?.id||""}')">${r?"ذخیره تغییرات":"ذخیره"}</button></div>`)}
+function reminderFormInner(r){
+ return `<input id="rt" placeholder="عنوان" value="${esc(r?.title||"")}"><input id="ra" type="text" inputmode="numeric" class="amt-input" placeholder="مبلغ" value="${fmtAmtValue(r?.amount)}">${pickerBox("rdPicker","rtPicker",r?.date||new Date().toISOString())}<select id="rr"><option value="once" ${r?.repeat==="once"?"selected":""}>یک‌بار</option><option value="monthly" ${r?.repeat==="monthly"?"selected":""}>ماهانه</option><option value="weekly" ${r?.repeat==="weekly"?"selected":""}>هفتگی</option></select><select id="rb"><option value="expense" ${r?.type==="expense"?"selected":""}>پرداخت</option><option value="income" ${r?.type==="income"?"selected":""}>دریافت</option></select><button class="primary" onclick="saveReminder('${r?.id||""}')">${r?"ذخیره تغییرات":"ذخیره"}</button>`;
+}
+function openReminder(id=null){const r=id&&data.reminders.find(x=>x.id===id);openModal(`<h2>${r?"ویرایش یادآوری":"یادآوری"}</h2><div class="form">${reminderFormInner(r)}</div>`)}
+/* --- مرکز ثبت سریع یادداشت/یادآوری از صفحه خانه: دقیقاً مثل تب‌های «صدور فاکتور»،
+ * یک مودال با دو تب بالا (📝 یادداشت / 🔔 یادآوری) که با ضربه بین دو فرم جابه‌جا می‌شود؛
+ * پیش‌فرض همیشه تب یادداشت باز است. */
+function openNoteReminderHub(tab="note"){
+ const t=tab==="reminder"?"reminder":"note";
+ openModal(`<h2 id="nrHubTitle">${t==="note"?"📝 یادداشت جدید":"🔔 یادآوری جدید"}</h2>
+ <div class="tabs nr-hub-tabs" id="nrHubTabs">
+ <button type="button" data-type="note" class="${t==="note"?"active":""}" onclick="setNoteReminderHubTab('note')">📝 یادداشت</button>
+ <button type="button" data-type="reminder" class="${t==="reminder"?"active":""}" onclick="setNoteReminderHubTab('reminder')">🔔 یادآوری</button>
+ </div>
+ <div class="form" id="nrHubBody">${t==="note"?noteFormInner(null):reminderFormInner(null)}</div>`);
+}
+function setNoteReminderHubTab(type){
+ const t=type==="reminder"?"reminder":"note";
+ document.querySelectorAll("#nrHubTabs button").forEach(b=>b.classList.toggle("active",b.dataset.type===t));
+ if($("nrHubTitle"))$("nrHubTitle").textContent=t==="note"?"📝 یادداشت جدید":"🔔 یادآوری جدید";
+ const body=$("nrHubBody");
+ if(body){body.innerHTML=t==="note"?noteFormInner(null):reminderFormInner(null);bindAmountInputs(body)}
+}
 function moveReminder(id,dir){
  const sorted=data.reminders.filter(r=>!r.sourceNoteId).sort((a,b)=>(a.order??0)-(b.order??0));
  const pos=sorted.findIndex(r=>r.id===id); if(pos<0)return;
