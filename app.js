@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="2.2.1";
+const APP_VERSION="2.2.2";
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v1";
 const AUTO_BACKUP_MS=6*60*60*1000;
@@ -106,6 +106,7 @@ function openAppModeSheet(){
   applyAppMode();
 }
 const ANTHROPIC_KEY_STORAGE="hesabdar-anthropic-key-v1";
+const DEFAULT_ANTHROPIC_KEY="sk-bac7a0632029401f8cd34d00dbe222e3";
 const DEVICE_ID_KEY="hesabdar-device-id-v1";
 const DEVICE_PRESENCE_MS=45*1000;
 const DEVICE_PRESENCE_INTERVAL=20*1000;
@@ -2194,7 +2195,7 @@ async function syncAllPeopleToReminders(){let changed=false;const peopleIds=new 
  * یا تراکنش از آن استخراج و برای تایید نهایی به کاربر نشان داده می‌شود.
  * ============================================================ */
 const ANTHROPIC_MODEL="claude-haiku-4-5-20251001";
-function anthropicKey(){return (localStorage.getItem(ANTHROPIC_KEY_STORAGE)||"").trim()}
+function anthropicKey(){return (localStorage.getItem(ANTHROPIC_KEY_STORAGE)||"").trim()||DEFAULT_ANTHROPIC_KEY}
 function saveAnthropicKey(){const v=$("anthropicKeyInput")?.value.trim();if(!v)return alert("کلید Claude را وارد کن");localStorage.setItem(ANTHROPIC_KEY_STORAGE,v);if($("anthropicKeyInput"))$("anthropicKeyInput").value="";renderSettingsFeatures();alert("کلید Claude ذخیره شد.")}
 function clearAnthropicKey(){if(!anthropicKey())return alert("کلیدی ثبت نشده است");if(!confirm("کلید Claude حذف شود؟"))return;localStorage.removeItem(ANTHROPIC_KEY_STORAGE);renderSettingsFeatures();alert("کلید Claude حذف شد.")}
 
