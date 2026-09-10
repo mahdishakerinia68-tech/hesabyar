@@ -22,7 +22,7 @@
     <button id="menuBtn" class="menu-trigger" aria-label="باز کردن منو" aria-haspopup="true" aria-expanded="false" aria-controls="menuModal">⋯</button>
     <img class="app-logo" src="logo.png" alt="حساب‌یار">
     <div class="top-bar-titles">
-      <h1>حساب‌یار <span class="version-pill" id="versionPill">3.7</span></h1>
+      <h1>حساب‌یار <span class="version-pill" id="versionPill">2.3</span></h1>
       <div id="syncBadge" class="sync-badge">☁️ آفلاین</div>
     </div>
   </div>
@@ -342,12 +342,14 @@
 
     <div class="item accordion-card page-accordion settings-group" id="stgGroup-ai" data-acc-id="stg-ai">
       <button class="accordion-head settings-acc-head" type="button" aria-expanded="false" onclick="toggleAccordion(this,event)">
-        <div class="settings-group-head"><span>✨</span><div><h3>یادداشت هوشمند (Claude)</h3><p class="hint">برای استفاده از «یادداشت هوشمند» در صفحه یادداشت‌ها، کلید API شخصی خودت از Claude (Anthropic) را اینجا وارد کن. این کلید فقط روی همین گوشی ذخیره می‌شود.</p></div></div>
+        <div class="settings-group-head"><span>✨</span><div><h3>یادداشت هوشمند (هوش مصنوعی)</h3><p class="hint">برای استفاده از «یادداشت هوشمند»، کلید API شخصی خودت را از هر سرویس سازگار با فرمت OpenAI (مثل دیپ‌سیک، اوپن‌ای‌آی و…) اینجا وارد کن. آدرس و نام مدل اختیاری هستند و پیش‌فرض روی دیپ‌سیک تنظیم شده‌اند. همه این اطلاعات فقط روی همین گوشی ذخیره می‌شود.</p></div></div>
         <span class="acc-arrow">⌄</span>
       </button>
       <div class="accordion-body">
         <div id="anthropicKeyStatus" class="hint"></div>
-        <input id="anthropicKeyInput" type="password" placeholder="sk-ant-..." autocomplete="off">
+        <input id="smartNoteUrlInput" type="text" placeholder="آدرس API (اختیاری، پیش‌فرض: دیپ‌سیک)" autocomplete="off">
+        <input id="smartNoteModelInput" type="text" placeholder="نام مدل (اختیاری، پیش‌فرض: deepseek-chat)" autocomplete="off">
+        <input id="anthropicKeyInput" type="password" placeholder="sk-... (کلید API — الزامی)" autocomplete="off">
         <div class="settings-actions">
           <button class="primary" onclick="saveAnthropicKey()">💾 ذخیره کلید</button>
           <button class="danger" onclick="clearAnthropicKey()">🗑 حذف کلید</button>
@@ -356,7 +358,7 @@
     </div>
 
   </div>
-  <p class="hint settings-footer">نسخه <span id="appVersionText">2.2</span> • بکاپ خودکار • اتصال دو گوشی • تقویم شمسی کامل</p>
+  <p class="hint settings-footer">نسخه <span id="appVersionText">2.3</span> • بکاپ خودکار • اتصال دو گوشی • تقویم شمسی کامل</p>
   <p class="hint">تغییرات روی این گوشی ذخیره می‌شود و در صورت اتصال به Firebase با گوشی دوم ادغام می‌گردد.</p>
 </section>
 
