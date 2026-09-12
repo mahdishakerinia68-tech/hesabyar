@@ -642,7 +642,8 @@ body:not(.dark) .reorder-btns button{background:var(--bg3)}
 .reorder-btns button:disabled{opacity:.3}
 .reorder-btns button:active{transform:scale(.9)}
 .note-edit-row{display:flex;align-items:center;gap:6px;margin-bottom:6px}
-.note-edit-row input{flex:1}
+.note-edit-row input.note-item-input{flex:1}
+.note-edit-row input.note-item-done{flex:none;width:20px;height:20px;accent-color:var(--blue)}
 
 /* ===== v5.5: AI enhance button for logo / stamp / signature ===== */
 .ai-enhance-row{display:flex;gap:8px;align-items:center;margin:6px 0 10px;flex-wrap:wrap}
