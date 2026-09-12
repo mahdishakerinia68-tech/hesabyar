@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="2.4";
+const APP_VERSION="2.5";
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v1";
 const AUTO_BACKUP_MS=6*60*60*1000;
@@ -566,7 +566,7 @@ function save(){
 function saveWithAttachments(records){
  if(persistLocal()){maybeAutoBackup("ذخیره زمان‌بندی‌شده");render();syncSave();return true}
  let stripped=false;
- (Array.isArray(records)?records:[records]).forEach(r=>{if(r&&(r.image||r.receipt)){delete r.image;delete r.receipt;stripped=true}});
+ (Array.isArray(records)?records:[records]).forEach(r=>{if(r&&(r.image||r.receipt||(r.images&&r.images.length))){delete r.image;delete r.receipt;delete r.images;stripped=true}});
  if(stripped&&persistLocal()){maybeAutoBackup("ذخیره زمان‌بندی‌شده");render();syncSave();alert("⚠️ حجم عکس پیوست بیش از فضای خالی دستگاه بود؛ اطلاعات بدون عکس ذخیره شد.");return true}
  alert(STORAGE_FULL_MSG);return false
 }
@@ -883,7 +883,13 @@ function showWhatsNewOnce(){
   <h2>🎉 به حساب‌یار خوش آمدی</h2>
   <p class="hint">این صفحه فقط یک‌بار در اولین اجرای این نسخه نمایش داده می‌شود.</p>
   <div class="whats-new-section">
-   <h3>🛠 تغییرات این نسخه (۲.۴)</h3>
+   <h3>🛠 تغییرات این نسخه (۲.۵)</h3>
+   <ul>
+    <li>📎 پیوست تراکنش حالا چند-عکسی شد: برای هر تراکنش (مثلاً هزینه‌ی تعمیرگاه) می‌توانی تا ۵ عکس با هم ذخیره کنی — مثلاً هم عکس فاکتور و هم عکس فیش واریزی را کنار هم نگه داری. از پنجره‌ی ثبت/ویرایش تراکنش عکس‌ها را یکی‌یکی یا چندتایی اضافه کن، هرکدام را جدا با ضربدر حذف کن، و در لیست تراکنش‌ها روی عکس بزن تا همه‌ی عکس‌های آن تراکنش را با هم ببینی.</li>
+   </ul>
+  </div>
+  <div class="whats-new-section">
+   <h3>🛠 تغییرات نسخه قبل (۲.۴)</h3>
    <ul>
     <li>حالا از داخل فرم ویرایش یادداشت و یادآوری (همون پنجره‌ای که با زدن روی یادداشت/یادآوری در جدول هفتگی باز می‌شود) یک دکمه «🗑 حذف» هم اضافه شد؛ یعنی دیگر لازم نیست برای حذف حتماً به لیست اصلی برگردی — همان‌جا هم می‌توانی حذف کنی و هم تغییرات را ذخیره کنی.</li>
     <li>آیتم‌های زیرمجموعه‌ی یادداشت، داخل همین فرم ویرایش، حالا کنار هر آیتم یک تیک (چک‌باکس) هم دارند؛ با تیک زدن یک آیتم و ذخیره‌ی فرم، همان آیتم در لیست یادداشت‌ها و در جدول هفتگی هم به‌صورت انجام‌شده (خط‌خورده) نشان داده می‌شود.</li>
@@ -1261,6 +1267,9 @@ function deleteAccount(id){const a=data.accounts.find(x=>x.id===id);if(!a)return
    parent of whatever is already selected auto-expands so editing a tx with a
    subcategory set doesn't look like nothing is picked. */
 let catExpand={expense:null,income:null};
+/* v3.12: چند-عکسی‌شدن پیوست تراکنش (حداکثر ۵ عکس) — وضعیت موقت فرم تراکنش باز */
+let txImagesTemp=[];
+const TX_IMAGES_MAX=5;
 function categoryButtons(type,selected=""){
   const arr=type==="expense"?data.expenseCats:data.incomeCats;
   if(catExpand[type]==null&&selected){
@@ -1279,7 +1288,7 @@ function categoryButtons(type,selected=""){
   }).join("")}</div><button type="button" class="cat-manage-link" onclick="openCategory()">⚙ مدیریت کامل دسته‌ها و زیرمجموعه‌ها</button>`;
 }
 function toggleCategoryExpand(type,id){catExpand[type]=catExpand[type]===id?null:id;refreshCategoryButtonsInTxForm(type)}
-function openTx(id=null){if(!data.accounts.length)return alert("اول از بخش حساب‌ها یک حساب اضافه کنید");const t=id&&data.transactions.find(x=>x.id===id);if(t?.type==="transfer")return openTransfer(id);const typ=t?.type||"expense";catExpand={expense:null,income:null};openModal(`<h2>${t?"ویرایش تراکنش":"ثبت تراکنش"}</h2><div class="form"><div class="type-switch"><button type="button" id="expBtn" class="${typ==="expense"?"chosen":""}" onclick="txType('expense')">💸 هزینه</button><button type="button" id="incBtn" class="${typ==="income"?"chosen":""}" onclick="txType('income')">💰 دریافت</button></div><input id="txKind" type="hidden" value="${typ}"><input id="title" placeholder="عنوان" value="${esc(t?.title||"")}"><input id="amount" type="text" inputmode="numeric" class="amt-input" placeholder="مبلغ" value="${fmtAmtValue(t?.amount)}"><div id="expensePanel" style="display:${typ==="expense"?"block":"none"}"><div class="cat-head-row"><b id="catLabel">${t?.category?"دسته: "+esc(t.category):"دسته را انتخاب کنید"}</b><div class="cat-toolbar"><button type="button" title="افزودن دسته" onclick="quickAddCategory('expense')">＋</button><button type="button" title="ویرایش دسته انتخاب‌شده" onclick="quickEditCategory('expense')">✏️</button><button type="button" title="حذف دسته انتخاب‌شده" class="danger-icon" onclick="quickDeleteCategory('expense')">🗑</button></div></div><div id="expenseCatButtons">${categoryButtons("expense",typ==="expense"?t?.category:"")}</div><input id="cat" type="hidden" value="${esc(typ==="expense"?t?.category||"":"")}"></div><div id="incomePanel" style="display:${typ==="income"?"block":"none"}"><div class="cat-head-row"><b id="incatLabel">${t?.category?"دسته: "+esc(t.category):"دسته را انتخاب کنید"}</b><div class="cat-toolbar"><button type="button" title="افزودن دسته" onclick="quickAddCategory('income')">＋</button><button type="button" title="ویرایش دسته انتخاب‌شده" onclick="quickEditCategory('income')">✏️</button><button type="button" title="حذف دسته انتخاب‌شده" class="danger-icon" onclick="quickDeleteCategory('income')">🗑</button></div></div><div id="incomeCatButtons">${categoryButtons("income",typ==="income"?t?.category:"")}</div><input id="incat" type="hidden" value="${esc(typ==="income"?t?.category||"":"")}"></div>${accountSelect("acc",t?.accountID||"")}<label class="hint" style="display:block;margin-top:8px">🔁 تکرار خودکار</label><select id="txRecur"><option value="none" ${!t?.recurring||t?.recurring==="none"?"selected":""}>بدون تکرار</option><option value="weekly" ${t?.recurring==="weekly"?"selected":""}>هفتگی</option><option value="monthly" ${t?.recurring==="monthly"?"selected":""}>ماهانه</option></select><label class="file-label">📎 تصویر پیوست (اختیاری)<input id="txImage" type="file" accept="image/*" onchange="previewTxImage(this)"></label>${t?.image?`<div class="attachment-preview"><img src="${t.image}" alt="پیوست"></div>`:""}<div id="txImagePreview"></div><button class="primary" onclick="saveTx('${t?.id||""}')">${t?"ذخیره تغییرات":"ثبت تراکنش"}</button></div>`)}
+function openTx(id=null){if(!data.accounts.length)return alert("اول از بخش حساب‌ها یک حساب اضافه کنید");const t=id&&data.transactions.find(x=>x.id===id);if(t?.type==="transfer")return openTransfer(id);const typ=t?.type||"expense";catExpand={expense:null,income:null};txImagesTemp=(t?.images&&t.images.length?t.images.slice(0,TX_IMAGES_MAX):(t?.image?[t.image]:[]));openModal(`<h2>${t?"ویرایش تراکنش":"ثبت تراکنش"}</h2><div class="form"><div class="type-switch"><button type="button" id="expBtn" class="${typ==="expense"?"chosen":""}" onclick="txType('expense')">💸 هزینه</button><button type="button" id="incBtn" class="${typ==="income"?"chosen":""}" onclick="txType('income')">💰 دریافت</button></div><input id="txKind" type="hidden" value="${typ}"><input id="title" placeholder="عنوان" value="${esc(t?.title||"")}"><input id="amount" type="text" inputmode="numeric" class="amt-input" placeholder="مبلغ" value="${fmtAmtValue(t?.amount)}"><div id="expensePanel" style="display:${typ==="expense"?"block":"none"}"><div class="cat-head-row"><b id="catLabel">${t?.category?"دسته: "+esc(t.category):"دسته را انتخاب کنید"}</b><div class="cat-toolbar"><button type="button" title="افزودن دسته" onclick="quickAddCategory('expense')">＋</button><button type="button" title="ویرایش دسته انتخاب‌شده" onclick="quickEditCategory('expense')">✏️</button><button type="button" title="حذف دسته انتخاب‌شده" class="danger-icon" onclick="quickDeleteCategory('expense')">🗑</button></div></div><div id="expenseCatButtons">${categoryButtons("expense",typ==="expense"?t?.category:"")}</div><input id="cat" type="hidden" value="${esc(typ==="expense"?t?.category||"":"")}"></div><div id="incomePanel" style="display:${typ==="income"?"block":"none"}"><div class="cat-head-row"><b id="incatLabel">${t?.category?"دسته: "+esc(t.category):"دسته را انتخاب کنید"}</b><div class="cat-toolbar"><button type="button" title="افزودن دسته" onclick="quickAddCategory('income')">＋</button><button type="button" title="ویرایش دسته انتخاب‌شده" onclick="quickEditCategory('income')">✏️</button><button type="button" title="حذف دسته انتخاب‌شده" class="danger-icon" onclick="quickDeleteCategory('income')">🗑</button></div></div><div id="incomeCatButtons">${categoryButtons("income",typ==="income"?t?.category:"")}</div><input id="incat" type="hidden" value="${esc(typ==="income"?t?.category||"":"")}"></div>${accountSelect("acc",t?.accountID||"")}<label class="hint" style="display:block;margin-top:8px">🔁 تکرار خودکار</label><select id="txRecur"><option value="none" ${!t?.recurring||t?.recurring==="none"?"selected":""}>بدون تکرار</option><option value="weekly" ${t?.recurring==="weekly"?"selected":""}>هفتگی</option><option value="monthly" ${t?.recurring==="monthly"?"selected":""}>ماهانه</option></select><label class="file-label">📎 تصویر پیوست (حداکثر ${fa(TX_IMAGES_MAX)} عکس)<input id="txImage" type="file" accept="image/*" multiple onchange="handleTxImageSelect(this)"></label><div id="txImagePreview">${txImagesPreviewHTML()}</div><button class="primary" onclick="saveTx('${t?.id||""}')">${t?"ذخیره تغییرات":"ثبت تراکنش"}</button></div>`)}
 function txType(t){$("txKind").value=t;$("expBtn").classList.toggle("chosen",t==="expense");$("incBtn").classList.toggle("chosen",t==="income");$("expensePanel").style.display=t==="expense"?"block":"none";$("incomePanel").style.display=t==="income"?"block":"none"}
 function pickCategory(type,id){const c=(type==="expense"?data.expenseCats:data.incomeCats).find(x=>x.id===id);if(!c)return;setCategoryValue(type,c.name)}
 function pickSubCategory(type,catId,childId){const c=(type==="expense"?data.expenseCats:data.incomeCats).find(x=>x.id===catId);const ch=c?.children?.find(x=>x.id===childId);if(!c||!ch)return;setCategoryValue(type,c.name+" - "+ch.name)}
@@ -1357,18 +1366,17 @@ async function saveTx(id){
  const amount=parseMoney($("amount").value),type=$("txKind").value,category=type==="expense"?$("cat").value:$("incat").value;
  if(!amount)return alert("مبلغ را وارد کنید");if(!category)return alert("دسته را انتخاب کنید");
  const recur=$("txRecur")?.value||"none";
- let image=null; const file=$("txImage")?.files?.[0];
- if(file){try{image=await compressImage(file,1000,.6)}catch(e){console.warn(e)}}
+ const images=txImagesTemp.slice(0,TX_IMAGES_MAX);
  let t;
  if(id){
   t=data.transactions.find(x=>x.id===id); if(!t)return;
   Object.assign(t,{title:$("title").value.trim()||category,amount,type,category,accountID:$("acc").value});
-  if(image)t.image=image;
+  delete t.image;if(images.length)t.images=images;else delete t.images;
   applyRecurSetting(t,recur);
   touch(t);markDirty("transactions",t.id,false,t,t.updatedAt);
  }else{
   t=touch({id:uid(),title:$("title").value.trim()||category,amount,type,category,accountID:$("acc").value,date:new Date().toISOString(),source:"manual"});
-  if(image)t.image=image;
+  if(images.length)t.images=images;
   applyRecurSetting(t,recur);
   data.transactions.unshift(t);markDirty("transactions",t.id,false,t,t.updatedAt);
  }
@@ -1412,10 +1420,28 @@ function compressImage(file,max=1200,quality=.72){
   };r.readAsDataURL(file)
  })
 }
-function previewTxImage(input){
- const f=input?.files?.[0],box=$("txImagePreview");if(!box||!f)return;
- const r=new FileReader();r.onload=()=>box.innerHTML=`<div class="attachment-preview"><img src="${r.result}" alt="پیش‌نمایش"></div>`;r.readAsDataURL(f)
+/* v3.12: انتخاب چند عکس برای پیوست تراکنش (حداکثر TX_IMAGES_MAX عکس)؛
+   عکس‌های قبلی (در ویرایش) و عکس‌های تازه انتخاب‌شده همه در txImagesTemp
+   نگه‌داری می‌شوند تا با یک دکمه ضربدر هرکدام جدا حذف شوند. */
+async function handleTxImageSelect(input){
+ const files=Array.from(input?.files||[]);input.value="";if(!files.length)return;
+ const remain=TX_IMAGES_MAX-txImagesTemp.length;
+ if(remain<=0){alert(`حداکثر ${fa(TX_IMAGES_MAX)} عکس می‌توانید پیوست کنید`);return}
+ const toAdd=files.slice(0,remain);
+ if(files.length>toAdd.length)alert(`فقط ${fa(toAdd.length)} عکس اضافه شد (سقف ${fa(TX_IMAGES_MAX)} عکس)`);
+ for(const f of toAdd){
+  try{txImagesTemp.push(await compressImage(f,1000,.6))}catch(e){console.warn(e)}
+ }
+ renderTxImagesPreview();
 }
+function removeTxImage(idx){txImagesTemp.splice(idx,1);renderTxImagesPreview()}
+function txImagesPreviewHTML(){
+ if(!txImagesTemp.length)return "";
+ const items=txImagesTemp.map((src,i)=>`<div class="tx-img-item"><img src="${src}" alt="پیوست ${fa(i+1)}"><button type="button" class="tx-img-remove" title="حذف این عکس" onclick="removeTxImage(${i})">✕</button></div>`).join("");
+ const counter=`<div class="tx-images-count">${fa(txImagesTemp.length)} از ${fa(TX_IMAGES_MAX)} عکس</div>`;
+ return `<div class="tx-images-grid">${items}</div>${counter}`;
+}
+function renderTxImagesPreview(){const box=$("txImagePreview");if(box)box.innerHTML=txImagesPreviewHTML()}
 function openBankMessage(){
   if(!data.accounts.length)return alert("ابتدا یک حساب اضافه کنید");
   openModal(`<h2>🏦 تشخیص پیامک بانکی</h2><div class="form">
@@ -2352,8 +2378,9 @@ function transferItemHTML(t){
  }
  return `<div class="item"><div><b>↔ ${esc(t.title)}</b><div class="meta">از ${esc(data.accounts.find(a=>a.id===t.from)?.name||"")} ← ${destLabel}</div><div class="meta">${jalaliDateTimeInput(t.date)}</div></div><div><strong>${money(t.amount)}</strong>${actionButtons("openTransfer","deleteTx",t.id)}</div></div>`;
 }
-function txHTML(t){if(t.type==="transfer")return transferItemHTML(t);let a=data.accounts.find(x=>x.id===t.accountID),sign=t.type==="income"?"+":"−";const recurBadge=t.recurring&&t.recurring!=="none"?` • 🔁 ${t.recurring==="monthly"?"ماهانه":"هفتگی"}`:t.source==="recurring"?" • 🔁 خودکار":"";return `<div class="item"><div><b>${esc(t.title)}</b><div class="meta">${esc(t.category||"")} • ${a?esc(a.name):""} • ${t.source==="bank"?"بانکی":t.source==="recurring"?"تکرارشونده":"دستی"}${recurBadge}</div><div class="meta">${jalaliDateTimeInput(t.date)}</div>${t.image?`<img class="tx-thumb" src="${t.image}" alt="پیوست" onclick="viewImage('${t.id}')">`:""}</div><div><strong class="${t.type}">${sign}${money(t.amount)}</strong>${actionButtons("openTx","deleteTx",t.id)}</div></div>`}
-function viewImage(id){const t=data.transactions.find(x=>x.id===id);if(!t?.image)return;openModal(`<h2>📎 تصویر پیوست</h2><div class="attachment-large"><img src="${t.image}" alt="پیوست"></div>`)}
+function txImagesOf(t){return (t?.images&&t.images.length)?t.images:(t?.image?[t.image]:[])}
+function txHTML(t){if(t.type==="transfer")return transferItemHTML(t);let a=data.accounts.find(x=>x.id===t.accountID),sign=t.type==="income"?"+":"−";const recurBadge=t.recurring&&t.recurring!=="none"?` • 🔁 ${t.recurring==="monthly"?"ماهانه":"هفتگی"}`:t.source==="recurring"?" • 🔁 خودکار":"";const imgs=txImagesOf(t);const thumb=imgs.length?`<div class="tx-thumb-wrap" onclick="viewImage('${t.id}')"><img class="tx-thumb" src="${imgs[0]}" alt="پیوست">${imgs.length>1?`<span class="tx-thumb-count">${fa(imgs.length)}</span>`:""}</div>`:"";return `<div class="item"><div><b>${esc(t.title)}</b><div class="meta">${esc(t.category||"")} • ${a?esc(a.name):""} • ${t.source==="bank"?"بانکی":t.source==="recurring"?"تکرارشونده":"دستی"}${recurBadge}</div><div class="meta">${jalaliDateTimeInput(t.date)}</div>${thumb}</div><div><strong class="${t.type}">${sign}${money(t.amount)}</strong>${actionButtons("openTx","deleteTx",t.id)}</div></div>`}
+function viewImage(id){const t=data.transactions.find(x=>x.id===id);const imgs=txImagesOf(t);if(!imgs.length)return;openModal(`<h2>📎 تصویر${imgs.length>1?"‌های":""} پیوست (${fa(imgs.length)})</h2><div class="attachment-large tx-gallery">${imgs.map(src=>`<img src="${src}" alt="پیوست">`).join("")}</div>`)}
 function empty(s){return `<div class="card" style="text-align:center">${s}</div>`}
 
 function invoiceDateLabel(v){return jalaliLabel(v)}
