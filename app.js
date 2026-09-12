@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="2.5";
+const APP_VERSION="2.6.0";
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v1";
 const AUTO_BACKUP_MS=6*60*60*1000;
@@ -1780,7 +1780,7 @@ function pickInstallmentReceipt(personId,instId){
 }
 function viewInstallmentImage(personId,instId){
   const p=data.people.find(x=>x.id===personId);const it=p?.installments?.items.find(x=>x.id===instId);if(!it?.receipt)return;
-  openModal(`<h2>📎 عکس رسید قسط</h2><div class="attachment-large"><img src="${it.receipt}" alt="رسید"></div>`);
+  imageViewerOpen([it.receipt],0);
 }
 function toggleInstallment(personId,instId){
   const p=data.people.find(x=>x.id===personId);if(!p?.installments)return;
@@ -2380,7 +2380,89 @@ function transferItemHTML(t){
 }
 function txImagesOf(t){return (t?.images&&t.images.length)?t.images:(t?.image?[t.image]:[])}
 function txHTML(t){if(t.type==="transfer")return transferItemHTML(t);let a=data.accounts.find(x=>x.id===t.accountID),sign=t.type==="income"?"+":"−";const recurBadge=t.recurring&&t.recurring!=="none"?` • 🔁 ${t.recurring==="monthly"?"ماهانه":"هفتگی"}`:t.source==="recurring"?" • 🔁 خودکار":"";const imgs=txImagesOf(t);const thumb=imgs.length?`<div class="tx-thumb-wrap" onclick="viewImage('${t.id}')"><img class="tx-thumb" src="${imgs[0]}" alt="پیوست">${imgs.length>1?`<span class="tx-thumb-count">${fa(imgs.length)}</span>`:""}</div>`:"";return `<div class="item"><div><b>${esc(t.title)}</b><div class="meta">${esc(t.category||"")} • ${a?esc(a.name):""} • ${t.source==="bank"?"بانکی":t.source==="recurring"?"تکرارشونده":"دستی"}${recurBadge}</div><div class="meta">${jalaliDateTimeInput(t.date)}</div>${thumb}</div><div><strong class="${t.type}">${sign}${money(t.amount)}</strong>${actionButtons("openTx","deleteTx",t.id)}</div></div>`}
-function viewImage(id){const t=data.transactions.find(x=>x.id===id);const imgs=txImagesOf(t);if(!imgs.length)return;openModal(`<h2>📎 تصویر${imgs.length>1?"‌های":""} پیوست (${fa(imgs.length)})</h2><div class="attachment-large tx-gallery">${imgs.map(src=>`<img src="${src}" alt="پیوست">`).join("")}</div>`)}
+let imageViewerState={imgs:[],index:0,scale:1,x:0,y:0,startDist:0,startScale:1,startX:0,startY:0,dragX:0,dragY:0};
+function imageViewerRender(){
+ const img=$("imageViewerImg"),count=$("imageViewerCount"); if(!img)return;
+ const src=imageViewerState.imgs[imageViewerState.index]; img.src=src; imageViewerReset(false);
+ if(count)count.textContent=`${fa(imageViewerState.index+1)} / ${fa(imageViewerState.imgs.length)}`;
+ const prev=$("imageViewerPrev"),next=$("imageViewerNext"); if(prev)prev.disabled=imageViewerState.index===0; if(next)next.disabled=imageViewerState.index===imageViewerState.imgs.length-1;
+}
+function imageViewerApply(){const img=$("imageViewerImg");if(img)img.style.transform=`translate3d(${imageViewerState.x}px,${imageViewerState.y}px,0) scale(${imageViewerState.scale})`;const z=$("imageViewerZoomLabel");if(z)z.textContent=`${Math.round(imageViewerState.scale*100)}٪`;}
+function imageViewerReset(){imageViewerState.scale=1;imageViewerState.x=0;imageViewerState.y=0;imageViewerApply()}
+function imageViewerZoom(delta){imageViewerState.scale=Math.max(1,Math.min(5,imageViewerState.scale+delta));if(imageViewerState.scale===1){imageViewerState.x=0;imageViewerState.y=0}imageViewerApply()}
+function imageViewerPan(dx,dy){if(imageViewerState.scale<=1)return;imageViewerState.x+=dx;imageViewerState.y+=dy;imageViewerApply()}
+function imageViewerPrev(){if(imageViewerState.index>0){imageViewerState.index--;imageViewerRender()}}
+function imageViewerNext(){if(imageViewerState.index<imageViewerState.imgs.length-1){imageViewerState.index++;imageViewerRender()}}
+function imageViewerOpen(imgs,index=0){
+ imageViewerState={imgs,index,scale:1,x:0,y:0,startDist:0,startScale:1,startX:0,startY:0,dragX:0,dragY:0};
+ openModal(`<div class="image-viewer"><div class="image-viewer-head"><b>📎 مشاهده عکس</b><span id="imageViewerCount"></span></div><div id="imageViewerStage" class="image-viewer-stage"><img id="imageViewerImg" alt="پیوست" draggable="false"></div><div class="image-viewer-tools"><button type="button" onclick="imageViewerZoom(-0.25)">−</button><span id="imageViewerZoomLabel">100٪</span><button type="button" onclick="imageViewerZoom(0.25)">＋</button><button type="button" onclick="imageViewerReset()">↺</button><button type="button" onclick="downloadViewedImage()">⬇️ ذخیره عکس</button></div><div class="image-viewer-nav"><button id="imageViewerPrev" type="button" onclick="imageViewerPrev()">‹ قبلی</button><button id="imageViewerNext" type="button" onclick="imageViewerNext()">بعدی ›</button></div><p class="hint image-viewer-hint">با دو انگشت زوم کن و با یک انگشتِ عکسِ زوم‌شده را جابه‌جا کن.</p></div>`);
+ imageViewerRender();
+ const stage=$("imageViewerStage"); if(stage){
+  stage.style.touchAction="none";
+  const pointers=new Map();
+  let lastPinchDistance=0;
+  let pinchActive=false;
+  stage.addEventListener("wheel",e=>{e.preventDefault();imageViewerZoom(e.deltaY<0?.2:-.2)},{passive:false});
+  stage.addEventListener("pointerdown",e=>{
+   pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+   stage.setPointerCapture?.(e.pointerId);
+   if(pointers.size===2){
+    const pts=[...pointers.values()];
+    lastPinchDistance=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);
+    pinchActive=true;
+   }else if(pointers.size===1){
+    imageViewerState.dragX=e.clientX;imageViewerState.dragY=e.clientY;
+   }
+  });
+  stage.addEventListener("pointermove",e=>{
+   if(!pointers.has(e.pointerId))return;
+   pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+   if(pointers.size>=2){
+    const pts=[...pointers.values()];
+    const dist=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);
+    if(lastPinchDistance>0){
+     const factor=dist/lastPinchDistance;
+     const next=Math.max(1,Math.min(5,imageViewerState.scale*factor));
+     imageViewerState.scale=next;
+     if(next===1){imageViewerState.x=0;imageViewerState.y=0}
+     imageViewerApply();
+    }
+    lastPinchDistance=dist;
+    pinchActive=true;
+    return;
+   }
+   if(pointers.size===1 && !pinchActive && e.buttons===1){
+    const dx=e.clientX-imageViewerState.dragX,dy=e.clientY-imageViewerState.dragY;
+    imageViewerState.dragX=e.clientX;imageViewerState.dragY=e.clientY;imageViewerPan(dx,dy);
+   }
+  });
+  const endPointer=e=>{
+   pointers.delete(e.pointerId);
+   if(pointers.size<2)lastPinchDistance=0;
+   if(pointers.size===0)pinchActive=false;
+   try{stage.releasePointerCapture?.(e.pointerId)}catch(_){ }
+   if(pointers.size===1){const p=[...pointers.values()][0];imageViewerState.dragX=p.x;imageViewerState.dragY=p.y;pinchActive=false;}
+  };
+  stage.addEventListener("pointerup",endPointer);stage.addEventListener("pointercancel",endPointer);stage.addEventListener("pointerleave",()=>{});
+ }
+}
+async function downloadViewedImage(){
+ const src=imageViewerState.imgs[imageViewerState.index]; if(!src)return;
+ const filename=`hesabdar-image-${Date.now()}.jpg`;
+ try{
+  const fs=filesystemPlugin();
+  if(fs && src.startsWith("data:")){
+   const base64=src.split(",")[1];
+   await fs.writeFile({path:`Download/حسابداری/عکس‌ها/${filename}`,data:base64,directory:AUTO_BACKUP_DIRECTORY,recursive:true});
+   alert("عکس با موفقیت در پوشه Download/حسابداری/عکس‌ها ذخیره شد."); return;
+  }
+ }catch(e){console.warn("native image save failed",e)}
+ try{
+  const a=document.createElement("a");a.href=src;a.download=filename;a.target="_blank";document.body.appendChild(a);a.click();a.remove();
+  alert("عکس برای ذخیره/دانلود آماده شد. در آیفون در صورت نمایش عکس، گزینه Share > Save Image را بزن.");
+ }catch(e){alert("ذخیره عکس انجام نشد.")}
+}
+function viewImage(id){const t=data.transactions.find(x=>x.id===id);const imgs=txImagesOf(t);if(!imgs.length)return;imageViewerOpen(imgs,0)}
 function empty(s){return `<div class="card" style="text-align:center">${s}</div>`}
 
 function invoiceDateLabel(v){return jalaliLabel(v)}

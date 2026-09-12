@@ -740,3 +740,16 @@ button,.nav,a,input,select,textarea{touch-action:manipulation}
  #invoicePreview,#invoicePreview *{visibility:visible}
  #invoicePreview{position:absolute;inset:0;margin:0;box-shadow:none;border:none}
 }
+
+/* ===== Image viewer: zoom / pan / save ===== */
+.image-viewer{width:min(100%,520px);display:flex;flex-direction:column;gap:10px}
+.image-viewer-head{display:flex;justify-content:space-between;align-items:center;font-size:15px}
+.image-viewer-stage{height:min(62vh,560px);min-height:300px;background:#000;border-radius:16px;overflow:hidden;display:flex;align-items:center;justify-content:center;touch-action:none;position:relative}
+.image-viewer-stage img{max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;transform-origin:center center;transition:transform .12s ease;user-select:none;-webkit-user-drag:none;will-change:transform}
+.image-viewer-tools{display:flex;align-items:center;justify-content:center;gap:7px;flex-wrap:wrap}
+.image-viewer-tools button,.image-viewer-nav button{border:none;background:var(--bg3);color:var(--label);border-radius:10px;min-height:38px;padding:0 12px;font:inherit;font-size:13px}
+.image-viewer-tools button:last-child{background:var(--blue);color:#fff;font-weight:700}
+.image-viewer-tools span{min-width:48px;text-align:center;font-size:12px;color:var(--label2)}
+.image-viewer-nav{display:flex;justify-content:space-between;gap:8px}.image-viewer-nav button{flex:1}
+.image-viewer-nav button:disabled{opacity:.35}
+.image-viewer-hint{text-align:center;margin:0}
