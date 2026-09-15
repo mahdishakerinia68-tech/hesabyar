@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="2.7.0";
+const APP_VERSION="2.7.1";
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v1";
 const AUTO_BACKUP_MS=6*60*60*1000;
@@ -884,7 +884,14 @@ function showWhatsNewOnce(){
   <h2>🎉 به حساب‌یار خوش آمدی</h2>
   <p class="hint">این صفحه فقط یک‌بار در اولین اجرای این نسخه نمایش داده می‌شود.</p>
   <div class="whats-new-section">
-   <h3>🛠 تغییرات این نسخه (۲.۷)</h3>
+   <h3>🛠 تغییرات این نسخه (۲.۷.۱)</h3>
+   <ul>
+    <li>✓ در چک‌لیستِ یادداشت‌ها، به‌محض تیک خوردن یک آیتم، دیگر خط‌خورده وسط لیست نمی‌ماند — از دید کنار می‌رود و زیر یک دکمهٔ «✓ تکمیل‌شده» جمع می‌شود تا لیست شلوغ نشود؛ با زدن همان دکمه هر وقت خواستی می‌توانی موارد انجام‌شده را دوباره ببینی یا تیکشان را بردار.</li>
+    <li>🎨 چهرهٔ اپ کمی خاص‌تر شد: کارت بالای صفحه (خانه) و کارت‌های یادداشت طرح تازه‌ای گرفتند و چک‌باکس آیتم‌های یادداشت هم به‌جای چک‌باکس معمولی مرورگر، یک نشان دایره‌ای مُهرمانند دارد.</li>
+   </ul>
+  </div>
+  <div class="whats-new-section">
+   <h3>🛠 تغییرات نسخه قبل (۲.۷)</h3>
    <ul>
     <li>⏰ جدول هفتگی یادداشت‌ها و یادآوری‌ها حالا کنار هر آیتم ساعتش را هم نشان می‌دهد و برنامه‌های هر روز بر اساس همان ساعت مرتب می‌شوند؛ یعنی هرچه زودتر باشد بالاتر از بقیه‌ی همان روز می‌نشیند.</li>
    </ul>
@@ -1928,13 +1935,36 @@ async function saveNote(id){
  else{const minOrder=data.notes.length?Math.min(...data.notes.map(n=>n.order??0)):0;const nn=touch({id:uid(),order:minOrder-1,...o});data.notes.unshift(nn);markDirty("notes",nn.id,false,nn,nn.updatedAt);save();await upsertReminderForNote(nn)}
  logEvent(id?"ویرایش یادداشت":"ایجاد یادداشت",title,id?"edit":"create");closeModal();
 }
-async function toggleNoteItem(noteId,itemId){const n=data.notes.find(x=>x.id===noteId);const it=n?.items?.find(x=>x.id===itemId);if(!it)return;it.done=!it.done;touch(n);markDirty("notes",n.id,false,n,n.updatedAt);localStorage.setItem(KEY,JSON.stringify(data));syncSave();await upsertReminderForNote(n,false);logEvent(it.done?"تکمیل آیتم یادداشت":"بازگردانی آیتم یادداشت",`${n.title} • ${it.text}`,"edit");const row=document.querySelector(`[data-note-row="${CSS.escape(itemId)}"]`);if(row){const span=row.querySelector("span");if(span)span.classList.toggle("done",it.done);const cb=row.querySelector("input[type=checkbox]");if(cb)cb.checked=it.done}const card=document.querySelector(`[data-note-card="${CSS.escape(noteId)}"]`);if(card){const total=(n.items||[]).length,done=(n.items||[]).filter(x=>x.done).length;const count=card.querySelector(".note-count");if(count)count.textContent=total?`${fa(done)} / ${fa(total)}`:""}}
+/* v2.7.1: تیک‌خوردن یک آیتم دیگر فقط خط‌خورده نشانش نمی‌دهد — چون در یادداشت‌های
+   بلند همین باقی‌ماندن آیتم‌های انجام‌شده در لیست باعث شلوغی می‌شد. حالا به‌محض تیک
+   خوردن، آیتم از لیست اصلی کنار می‌رود و زیر یک دکمهٔ جمع‌وجورِ «✓ تکمیل‌شده (n)»
+   مخفی می‌شود؛ با زدن همان دکمه می‌شود لیست تکمیل‌شده‌ها را باز/بسته کرد یا از آنجا
+   تیک را برداشت. خودِ آیتم هیچ‌وقت واقعاً حذف نمی‌شود، فقط از دید پنهان می‌شود. */
+const doneListOpen=new Set();
+function toggleDoneList(noteId){
+ if(doneListOpen.has(noteId))doneListOpen.delete(noteId);else doneListOpen.add(noteId);
+ const n=data.notes.find(x=>x.id===noteId);const card=document.querySelector(`[data-note-card="${CSS.escape(noteId)}"]`);
+ if(card&&n){const list=card.querySelector(".note-checklist");if(list)list.innerHTML=noteChecklistHTML(n)}
+}
+function noteChecklistHTML(n){
+ const items=n.items||[];
+ if(!items.length)return '<div class="meta">هنوز آیتمی اضافه نشده</div>';
+ const pending=items.filter(x=>!x.done),done=items.filter(x=>x.done);
+ const showDone=doneListOpen.has(n.id);
+ let html=pending.length?pending.map(it=>noteItemHTML(n,it,items.indexOf(it),items.length)).join(''):(done.length?'<div class="meta note-all-done">✓ همه آیتم‌ها انجام شد</div>':'');
+ if(done.length){
+  html+=`<button type="button" class="note-done-toggle" onclick="event.stopPropagation();toggleDoneList('${n.id}')">${showDone?'▲ پنهان کردن':'✓ تکمیل‌شده'} (${fa(done.length)})</button>`;
+  if(showDone)html+='<div class="note-done-list">'+done.map(it=>noteItemHTML(n,it,items.indexOf(it),items.length)).join('')+'</div>';
+ }
+ return html;
+}
+async function toggleNoteItem(noteId,itemId){const n=data.notes.find(x=>x.id===noteId);const it=n?.items?.find(x=>x.id===itemId);if(!it)return;it.done=!it.done;touch(n);markDirty("notes",n.id,false,n,n.updatedAt);localStorage.setItem(KEY,JSON.stringify(data));syncSave();await upsertReminderForNote(n,false);logEvent(it.done?"تکمیل آیتم یادداشت":"بازگردانی آیتم یادداشت",`${n.title} • ${it.text}`,"edit");const card=document.querySelector(`[data-note-card="${CSS.escape(noteId)}"]`);if(card){const list=card.querySelector(".note-checklist");if(list)list.innerHTML=noteChecklistHTML(n);const total=(n.items||[]).length,doneCount=(n.items||[]).filter(x=>x.done).length;const count=card.querySelector(".note-count");if(count)count.textContent=total?`${fa(doneCount)} / ${fa(total)}`:""}}
 async function deleteNote(id){if(confirm("این یادداشت و همه آیتم‌های آن حذف شود؟")){const n=data.notes.find(x=>x.id===id);await removeReminderForNote(id);removeRecord("notes",id);logEvent("حذف یادداشت",n?.title||id,"delete");closeModal()}}
-async function deleteNoteItem(noteId,itemId){const n=data.notes.find(x=>x.id===noteId);if(!n)return;if(confirm("این آیتم حذف شود؟")){n.items=(n.items||[]).filter(x=>x.id!==itemId);touch(n);markDirty("notes",n.id,false,n,n.updatedAt);localStorage.setItem(KEY,JSON.stringify(data));syncSave();await upsertReminderForNote(n,false);logEvent("حذف آیتم یادداشت",n.title,"delete");const row=document.querySelector(`[data-note-row="${CSS.escape(itemId)}"]`);if(row)row.remove();const card=document.querySelector(`[data-note-card="${CSS.escape(noteId)}"]`);if(card){const total=(n.items||[]).length,done=(n.items||[]).filter(x=>x.done).length;const count=card.querySelector(".note-count");if(count)count.textContent=total?`${fa(done)} / ${fa(total)}⌄`:"⌄";const list=card.querySelector(".note-checklist");if(list&&!total)list.innerHTML='<div class="meta">هنوز آیتمی اضافه نشده</div>';}}}
+async function deleteNoteItem(noteId,itemId){const n=data.notes.find(x=>x.id===noteId);if(!n)return;if(confirm("این آیتم حذف شود؟")){n.items=(n.items||[]).filter(x=>x.id!==itemId);touch(n);markDirty("notes",n.id,false,n,n.updatedAt);localStorage.setItem(KEY,JSON.stringify(data));syncSave();await upsertReminderForNote(n,false);logEvent("حذف آیتم یادداشت",n.title,"delete");const card=document.querySelector(`[data-note-card="${CSS.escape(noteId)}"]`);if(card){const total=(n.items||[]).length,doneCount=(n.items||[]).filter(x=>x.done).length;const count=card.querySelector(".note-count");if(count)count.textContent=total?`${fa(doneCount)} / ${fa(total)}`:"";const list=card.querySelector(".note-checklist");if(list)list.innerHTML=noteChecklistHTML(n)}}}
 function noteRepeatLabel(r){return r==="daily"?"روزانه":r==="weekly"?"هفتگی":r==="monthly"?"ماهانه":"بدون تکرار"}
 function noteItemHTML(n,it,i,total){
  const moveBtns=total>1?'<div class="reorder-btns" onclick="event.stopPropagation()"><button type="button" title="انتقال به بالا" '+(i===0?'disabled':'')+' onclick="event.stopPropagation();moveNoteItem(\''+n.id+'\',\''+it.id+'\',-1)">▲</button><button type="button" title="انتقال به پایین" '+(i===total-1?'disabled':'')+' onclick="event.stopPropagation();moveNoteItem(\''+n.id+'\',\''+it.id+'\',1)">▼</button></div>':'';
- return '<div class="note-check-row" data-note-row="'+esc(it.id)+'" onclick="event.stopPropagation()">'+moveBtns+'<label onclick="event.stopPropagation()"><input type="checkbox" '+(it.done?'checked':'')+' onclick="event.stopPropagation()" onchange="toggleNoteItem(\''+n.id+'\',\''+it.id+'\')"><span class="'+(it.done?'done':'')+'">'+esc(it.text)+'</span></label><button type="button" class="mini-danger note-item-delete" title="حذف آیتم" onclick="event.stopPropagation();deleteNoteItem(\''+n.id+'\',\''+it.id+'\')">×</button></div>';
+ return '<div class="note-check-row" data-note-row="'+esc(it.id)+'" onclick="event.stopPropagation()">'+moveBtns+'<label class="note-check-label" onclick="event.stopPropagation()"><input type="checkbox" '+(it.done?'checked':'')+' onclick="event.stopPropagation()" onchange="toggleNoteItem(\''+n.id+'\',\''+it.id+'\')"><span class="note-check-mark"></span><span class="'+(it.done?'done':'')+'">'+esc(it.text)+'</span></label><button type="button" class="mini-danger note-item-delete" title="حذف آیتم" onclick="event.stopPropagation();deleteNoteItem(\''+n.id+'\',\''+it.id+'\')">×</button></div>';
 }
 async function moveNoteItem(noteId,itemId,dir){
  const n=data.notes.find(x=>x.id===noteId); if(!n||!n.items)return;
@@ -2016,7 +2046,6 @@ function notesWeekTableHTML(){
 const openAccordions=new Set();
 function noteHTML(n,pos){
  const items=n.items||[];
- const list=items.length?items.map((it,i)=>noteItemHTML(n,it,i,items.length)).join(''):'<div class="meta">هنوز آیتمی اضافه نشده</div>';
  const alarm=n.date?`<div class="meta note-alarm">⏰ آلارم جداگانه: ${jalaliDateTimeInput(n.date)} • ${noteRepeatLabel(n.repeat)}</div>`:'<div class="meta note-alarm">بدون آلارم</div>';
  const accId="note-"+n.id;const isOpen=openAccordions.has(accId);
  /* The header (this note card's own position among other notes) needs its
@@ -2024,7 +2053,7 @@ function noteHTML(n,pos){
   * collapsed accordion body, where only the checklist sub-items live.
   * So these sit in a row alongside the collapse button itself. */
  const moveBtns=pos?`<div class="reorder-btns note-head-move" onclick="event.stopPropagation()"><button type="button" title="انتقال یادداشت به بالا" ${pos.i===0?"disabled":""} onclick="event.stopPropagation();moveNote('${n.id}',-1)">▲</button><button type="button" title="انتقال یادداشت به پایین" ${pos.i===pos.total-1?"disabled":""} onclick="event.stopPropagation();moveNote('${n.id}',1)">▼</button></div>`:"";
- return `<div class="note-card item accordion-card${isOpen?' open':''}" data-note-card="${esc(n.id)}" data-acc-id="${accId}"><div class="accordion-head-row">${moveBtns}<button class="accordion-head" type="button" aria-expanded="${isOpen}" onclick="toggleAccordion(this,event)"><span><span class="note-badge">📝</span> <b>${esc(n.title)}</b></span><span class="note-count">${items.length?fa(items.filter(x=>x.done).length)+' / '+fa(items.length):''}</span><span class="acc-arrow">⌄</span></button></div><div class="accordion-body"><div class="note-main">${n.text?'<div class="meta note-text">'+esc(n.text)+'</div>':''}${alarm}<div class="note-checklist">${list}</div></div><div class="note-actions">${actionButtons('openNote','deleteNote',n.id)}</div></div></div>`;
+ return `<div class="note-card item accordion-card${isOpen?' open':''}" data-note-card="${esc(n.id)}" data-acc-id="${accId}"><div class="accordion-head-row">${moveBtns}<button class="accordion-head" type="button" aria-expanded="${isOpen}" onclick="toggleAccordion(this,event)"><span><span class="note-badge">📝</span> <b>${esc(n.title)}</b></span><span class="note-count">${items.length?fa(items.filter(x=>x.done).length)+' / '+fa(items.length):''}</span><span class="acc-arrow">⌄</span></button></div><div class="accordion-body"><div class="note-main">${n.text?'<div class="meta note-text">'+esc(n.text)+'</div>':''}${alarm}<div class="note-checklist">${noteChecklistHTML(n)}</div></div><div class="note-actions">${actionButtons('openNote','deleteNote',n.id)}</div></div></div>`;
 }
 function moveNote(id,dir){
  const sorted=[...data.notes].sort((a,b)=>(a.order??0)-(b.order??0));
