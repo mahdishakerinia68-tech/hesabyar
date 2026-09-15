@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="2.6.0";
+const APP_VERSION="2.7.0";
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v1";
 const AUTO_BACKUP_MS=6*60*60*1000;
@@ -322,6 +322,7 @@ async function addToAndroidClock(r){const p=getNativeSystemAlarm();if(!p||!r?.da
 function getNativeLocalNotifications(){try{if(nativeNotifications)return nativeNotifications;const p=globalThis.Capacitor?.Plugins?.LocalNotifications;if(p&&typeof p.schedule==="function")nativeNotifications=p;return nativeNotifications}catch(e){return null}}
 function notificationIdForReminder(id){let h=0;for(const ch of String(id||""))h=((h<<5)-h+ch.charCodeAt(0))|0;return NATIVE_NOTIFICATION_ID_PREFIX+(Math.abs(h)%100000000)}
 function localDateFromInput(v){if(!v)return null;const d=new Date(v);return Number.isNaN(d.getTime())?null:d}
+function timeFa(v){const d=localDateFromInput(v);if(!d)return '';return `${toFaDigits(String(d.getHours()).padStart(2,'0'))}:${toFaDigits(String(d.getMinutes()).padStart(2,'0'))}`}
 function addMonthsSafe(d,n){const out=new Date(d.getTime()),day=out.getDate();out.setDate(1);out.setMonth(out.getMonth()+n);const last=new Date(out.getFullYear(),out.getMonth()+1,0).getDate();out.setDate(Math.min(day,last));return out}
 function nextReminderDate(r,now=new Date()){let d=localDateFromInput(r?.date);if(!d)return null;const rep=r.repeat||"once";if(rep==="once")return d>now?d:null;let guard=0;while(d<=now&&guard++<500){if(rep==="daily")d=new Date(d.getTime()+86400000);else if(rep==="weekly")d=new Date(d.getTime()+7*86400000);else if(rep==="monthly")d=addMonthsSafe(d,1);else return null}return d>now?d:null}
 async function cancelNativeReminder(id){const p=getNativeLocalNotifications();if(!p)return;try{await p.cancel({notifications:[{id:notificationIdForReminder(id)}]})}catch(e){console.warn("cancel reminder",e)}}
@@ -883,7 +884,13 @@ function showWhatsNewOnce(){
   <h2>🎉 به حساب‌یار خوش آمدی</h2>
   <p class="hint">این صفحه فقط یک‌بار در اولین اجرای این نسخه نمایش داده می‌شود.</p>
   <div class="whats-new-section">
-   <h3>🛠 تغییرات این نسخه (۲.۵)</h3>
+   <h3>🛠 تغییرات این نسخه (۲.۷)</h3>
+   <ul>
+    <li>⏰ جدول هفتگی یادداشت‌ها و یادآوری‌ها حالا کنار هر آیتم ساعتش را هم نشان می‌دهد و برنامه‌های هر روز بر اساس همان ساعت مرتب می‌شوند؛ یعنی هرچه زودتر باشد بالاتر از بقیه‌ی همان روز می‌نشیند.</li>
+   </ul>
+  </div>
+  <div class="whats-new-section">
+   <h3>🛠 تغییرات نسخه قبل (۲.۵)</h3>
    <ul>
     <li>📎 پیوست تراکنش حالا چند-عکسی شد: برای هر تراکنش (مثلاً هزینه‌ی تعمیرگاه) می‌توانی تا ۵ عکس با هم ذخیره کنی — مثلاً هم عکس فاکتور و هم عکس فیش واریزی را کنار هم نگه داری. از پنجره‌ی ثبت/ویرایش تراکنش عکس‌ها را یکی‌یکی یا چندتایی اضافه کن، هرکدام را جدا با ضربدر حذف کن، و در لیست تراکنش‌ها روی عکس بزن تا همه‌ی عکس‌های آن تراکنش را با هم ببینی.</li>
    </ul>
@@ -1996,11 +2003,12 @@ function notesWeekTableHTML(){
     const day=new Date(start.getTime()+i*86400000);
     const jd=gregorianToJalali(day.getFullYear(),day.getMonth()+1,day.getDate());
     const isToday=day.getTime()===t.getTime();
-    const dayNotes=data.notes.filter(n=>noteOccursOnDay(n,day)).sort((a,b)=>(a.order??0)-(b.order??0));
-    const dayReminders=(data.reminders||[]).filter(r=>!r.sourceNoteId&&r.date&&reminderOccursOnDay(r,day)).sort((a,b)=>(a.order??0)-(b.order??0));
-    const noteChips=dayNotes.map(n=>`<button type="button" class="week-note-chip" onclick="openNote('${n.id}')">📝 ${esc(n.title)}</button>`).join("");
-    const reminderChips=dayReminders.map(r=>`<button type="button" class="week-note-chip week-reminder-chip" onclick="openReminder('${r.id}')">🔔 ${esc(r.title)}</button>`).join("");
-    const chips=(noteChips+reminderChips)||`<span class="meta">برنامه‌ای ثبت نشده</span>`;
+    const dayNotes=data.notes.filter(n=>noteOccursOnDay(n,day)).map(n=>({kind:"note",id:n.id,title:n.title,date:n.date,order:n.order??0}));
+    const dayReminders=(data.reminders||[]).filter(r=>!r.sourceNoteId&&r.date&&reminderOccursOnDay(r,day)).map(r=>({kind:"reminder",id:r.id,title:r.title,date:r.date,order:r.order??0}));
+    /* اولویت‌بندی برنامه‌های هر روز بر اساس ساعت: هرچه زودتر، بالاتر؛ اگر ساعتی
+       ثبت نشده باشد آخر لیست همان روز قرار می‌گیرد و ترتیب قبلی (order) حفظ می‌شود. */
+    const dayItems=dayNotes.concat(dayReminders).map(it=>{const d=localDateFromInput(it.date);return {...it,mins:d?d.getHours()*60+d.getMinutes():Infinity}}).sort((a,b)=>a.mins-b.mins||a.order-b.order);
+    const chips=dayItems.length?dayItems.map(it=>{const timeLbl=Number.isFinite(it.mins)?`<span class="week-chip-time">${timeFa(it.date)}</span> `:"";return it.kind==="reminder"?`<button type="button" class="week-note-chip week-reminder-chip" onclick="openReminder('${it.id}')">🔔 ${timeLbl}${esc(it.title)}</button>`:`<button type="button" class="week-note-chip" onclick="openNote('${it.id}')">📝 ${timeLbl}${esc(it.title)}</button>`}).join(""):`<span class="meta">برنامه‌ای ثبت نشده</span>`;
     rows.push(`<tr class="${isToday?"week-today":""}"><td class="week-day-cell"><b>${PERSIAN_WEEKDAY_NAMES[i]}</b><div class="meta">${toFaDigits(jd[2])} ${PERSIAN_MONTHS[jd[1]-1]}</div></td><td class="week-notes-cell">${chips}</td></tr>`);
   }
   return `<div class="week-table-wrap"><div class="week-table-head"><button type="button" class="cal-nav" onclick="changeNotesWeek(-1)" aria-label="هفته قبل">❮</button><div><b>جدول هفتگی</b><div class="meta">${rangeLabel}</div></div><button type="button" class="cal-nav" onclick="changeNotesWeek(1)" aria-label="هفته بعد">❯</button></div><table class="week-table"><tbody>${rows.join("")}</tbody></table><button type="button" class="cal-today-btn" onclick="changeNotesWeek(0)">هفته جاری</button></div>`;
