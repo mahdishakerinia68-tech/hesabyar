@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="2.7.1";
+const APP_VERSION="2.7.2";
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v1";
 const AUTO_BACKUP_MS=6*60*60*1000;
@@ -715,7 +715,7 @@ async function initSync(){
       sync.unsubscribe=recordsCollection().onSnapshot(snap=>{
         if(sync.hydrating)return;
         const remote=snap.docs.map(d=>d.data());
-        if(mergeCloud(remote)){localStorage.setItem(KEY,JSON.stringify(data));render();syncSave();syncAllNotesToReminders().catch(console.error);rescheduleAllNativeReminders().catch(console.error)}
+        if(mergeCloud(remote)){localStorage.setItem(KEY,JSON.stringify(data));render();syncSave();syncAllNotesToReminders().catch(console.error);syncAllPeopleToReminders().catch(console.error);rescheduleAllNativeReminders().catch(console.error)}
         setSyncStatus("☁️ آنلاین • همگام‌سازی لحظه‌ای")
       },e=>setSyncStatus("⚠️ همگام‌سازی: "+(e.code||e.message)));
       sync.timer=setInterval(syncTick,SYNC_INTERVAL);
@@ -884,7 +884,14 @@ function showWhatsNewOnce(){
   <h2>🎉 به حساب‌یار خوش آمدی</h2>
   <p class="hint">این صفحه فقط یک‌بار در اولین اجرای این نسخه نمایش داده می‌شود.</p>
   <div class="whats-new-section">
-   <h3>🛠 تغییرات این نسخه (۲.۷.۱)</h3>
+   <h3>🛠 تغییرات این نسخه (۲.۷.۲)</h3>
+   <ul>
+    <li>👥 بدهکار/بستانکار حالا در «جدول هفتگی یادداشت‌ها» هم دیده می‌شود: اگر یک‌جا سررسید دارد، همان روز نشان داده می‌شود؛ اگر قسطی است، هر قسطِ پرداخت‌نشده سر ماه خودش (طبق همان تقسیم ماهانه‌ای که از قبل هنگام ساختن اقساط انجام می‌شد) روی روزِ سررسیدش می‌آید.</li>
+    <li>🔔 برای هر سررسید (چه بدهی، چه طلب — یک‌جا یا هر قسط جدا) یک یادآوری واقعی با اعلان روی گوشی هم ساخته می‌شود؛ با پرداخت همان قسط یا تسویه‌ی کامل، یادآوری‌اش خودش پاک می‌شود. این یادآوری‌ها زیر یک بخش جدا به‌نام «👤 سررسید بدهکار/بستانکار» در صفحه‌ی یادآوری‌ها هم قابل دیدن‌اند.</li>
+   </ul>
+  </div>
+  <div class="whats-new-section">
+   <h3>🛠 تغییرات نسخه قبل (۲.۷.۱)</h3>
    <ul>
     <li>✓ در چک‌لیستِ یادداشت‌ها، به‌محض تیک خوردن یک آیتم، دیگر خط‌خورده وسط لیست نمی‌ماند — از دید کنار می‌رود و زیر یک دکمهٔ «✓ تکمیل‌شده» جمع می‌شود تا لیست شلوغ نشود؛ با زدن همان دکمه هر وقت خواستی می‌توانی موارد انجام‌شده را دوباره ببینی یا تیکشان را بردار.</li>
     <li>🎨 چهرهٔ اپ کمی خاص‌تر شد: کارت بالای صفحه (خانه) و کارت‌های یادداشت طرح تازه‌ای گرفتند و چک‌باکس آیتم‌های یادداشت هم به‌جای چک‌باکس معمولی مرورگر، یک نشان دایره‌ای مُهرمانند دارد.</li>
@@ -1730,9 +1737,10 @@ function savePerson(id){
     if(instCount>1)np.installments=generateInstallments(amount,instCount,due);
     data.people.push(np);markDirty("people",np.id,false,np,np.updatedAt);
   }
-  localStorage.setItem(KEY,JSON.stringify(data));render();syncSave();logEvent(id?"ویرایش شخص":"ایجاد شخص",`${name} • ${money(amount)}`,id?"edit":"create");closeModal()
+  localStorage.setItem(KEY,JSON.stringify(data));render();syncSave();logEvent(id?"ویرایش شخص":"ایجاد شخص",`${name} • ${money(amount)}`,id?"edit":"create");closeModal();
+  upsertRemindersForPerson(id?data.people.find(x=>x.id===id):data.people[data.people.length-1]).catch(console.error);
 }
-function deletePerson(id){if(confirm("این مورد حذف شود؟")){const p=data.people.find(x=>x.id===id);if(p?.invoiceId){const inv=data.invoices.find(x=>x.id===p.invoiceId);if(inv){inv.personId="";touch(inv);markDirty("invoices",inv.id,false,inv,inv.updatedAt)}}removeRecord("people",id);logEvent("حذف شخص",p?.name||id,"delete")}}
+function deletePerson(id){if(confirm("این مورد حذف شود؟")){const p=data.people.find(x=>x.id===id);if(p?.invoiceId){const inv=data.invoices.find(x=>x.id===p.invoiceId);if(inv){inv.personId="";touch(inv);markDirty("invoices",inv.id,false,inv,inv.updatedAt)}}removeRemindersForPerson(id).catch(console.error);removeRecord("people",id);logEvent("حذف شخص",p?.name||id,"delete")}}
 function payPerson(id){openPersonPayment(id)}
 function openPersonPayment(id){
   const p=data.people.find(x=>x.id===id);if(!p)return;
@@ -1762,6 +1770,7 @@ async function confirmPersonPayment(id){
   syncInvoiceFromPerson(p);
   if(!saveWithAttachments(nt))return;
   logEvent("تسویه شخص",`${p.name} • ${money(n)} • ${data.accounts.find(a=>a.id===accountID)?.name||""}`,"payment");
+  upsertRemindersForPerson(p).catch(console.error);
   closeModal();
 }
 function openInstallments(id){
@@ -1806,6 +1815,7 @@ function toggleInstallment(personId,instId){
     touch(p);markDirty("people",p.id,false,p,p.updatedAt);
     syncInvoiceFromPerson(p);save();
     logEvent("لغو پرداخت قسط",`${p.name} • ${money(it.amount)}`,"payment");
+    upsertRemindersForPerson(p).catch(console.error);
     const box=$("installmentsBox");if(box)box.innerHTML=p.installments.items.map((x,i)=>installmentRowHTML(p,x,i)).join("");
     return;
   }
@@ -1843,6 +1853,7 @@ async function confirmInstallmentPayment(personId,instId){
   syncInvoiceFromPerson(p);
   if(!saveWithAttachments([it,nt]))return;
   logEvent("پرداخت قسط",`${p.name} • ${money(it.amount)} • ${data.accounts.find(a=>a.id===accountID)?.name||""}`,"payment");
+  upsertRemindersForPerson(p).catch(console.error);
   closeModal();
   if(!linkedInvoiceId||data.people.find(x=>x.id===personId))openInstallments(personId);
 }
@@ -2034,11 +2045,12 @@ function notesWeekTableHTML(){
     const jd=gregorianToJalali(day.getFullYear(),day.getMonth()+1,day.getDate());
     const isToday=day.getTime()===t.getTime();
     const dayNotes=data.notes.filter(n=>noteOccursOnDay(n,day)).map(n=>({kind:"note",id:n.id,title:n.title,date:n.date,order:n.order??0}));
-    const dayReminders=(data.reminders||[]).filter(r=>!r.sourceNoteId&&r.date&&reminderOccursOnDay(r,day)).map(r=>({kind:"reminder",id:r.id,title:r.title,date:r.date,order:r.order??0}));
+    const dayReminders=(data.reminders||[]).filter(r=>!r.sourceNoteId&&!r.sourcePersonId&&r.date&&reminderOccursOnDay(r,day)).map(r=>({kind:"reminder",id:r.id,title:r.title,date:r.date,order:r.order??0}));
+    const dayPeople=personDueItemsOnDay(day).map(pp=>({kind:"person",id:pp.id,title:pp.title,date:null,order:0,ptype:pp.type}));
     /* اولویت‌بندی برنامه‌های هر روز بر اساس ساعت: هرچه زودتر، بالاتر؛ اگر ساعتی
        ثبت نشده باشد آخر لیست همان روز قرار می‌گیرد و ترتیب قبلی (order) حفظ می‌شود. */
-    const dayItems=dayNotes.concat(dayReminders).map(it=>{const d=localDateFromInput(it.date);return {...it,mins:d?d.getHours()*60+d.getMinutes():Infinity}}).sort((a,b)=>a.mins-b.mins||a.order-b.order);
-    const chips=dayItems.length?dayItems.map(it=>{const timeLbl=Number.isFinite(it.mins)?`<span class="week-chip-time">${timeFa(it.date)}</span> `:"";return it.kind==="reminder"?`<button type="button" class="week-note-chip week-reminder-chip" onclick="openReminder('${it.id}')">🔔 ${timeLbl}${esc(it.title)}</button>`:`<button type="button" class="week-note-chip" onclick="openNote('${it.id}')">📝 ${timeLbl}${esc(it.title)}</button>`}).join(""):`<span class="meta">برنامه‌ای ثبت نشده</span>`;
+    const dayItems=dayNotes.concat(dayReminders).concat(dayPeople).map(it=>{const d=it.date?localDateFromInput(it.date):null;return {...it,mins:d?d.getHours()*60+d.getMinutes():Infinity}}).sort((a,b)=>a.mins-b.mins||a.order-b.order);
+    const chips=dayItems.length?dayItems.map(it=>{const timeLbl=Number.isFinite(it.mins)?`<span class="week-chip-time">${timeFa(it.date)}</span> `:"";if(it.kind==="reminder")return `<button type="button" class="week-note-chip week-reminder-chip" onclick="openReminder('${it.id}')">🔔 ${timeLbl}${esc(it.title)}</button>`;if(it.kind==="person")return `<button type="button" class="week-note-chip week-person-chip${it.ptype==="credit"?" week-credit-chip":""}" onclick="openPerson('${it.id}')">${it.ptype==="credit"?"💰":"⚠️"} ${esc(it.title)}</button>`;return `<button type="button" class="week-note-chip" onclick="openNote('${it.id}')">📝 ${timeLbl}${esc(it.title)}</button>`}).join(""):`<span class="meta">برنامه‌ای ثبت نشده</span>`;
     rows.push(`<tr class="${isToday?"week-today":""}"><td class="week-day-cell"><b>${PERSIAN_WEEKDAY_NAMES[i]}</b><div class="meta">${toFaDigits(jd[2])} ${PERSIAN_MONTHS[jd[1]-1]}</div></td><td class="week-notes-cell">${chips}</td></tr>`);
   }
   return `<div class="week-table-wrap"><div class="week-table-head"><button type="button" class="cal-nav" onclick="changeNotesWeek(-1)" aria-label="هفته قبل">❮</button><div><b>جدول هفتگی</b><div class="meta">${rangeLabel}</div></div><button type="button" class="cal-nav" onclick="changeNotesWeek(1)" aria-label="هفته بعد">❯</button></div><table class="week-table"><tbody>${rows.join("")}</tbody></table><button type="button" class="cal-today-btn" onclick="changeNotesWeek(0)">هفته جاری</button></div>`;
@@ -2206,6 +2218,54 @@ async function upsertReminderForCheck(check,renderAfter=true){
 }
 async function removeReminderForCheck(checkId){const matches=(data.reminders||[]).filter(r=>r.sourceCheckId===checkId);for(const r of matches){await cancelNativeReminder(r.id);removeRecordSilent("reminders",r.id)}if(matches.length)save()}
 async function syncAllChecksToReminders(){let changed=false;const checkIds=new Set((data.checks||[]).map(c=>c.id));for(const c of data.checks||[]){const before=(data.reminders||[]).length;await upsertReminderForCheck(c,false);if((data.reminders||[]).length!==before)changed=true}for(const r of [...(data.reminders||[])]){if(r.sourceCheckId&&!checkIds.has(r.sourceCheckId)){await cancelNativeReminder(r.id);removeRecordSilent("reminders",r.id);changed=true}}if(changed){localStorage.setItem(KEY,JSON.stringify(data));syncSave();render()}}
+
+/* ---- v2.7.2: سررسید بدهکار/بستانکار → یادآوری واقعی + جدول هفتگی ----
+ * دقیقاً همان الگوی چک‌ها/یادداشت‌ها: هر شخص (بدهکار یا بستانکار) با سررسید
+ * تنظیم‌شده یک یادآوری واقعی (اعلان روی گوشی) می‌گیرد. اگر قسطی باشد، هر
+ * قسطِ پرداخت‌نشده سررسید ماهانه‌ی خودش را دارد (چون generateInstallments از
+ * قبل هر قسط را یک ماه بعد از قسط قبلی می‌گذارد) و برای هر کدام یک یادآوری
+ * جدا ساخته می‌شود؛ اگر قسطی نباشد، همان یک سررسید کلی خبر می‌دهد. با
+ * پرداخت هر قسط (یا تسویه‌ی کامل)، یادآوری همان مورد به‌خودی‌خود حذف می‌شود. */
+function personDueDateISO(dateStr){const d=new Date(dateStr);if(Number.isNaN(d.getTime()))return null;d.setHours(9,0,0,0);return d.toISOString()}
+async function upsertRemindersForPerson(p,renderAfter=true){
+ if(!p?.id)return;
+ const linked=(data.reminders||[]).filter(x=>x.sourcePersonId===p.id);
+ const dueLabel=p.type==="credit"?"سررسید واریز":"سررسید پرداخت";
+ const icon=p.type==="credit"?"💰":"⚠️";
+ let wanted=[];
+ if(p.installments?.items?.length){
+  wanted=p.installments.items.filter(it=>!it.paid&&it.due).map(it=>({key:it.id,date:it.due,amount:it.amount}));
+ }else if(p.due){
+  const remaining=Math.max(0,(Number(p.amount)||0)-(Number(p.paid)||0));
+  if(remaining>0)wanted=[{key:"",date:p.due,amount:remaining}];
+ }
+ const wantedKeys=new Set(wanted.map(w=>w.key));
+ for(const r of linked){if(!wantedKeys.has(r.sourceInstallmentId||"")){await cancelNativeReminder(r.id);removeRecordSilent("reminders",r.id)}}
+ for(const w of wanted){
+  const iso=personDueDateISO(w.date);if(!iso)continue;
+  let r=linked.find(x=>(x.sourceInstallmentId||"")===w.key);
+  const o={title:`${icon} ${dueLabel}: ${p.name}`,amount:w.amount,date:iso,repeat:"once",type:p.type==="credit"?"income":"expense",sourcePersonId:p.id,sourceInstallmentId:w.key,body:`مبلغ: ${money(w.amount)} • ${dueLabel}: ${jalaliLabel(w.date)}`};
+  if(r){Object.assign(r,o);touch(r);markDirty("reminders",r.id,false,r,r.updatedAt)}else{r=touch({id:uid(),...o});data.reminders.push(r);markDirty("reminders",r.id,false,r,r.updatedAt)}
+  await cancelNativeReminder(r.id);await scheduleNativeReminder(r);
+ }
+ if(renderAfter)save();else{localStorage.setItem(KEY,JSON.stringify(data));syncSave()}
+}
+async function removeRemindersForPerson(personId){const matches=(data.reminders||[]).filter(r=>r.sourcePersonId===personId);for(const r of matches){await cancelNativeReminder(r.id);removeRecordSilent("reminders",r.id)}if(matches.length)save()}
+async function syncAllPeopleToReminders(){let changed=false;const peopleIds=new Set((data.people||[]).map(p=>p.id));for(const p of data.people||[]){const before=(data.reminders||[]).length;await upsertRemindersForPerson(p,false);if((data.reminders||[]).length!==before)changed=true}for(const r of [...(data.reminders||[])]){if(r.sourcePersonId&&!peopleIds.has(r.sourcePersonId)){await cancelNativeReminder(r.id);removeRecordSilent("reminders",r.id);changed=true}}if(changed){localStorage.setItem(KEY,JSON.stringify(data));syncSave();render()}}
+/* هر سررسید فعال یک شخص (کلی یا هر قسط) که در یک روز مشخص از هفته می‌افتد؛
+ * دقیقاً شبیه noteOccursOnDay اما مستقیم از data.people خوانده می‌شود تا در
+ * جدول هفتگی، مثل یادداشت‌ها و یادآوری‌های مستقل، ردیف جدا نشان داده شود. */
+function personDueItemsOnDay(day){
+ const y=day.getFullYear(),m=day.getMonth(),d=day.getDate();
+ const out=[];
+ for(const p of data.people||[]){
+  const wanted=[];
+  if(p.installments?.items?.length){for(const it of p.installments.items){if(!it.paid&&it.due)wanted.push({due:it.due,amount:it.amount})}}
+  else if(p.due){const remaining=Math.max(0,(Number(p.amount)||0)-(Number(p.paid)||0));if(remaining>0)wanted.push({due:p.due,amount:remaining})}
+  for(const w of wanted){const dd=new Date(w.due);if(Number.isNaN(dd.getTime()))continue;if(dd.getFullYear()===y&&dd.getMonth()===m&&dd.getDate()===d)out.push({id:p.id,title:`${p.name} • ${money(w.amount)}`,type:p.type})}
+ }
+ return out;
+}
 
 
 /* ============================================================
@@ -3158,7 +3218,7 @@ function render(){
  if($("txList")&&pageActive("transactions"))$("txList").innerHTML=data.transactions.filter(t=>(!q||String(t.title).includes(q)||String(t.category||"").includes(q))&&(!ft||t.type===ft)&&(!fc||t.category===fc)).map(txHTML).join("")||empty("تراکنشی پیدا نشد");
  if($("customerList")&&pageActive("customers"))renderCustomers();
  if($("peopleList")&&pageActive("people"))$("peopleList").innerHTML=data.people.filter(p=>(p.type||"debt")===peopleMode).map(p=>{const total=Number(p.amount)||0,paid=Math.min(Number(p.paid)||0,total),remaining=Math.max(0,total-paid);const inst=p.installments;const instMeta=inst?`<div class="meta">🧾 اقساط: ${fa(inst.items.filter(x=>x.paid).length)} از ${fa(inst.count)} پرداخت‌شده</div>`:"";const instBtn=inst?`<button type="button" onclick="openInstallments('${p.id}')">اقساط</button>`:`<button type="button" onclick="payPerson('${p.id}')">تسویه</button>`;const invBadge=p.source==="invoice"?`<div class="meta">🧾 مانده فاکتور</div>`:"";const dueLabel=p.type==="credit"?"سررسید واریز":"سررسید پرداخت";return `<div class="item"><div><b>${esc(p.name)}</b>${invBadge}<div class="meta">${p.due?dueLabel+": "+p.due:""}${p.note?" • "+esc(p.note):""}</div><div class="meta">کل: ${money(total)} • تسویه: ${money(paid)}</div>${instMeta}</div><div><strong>${money(remaining)}</strong><div class="actions">${instBtn}${actionButtons("openPerson","deletePerson",p.id)}</div></div></div>`}).join("")||empty(peopleMode==="debt"?"هنوز بدهکاری ثبت نشده":"هنوز طلبی ثبت نشده");
- if($("reminderList")&&pageActive("reminders")){const normalReminders=data.reminders.filter(r=>!r.sourceNoteId).sort((a,b)=>(a.order??0)-(b.order??0)); const noteAlarms=data.reminders.filter(r=>r.sourceNoteId); const normal=normalReminders.map((r,i)=>{const accId="rem-"+r.id;const isOpen=openAccordions.has(accId);return `<div class="item accordion-card${isOpen?' open':''}" data-acc-id="${accId}"><button class="accordion-head" type="button" aria-expanded="${isOpen}" onclick="toggleAccordion(this,event)"><span>🔔 <b>${esc(r.title)}</b></span><span>⌄</span></button><div class="accordion-body"><div class="meta">${jalaliLabel(r.date)} • ${r.repeat==="once"?"یک‌بار":r.repeat==="weekly"?"هفتگی":"ماهانه"}</div><div class="accordion-actions"><strong>${r.amount?money(r.amount):""}</strong><div class="reorder-btns"><button type="button" title="انتقال به بالا" ${i===0?"disabled":""} onclick="event.stopPropagation();moveReminder('${r.id}',-1)">▲</button><button type="button" title="انتقال به پایین" ${i===normalReminders.length-1?"disabled":""} onclick="event.stopPropagation();moveReminder('${r.id}',1)">▼</button></div>${actionButtons("openReminder","deleteReminder",r.id)}</div></div></div>`}).join(""); $("reminderList").innerHTML=`<div class="section-label">🔔 یادآوری‌های مستقل</div>${normal||empty("یادآوری مستقلی ندارید")}${noteAlarms.length?`<div class="section-label">📝⏰ آلارم یادداشت‌ها</div>`+noteAlarms.map(r=>{const accId="remnote-"+r.id;const isOpen=openAccordions.has(accId);return `<div class="item accordion-card${isOpen?' open':''}" data-acc-id="${accId}"><button class="accordion-head" type="button" aria-expanded="${isOpen}" onclick="toggleAccordion(this,event)"><span>📝 <b>${esc(r.title)}</b></span><span>⌄</span></button><div class="accordion-body"><div class="meta">${jalaliLabel(r.date)} • ${r.repeat==="once"?"یک‌بار":r.repeat==="weekly"?"هفتگی":"ماهانه"}</div></div></div>`}).join(""):``}`;}
+ if($("reminderList")&&pageActive("reminders")){const normalReminders=data.reminders.filter(r=>!r.sourceNoteId&&!r.sourcePersonId).sort((a,b)=>(a.order??0)-(b.order??0)); const noteAlarms=data.reminders.filter(r=>r.sourceNoteId); const peopleAlarms=data.reminders.filter(r=>r.sourcePersonId); const normal=normalReminders.map((r,i)=>{const accId="rem-"+r.id;const isOpen=openAccordions.has(accId);return `<div class="item accordion-card${isOpen?' open':''}" data-acc-id="${accId}"><button class="accordion-head" type="button" aria-expanded="${isOpen}" onclick="toggleAccordion(this,event)"><span>🔔 <b>${esc(r.title)}</b></span><span>⌄</span></button><div class="accordion-body"><div class="meta">${jalaliLabel(r.date)} • ${r.repeat==="once"?"یک‌بار":r.repeat==="weekly"?"هفتگی":"ماهانه"}</div><div class="accordion-actions"><strong>${r.amount?money(r.amount):""}</strong><div class="reorder-btns"><button type="button" title="انتقال به بالا" ${i===0?"disabled":""} onclick="event.stopPropagation();moveReminder('${r.id}',-1)">▲</button><button type="button" title="انتقال به پایین" ${i===normalReminders.length-1?"disabled":""} onclick="event.stopPropagation();moveReminder('${r.id}',1)">▼</button></div>${actionButtons("openReminder","deleteReminder",r.id)}</div></div></div>`}).join(""); $("reminderList").innerHTML=`<div class="section-label">🔔 یادآوری‌های مستقل</div>${normal||empty("یادآوری مستقلی ندارید")}${noteAlarms.length?`<div class="section-label">📝⏰ آلارم یادداشت‌ها</div>`+noteAlarms.map(r=>{const accId="remnote-"+r.id;const isOpen=openAccordions.has(accId);return `<div class="item accordion-card${isOpen?' open':''}" data-acc-id="${accId}"><button class="accordion-head" type="button" aria-expanded="${isOpen}" onclick="toggleAccordion(this,event)"><span>📝 <b>${esc(r.title)}</b></span><span>⌄</span></button><div class="accordion-body"><div class="meta">${jalaliLabel(r.date)} • ${r.repeat==="once"?"یک‌بار":r.repeat==="weekly"?"هفتگی":"ماهانه"}</div></div></div>`}).join(""):``}${peopleAlarms.length?`<div class="section-label">👤 سررسید بدهکار/بستانکار</div>`+peopleAlarms.map(r=>{const accId="remperson-"+r.id;const isOpen=openAccordions.has(accId);return `<div class="item accordion-card${isOpen?' open':''}" data-acc-id="${accId}"><button class="accordion-head" type="button" aria-expanded="${isOpen}" onclick="event.stopPropagation();openPerson('${r.sourcePersonId}')"><span>${r.type==="income"?"💰":"⚠️"} <b>${esc(r.title)}</b></span><span>⌄</span></button><div class="accordion-body"><div class="meta">${jalaliLabel(r.date)}${r.amount?" • "+money(r.amount):""}</div></div></div>`}).join(""):``}`;}
  if($("noteList")&&pageActive("notes")){
    document.querySelectorAll("#notesModeTabs button").forEach(b=>b.classList.toggle("active",b.dataset.mode===notesMode));
    if(notesMode==="table"){
@@ -3306,4 +3366,4 @@ async function importData(e){
   alert(msg)}
 }
 function clearData(){if(confirm("همه اطلاعات حذف شود؟")){const pin=data.pin,pinHash=data.pinHash,pinSalt=data.pinSalt,patternHash=data.patternHash,patternSalt=data.patternSalt,lockMethod=data.lockMethod,biometricEnabled=data.biometricEnabled,webauthnCredId=data.webauthnCredId,lang=data.lang;data=blankData();data.pin=pin;data.pinHash=pinHash;data.pinSalt=pinSalt;data.patternHash=patternHash;data.patternSalt=patternSalt;data.lockMethod=lockMethod;data.biometricEnabled=biometricEnabled;data.webauthnCredId=webauthnCredId;data.lang=lang;save();logEvent("پاک کردن اطلاعات","اطلاعات برنامه پاک شد","delete");}}
-(async function initApp(){normalizeData();purgeOldTrash();applyAccentThemeOnLoad();await migratePinSecurity();showLock();render();applyDashboardConfig();applyAppMode();renderBrandingInSettings();renderSettingsFeatures();applyLanguage();maybeAutoBackup("اجرای برنامه");processRecurringTransactions();logEvent("اجرای برنامه","برنامه حسابدار اجرا شد","system");await initSync();if(!sync.auth){[4000,12000,30000].forEach(ms=>setTimeout(()=>{if(!sync.auth)initSync()},ms))}syncAllNotesToReminders().catch(console.error);syncAllChecksToReminders().catch(console.error);rescheduleAllNativeReminders().catch(console.error);startUpdateChecker();startReminderChecker();if(!hasLockCode())setTimeout(showWhatsNewOnce,320);})();
+(async function initApp(){normalizeData();purgeOldTrash();applyAccentThemeOnLoad();await migratePinSecurity();showLock();render();applyDashboardConfig();applyAppMode();renderBrandingInSettings();renderSettingsFeatures();applyLanguage();maybeAutoBackup("اجرای برنامه");processRecurringTransactions();logEvent("اجرای برنامه","برنامه حسابدار اجرا شد","system");await initSync();if(!sync.auth){[4000,12000,30000].forEach(ms=>setTimeout(()=>{if(!sync.auth)initSync()},ms))}syncAllNotesToReminders().catch(console.error);syncAllChecksToReminders().catch(console.error);syncAllPeopleToReminders().catch(console.error);rescheduleAllNativeReminders().catch(console.error);startUpdateChecker();startReminderChecker();if(!hasLockCode())setTimeout(showWhatsNewOnce,320);})();
