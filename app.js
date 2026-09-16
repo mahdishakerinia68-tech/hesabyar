@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="1.1";
+const APP_VERSION="1.1.1";
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v1";
 const AUTO_BACKUP_MS=6*60*60*1000;
@@ -2137,7 +2137,7 @@ function notesWeekTableHTML(){
     /* اولویت‌بندی برنامه‌های هر روز بر اساس ساعت: هرچه زودتر، بالاتر؛ اگر ساعتی
        ثبت نشده باشد آخر لیست همان روز قرار می‌گیرد و ترتیب قبلی (order) حفظ می‌شود. */
     const dayItems=dayNotes.concat(dayReminders).concat(dayPeople).map(it=>{const d=it.date?localDateFromInput(it.date):null;return {...it,mins:d?d.getHours()*60+d.getMinutes():Infinity}}).sort((a,b)=>a.mins-b.mins||a.order-b.order);
-    const chips=dayItems.length?dayItems.map(it=>{const timeLbl=Number.isFinite(it.mins)?`<span class="week-chip-time">${timeFa(it.date)}</span> `:"";if(it.kind==="reminder")return `<button type="button" class="week-note-chip week-reminder-chip" onclick="openReminder('${it.id}')">🔔 ${timeLbl}${esc(it.title)}</button>`;if(it.kind==="person")return `<button type="button" class="week-note-chip week-person-chip${it.ptype==="credit"?" week-credit-chip":""}" onclick="openPerson('${it.id}')">${it.ptype==="credit"?"💰":"⚠️"} ${esc(it.title)}</button>`;return `<button type="button" class="week-note-chip" onclick="openNote('${it.id}')">📝 ${timeLbl}${esc(it.title)}</button>`}).join(""):`<span class="meta">برنامه‌ای ثبت نشده</span>`;
+    const chips=dayItems.length?dayItems.map(it=>{const timeLbl=Number.isFinite(it.mins)?`<span class="week-chip-time">${timeFa(it.date)}</span> `:"";if(it.kind==="reminder")return `<button type="button" class="week-note-chip week-reminder-chip" onclick="openReminder('${it.id}')">🔔 ${timeLbl}${esc(it.title)}</button>`;if(it.kind==="person")return `<button type="button" class="week-note-chip week-person-chip${it.ptype==="credit"?" week-credit-chip":""}" onclick="openWeeklyPerson('${it.id}')">${it.ptype==="credit"?"💰":"⚠️"} ${esc(it.title)}</button>`;return `<button type="button" class="week-note-chip" onclick="openNote('${it.id}')">📝 ${timeLbl}${esc(it.title)}</button>`}).join(""):`<span class="meta">برنامه‌ای ثبت نشده</span>`;
     rows.push(`<tr class="${isToday?"week-today":""}"><td class="week-day-cell"><b>${PERSIAN_WEEKDAY_NAMES[i]}</b><div class="meta">${toFaDigits(jd[2])} ${PERSIAN_MONTHS[jd[1]-1]}</div></td><td class="week-notes-cell">${chips}</td></tr>`);
   }
   return `<div class="week-table-wrap"><div class="week-table-head"><button type="button" class="cal-nav" onclick="changeNotesWeek(-1)" aria-label="هفته قبل">❮</button><div><b>جدول هفتگی</b><div class="meta">${rangeLabel}</div></div><button type="button" class="cal-nav" onclick="changeNotesWeek(1)" aria-label="هفته بعد">❯</button></div><table class="week-table"><tbody>${rows.join("")}</tbody></table><button type="button" class="cal-today-btn" onclick="changeNotesWeek(0)">هفته جاری</button></div>`;
@@ -2342,6 +2342,13 @@ async function syncAllPeopleToReminders(){let changed=false;const peopleIds=new 
 /* هر سررسید فعال یک شخص (کلی یا هر قسط) که در یک روز مشخص از هفته می‌افتد؛
  * دقیقاً شبیه noteOccursOnDay اما مستقیم از data.people خوانده می‌شود تا در
  * جدول هفتگی، مثل یادداشت‌ها و یادآوری‌های مستقل، ردیف جدا نشان داده شود. */
+function openWeeklyPerson(id){
+ const p=data.people.find(x=>x.id===id);if(!p)return;
+ /* From the weekly list, installment-based people open directly in the
+    installment management screen instead of the add/edit person form. */
+ if(p.installments?.items?.length){openInstallments(id);return;}
+ openPerson(id);
+}
 function personDueItemsOnDay(day){
  const y=day.getFullYear(),m=day.getMonth(),d=day.getDate();
  const out=[];
