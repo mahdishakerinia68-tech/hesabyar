@@ -5,7 +5,7 @@
  * which is exactly why a shipped feature can be invisible on some
  * phones: they're just still running the old cached copy. Tie it to
  * APP_VERSION mentally — same number as in app.js. */
-const CACHE="hesabdar-2-7-offline-v1";
+const CACHE="hesabdar-1-1-offline-v1";
 const ASSETS=["./","./index.html","./style.css","./app.js","./manifest.json","./logo.png","./capacitor-local-notifications-bridge.js","./capacitor-filesystem-bridge.js","./capacitor-biometric-bridge.js"];
 self.addEventListener("install",e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting()))});
 self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
@@ -31,4 +31,17 @@ self.addEventListener("fetch",e=>{
    return network.then(r=>r||caches.match("./index.html"));
   })
  );
+});
+
+/* v1.1: tapping a reminder notification opens the exact linked debtor/creditor. */
+self.addEventListener("notificationclick",e=>{
+ e.notification.close();
+ const rid=e.notification?.data?.reminderId;
+ const url=new URL("./",self.location.origin);
+ if(rid)url.searchParams.set("reminder",rid);
+ e.waitUntil((async()=>{
+   const clients=await self.clients.matchAll({type:"window",includeUncontrolled:true});
+   for(const c of clients){if("focus" in c){await c.focus();if(rid&&"navigate" in c)await c.navigate(url.href);return;}}
+   if(self.clients.openWindow)await self.clients.openWindow(url.href);
+ })());
 });
