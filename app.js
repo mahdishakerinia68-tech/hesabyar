@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="2.7.2";
+const APP_VERSION="2.7.3";
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v1";
 const AUTO_BACKUP_MS=6*60*60*1000;
@@ -884,7 +884,14 @@ function showWhatsNewOnce(){
   <h2>🎉 به حساب‌یار خوش آمدی</h2>
   <p class="hint">این صفحه فقط یک‌بار در اولین اجرای این نسخه نمایش داده می‌شود.</p>
   <div class="whats-new-section">
-   <h3>🛠 تغییرات این نسخه (۲.۷.۲)</h3>
+   <h3>🛠 تغییرات این نسخه (۲.۷.۳)</h3>
+   <ul>
+    <li>🧾 رفع باگ اقساط بدهکار/بستانکار: تا قبل از این، وقتی از فرم ویرایشِ یک بدهکار/بستانکار «تعداد اقساط» را عوض می‌کردی، کل برنامه‌ی اقساط از نو ساخته می‌شد و اقساطی که از قبل پرداخت شده بودند (و تراکنشِ واقعی‌شان روی موجودی حساب اثر گذاشته بود) به‌حالت «پرداخت‌نشده» برمی‌گشتند. حالا با تغییر تعداد اقساط، فقط اقساطِ پرداخت‌نشده کم یا زیاد می‌شوند؛ اقساطِ پرداخت‌شده و تراکنش متصل به هرکدام (و در نتیجه اثرشان روی افزایش/کاهش موجودی حساب) دست‌نخورده باقی می‌مانند.</li>
+    <li>🔒 اگر تعداد قسط جدید از تعداد اقساطِ پرداخت‌شده کمتر انتخاب شود، برنامه اجازه‌ی این کوچک‌تر شدن را نمی‌دهد و با یک پیام، تعداد را روی همان تعداد پرداخت‌شده نگه می‌دارد.</li>
+   </ul>
+  </div>
+  <div class="whats-new-section">
+   <h3>🛠 تغییرات نسخه قبل (۲.۷.۲)</h3>
    <ul>
     <li>👥 بدهکار/بستانکار حالا در «جدول هفتگی یادداشت‌ها» هم دیده می‌شود: اگر یک‌جا سررسید دارد، همان روز نشان داده می‌شود؛ اگر قسطی است، هر قسطِ پرداخت‌نشده سر ماه خودش (طبق همان تقسیم ماهانه‌ای که از قبل هنگام ساختن اقساط انجام می‌شد) روی روزِ سررسیدش می‌آید.</li>
     <li>🔔 برای هر سررسید (چه بدهی، چه طلب — یک‌جا یا هر قسط جدا) یک یادآوری واقعی با اعلان روی گوشی هم ساخته می‌شود؛ با پرداخت همان قسط یا تسویه‌ی کامل، یادآوری‌اش خودش پاک می‌شود. این یادآوری‌ها زیر یک بخش جدا به‌نام «👤 سررسید بدهکار/بستانکار» در صفحه‌ی یادآوری‌ها هم قابل دیدن‌اند.</li>
@@ -1717,6 +1724,43 @@ function generateInstallments(amount,count,startISO){
   }
   return {count,items};
 }
+/* v2.7.3: تغییر «تعداد اقساط» یک بدهکار/بستانکار موجود، دیگر کل برنامه‌ی اقساط را
+ * از صفر نمی‌سازد (که باعث می‌شد اقساط قبلاً پرداخت‌شده و تراکنش/تأثیرشان روی
+ * موجودی حساب، از دید خارج شود و «پرداخت‌شده» صفر بشود). حالا فقط اقساطِ
+ * پرداخت‌نشده جایگزین می‌شوند؛ اقساط پرداخت‌شده (و تراکنش واقعی متصل به هرکدام،
+ * که موجودی حساب از روی آن حساب می‌شود) دست‌نخورده می‌مانند. اگر عدد جدید کمتر
+ * از تعداد اقساط پرداخت‌شده باشد، اجازه‌ی کوچک‌تر شدن داده نمی‌شود. */
+function rebuildInstallmentsForCountChange(p,amount,instCount,dueISO){
+  const oldItems=p.installments?.items||[];
+  const paidItems=oldItems.filter(x=>x.paid);
+  const paidCount=paidItems.length;
+  const paidTotal=paidItems.reduce((s,x)=>s+(Number(x.amount)||0),0);
+  if(instCount<paidCount){
+    alert(`چون ${fa(paidCount)} قسط قبلاً پرداخت شده، تعداد اقساط نمی‌تواند کمتر از ${fa(paidCount)} باشد. تعداد اقساط روی ${fa(paidCount)} نگه داشته شد.`);
+    instCount=paidCount;
+  }
+  const remainingCount=instCount-paidCount;
+  const remainingAmount=Math.max(0,amount-paidTotal);
+  const newUnpaidItems=[];
+  if(remainingCount>0){
+    let startDate;
+    if(paidCount>0){
+      const lastPaidDue=paidItems[paidItems.length-1].due;
+      startDate=addMonthsSafe(lastPaidDue?new Date(lastPaidDue):new Date(),1);
+    }else{
+      startDate=dueISO?new Date(dueISO):new Date();
+    }
+    if(Number.isNaN(startDate.getTime()))startDate=new Date();
+    const base=Math.floor(remainingAmount/remainingCount);
+    for(let i=0;i<remainingCount;i++){
+      const dueDate=addMonthsSafe(startDate,i);
+      const amt=i===remainingCount-1?remainingAmount-base*(remainingCount-1):base;
+      newUnpaidItems.push({id:uid(),amount:amt,due:dueDate.toISOString().slice(0,10),paid:false,paidAt:""});
+    }
+  }
+  p.paid=paidTotal;
+  return {count:instCount,items:[...paidItems,...newUnpaidItems]};
+}
 function savePerson(id){
   const name=$("pn").value.trim(),amount=parseMoney($("pa").value);
   if(!name||!amount)return alert("نام و مبلغ را وارد کنید");
@@ -1728,8 +1772,15 @@ function savePerson(id){
     const prevCount=p.installments?.count||1;
     Object.assign(p,o);
     if(instCount>1){
-      if(instCount!==prevCount||!p.installments){p.installments=generateInstallments(amount,instCount,due);p.paid=0}
-    }else{delete p.installments}
+      if(!p.installments){
+        p.installments=generateInstallments(amount,instCount,due);p.paid=0;
+      }else if(instCount!==prevCount){
+        p.installments=rebuildInstallmentsForCountChange(p,amount,instCount,due);
+      }
+    }else if(p.installments){
+      p.paid=p.installments.items.filter(x=>x.paid).reduce((s,x)=>s+(Number(x.amount)||0),0);
+      delete p.installments;
+    }
     p.paid=Math.min(Number(p.paid)||0,amount);
     touch(p);markDirty("people",p.id,false,p,p.updatedAt);
   }else{
