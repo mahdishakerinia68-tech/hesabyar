@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="1.2.6";
+const APP_VERSION="1.2.7";
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v1";
 const AUTO_BACKUP_MS=6*60*60*1000;
@@ -311,7 +311,11 @@ function gregorianToJalali(gy,gm,gd){let gdm=[0,31,59,90,120,151,181,212,243,273
 function jalaliToGregorian(jy,jm,jd){jy+=1595;let days=-355668+(365*jy)+(div(jy,33)*8)+div(((jy%33)+3),4)+jd+((jm<7)?(jm-1)*31:((jm-7)*30)+186);let gy=400*div(days,146097);days%=146097;if(days>36524){gy+=100*div(--days,36524);days%=36524;if(days>=365)days++}gy+=4*div(days,1461);days%=1461;if(days>365){gy+=div(days-1,365);days=(days-1)%365}let gd=days+1;let sal_a=[0,31,((gy%4===0&&gy%100!==0)||(gy%400===0))?29:28,31,30,31,30,31,31,30,31,30,31];let gm;for(gm=1;gm<=12;gm++){const v=sal_a[gm];if(gd<=v)break;gd-=v}return [gy,gm,gd]}
 function padFa(n){return String(n).padStart(2,'0').replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d])}
 function toFaDigits(s){return String(s).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d])}
-function toEnDigits(s){return String(s).replace(/[۰-۹]/g,d=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))}
+/* v1.2.7: کیبورد فارسی/عربی روی گوشی‌ها معمولاً ارقام ۰-۹ (فارسی) یا ٠-٩ (عربی) را
+ * می‌فرستد، نه ارقام انگلیسی. قبلاً فقط ارقام فارسی تبدیل می‌شدند و فیلدهای عددی/مبلغی
+ * با کیبورد فارسی/عربی عملاً کار نمی‌کردند (ورودی خالی می‌ماند یا صفر ذخیره می‌شد).
+ * حالا هر دو دسته رقم پشتیبانی می‌شوند. */
+function toEnDigits(s){return String(s).replace(/[۰-۹٠-٩]/g,d=>{const fa='۰۱۲۳۴۵۶۷۸۹'.indexOf(d);if(fa!==-1)return String(fa);return String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))})}
 function jalaliLabel(v){if(!v)return '—';let d=new Date(v);if(Number.isNaN(d.getTime())){let m=toEnDigits(v).match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);return m?`${m[1]}/${String(m[2]).padStart(2,'0')}/${String(m[3]).padStart(2,'0')}`:String(v)}let j=gregorianToJalali(d.getFullYear(),d.getMonth()+1,d.getDate());return `${toFaDigits(j[0])}/${padFa(j[1])}/${padFa(j[2])}`} 
 function jalaliInputValue(v){if(!v)return '';let d=new Date(v);if(Number.isNaN(d.getTime()))return String(v);let j=gregorianToJalali(d.getFullYear(),d.getMonth()+1,d.getDate());return `${toFaDigits(j[0])}/${String(j[1]).padStart(2,'0')}/${String(j[2]).padStart(2,'0')}`} 
 function jalaliToISO(v){let m=toEnDigits(v||'').trim().match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);if(!m)return '';let g=jalaliToGregorian(+m[1],+m[2],+m[3]);return `${g[0]}-${String(g[1]).padStart(2,'0')}-${String(g[2]).padStart(2,'0')}`}
@@ -818,12 +822,15 @@ async function createFromSettings(){
 async function logoutSync(){try{const email=sync.user?.email||"";await sync.auth?.signOut();alert("از حساب همگام‌سازی خارج شد");logEvent("خروج از حساب همگام‌سازی",email,"auth")}catch(e){alert(e.message)}}
 
 function normalize(s){return String(s||"").replace(/[۰-۹]/g,d=>"۰۱۲۳۴۵۶۷۸۹".indexOf(d)).replace(/[٬،]/g,",").replace(/\s+/g," ").trim()}
-function parseMoney(v){return Number(String(v).replace(/[^\d]/g,""))||0}
+function parseMoney(v){return Number(toEnDigits(String(v)).replace(/[^\d]/g,""))||0}
 
 function bytesToB64(bytes){let s="";for(const b of new Uint8Array(bytes))s+=String.fromCharCode(b);return btoa(s)}
 function b64ToBytes(s){const bin=atob(s);const out=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)out[i]=bin.charCodeAt(i);return out}
 async function hashPin(pin,saltB64){const salt=saltB64?b64ToBytes(saltB64):crypto.getRandomValues(new Uint8Array(16));const key=await crypto.subtle.importKey("raw",new TextEncoder().encode(pin),"PBKDF2",false,["deriveBits"]);const bits=await crypto.subtle.deriveBits({name:"PBKDF2",salt,iterations:120000,hash:"SHA-256"},key,256);return {hash:bytesToB64(bits),salt:bytesToB64(salt)}}
-async function verifyPin(pin){if(data.pinHash&&data.pinSalt){const x=await hashPin(pin,data.pinSalt);return x.hash===data.pinHash}return String(pin)===String(data.pin||"")}
+/* v1.2.7: رمز عددی همیشه با ارقام انگلیسی هش/ذخیره می‌شود؛ اگر کاربر هنگام
+ * ورود یا تعیین رمز از کیبورد فارسی/عربی استفاده کند، اول به رقم انگلیسی
+ * تبدیل می‌شود تا با رمز قبلی (صرف‌نظر از کیبورد) مطابقت داشته باشد. */
+async function verifyPin(pin){pin=toEnDigits(String(pin??""));if(data.pinHash&&data.pinSalt){const x=await hashPin(pin,data.pinSalt);return x.hash===data.pinHash}return pin===String(data.pin||"")}
 async function migratePinSecurity(){if(!data.pin||data.pinHash)return;try{const x=await hashPin(data.pin);data.pinHash=x.hash;data.pinSalt=x.salt;data.pin="";localStorage.setItem(KEY,JSON.stringify(data));}catch(e){console.warn("PIN security migration",e)}}
 function hasLockCode(){return !!(data.pinHash||data.pin||data.patternHash)}
 
@@ -1063,10 +1070,11 @@ async function setPin(){
  if(data.lockMethod==="pattern"&&data.patternHash){alert("در حال حاضر قفل الگو فعال است. برای تغییر به رمز عددی، اول با «حذف رمز ورود» آن را غیرفعال کن.");return}
  const old=data.pinHash||data.pin?(prompt("رمز فعلی را وارد کن:")||""):"";
  if((data.pinHash||data.pin)&&!(await verifyPin(old)))return alert("رمز فعلی اشتباه است");
- const p=prompt(data.pinHash||data.pin?"رمز جدید ۴ تا ۸ رقمی:":"یک رمز ۴ تا ۸ رقمی برای ورود تعیین کن:");
+ let p=prompt(data.pinHash||data.pin?"رمز جدید ۴ تا ۸ رقمی:":"یک رمز ۴ تا ۸ رقمی برای ورود تعیین کن:");
  if(p===null)return;
+ p=toEnDigits(p);
  if(!/^\d{4,8}$/.test(p))return alert("رمز باید ۴ تا ۸ رقم باشد");
- const p2=prompt("رمز جدید را دوباره وارد کن:");
+ const p2=toEnDigits(prompt("رمز جدید را دوباره وارد کن:")||"");
  if(p!==p2)return alert("دو رمز یکسان نیستند");
  try{const x=await hashPin(p);data.pin="";data.pinHash=x.hash;data.pinSalt=x.salt;data.lockMethod="pin";save();logEvent("تغییر رمز ورود","رمز ورود تغییر کرد","settings");alert("رمز با موفقیت ذخیره شد");renderSettingsFeatures()}catch(e){alert("ذخیره رمز انجام نشد")}
 }
@@ -1188,12 +1196,30 @@ function groupThousandsStr(digitsOnly){return digitsOnly.replace(/\B(?=(\d{3})+(
 function fmtAmtValue(n){n=Math.round(Number(n)||0);return n?groupThousandsStr(String(n)):""}
 function formatAmountInputEl(el){
  const start=el.selectionStart,before=el.value.length;
- const digits=String(el.value||"").replace(/[^\d]/g,"");
+ const digits=toEnDigits(String(el.value||"")).replace(/[^\d]/g,"");
  const grouped=groupThousandsStr(digits);
  if(el.value===grouped)return;
  el.value=grouped;
  const diff=grouped.length-before;
  try{const pos=Math.max(0,(start||grouped.length)+diff);el.setSelectionRange(pos,pos)}catch(e){}
+}
+/* v1.2.7: فیلدهای عددی ساده (تعداد، درصد، موجودی) که جداکننده هزارگان
+ * ندارند اما باید همان‌طور که با کیبورد فارسی/عربی تایپ می‌شوند، به رقم
+ * انگلیسی تبدیل شوند تا Number(...) درست خوانده شود. با data-decimal="1"
+ * یک نقطه اعشار هم مجاز می‌شود (مثلاً تعداد کالای فاکتور). */
+function normalizeNumInputEl(el){
+ const allowDecimal=el.dataset.decimal==="1";
+ const start=el.selectionStart,before=el.value.length;
+ let v=toEnDigits(String(el.value||""));
+ v=allowDecimal?v.replace(/[^\d.]/g,""):v.replace(/[^\d]/g,"");
+ if(allowDecimal){
+  const firstDot=v.indexOf(".");
+  if(firstDot!==-1)v=v.slice(0,firstDot+1)+v.slice(firstDot+1).replace(/\./g,"");
+ }
+ if(el.value===v)return;
+ el.value=v;
+ const diff=v.length-before;
+ try{const pos=Math.max(0,(start||v.length)+diff);el.setSelectionRange(pos,pos)}catch(e){}
 }
 function bindAmountInputs(root){
  (root||document).querySelectorAll(".amt-input").forEach(el=>{
@@ -1201,6 +1227,12 @@ function bindAmountInputs(root){
   el.dataset.amtBound="1";
   el.addEventListener("input",()=>formatAmountInputEl(el));
   formatAmountInputEl(el);
+ });
+ (root||document).querySelectorAll(".num-input").forEach(el=>{
+  if(el.dataset.numBound)return;
+  el.dataset.numBound="1";
+  el.addEventListener("input",()=>normalizeNumInputEl(el));
+  normalizeNumInputEl(el);
  });
 }
 
@@ -1596,8 +1628,8 @@ function openProduct(id=null){const p=id&&data.products.find(x=>x.id===id);openM
  ${invField("قیمت فروش","تومان",`<input id="prdPrice" type="text" inputmode="numeric" class="amt-input" placeholder="۰" value="${fmtAmtValue(p?.price)}">`)}
  </div>
  <div class="two-fields">
- ${invField("موجودی فعلی","تعداد در انبار",`<input id="prdStock" type="number" min="0" inputmode="numeric" placeholder="۰" value="${Number(p?.stock)||""}">`)}
- ${invField("حداقل موجودی","برای هشدار موجودی کم",`<input id="prdMin" type="number" min="0" inputmode="numeric" placeholder="۰" value="${Number(p?.minStock)||""}">`)}
+ ${invField("موجودی فعلی","تعداد در انبار",`<input id="prdStock" type="text" class="num-input" inputmode="numeric" placeholder="۰" value="${Number(p?.stock)||""}">`)}
+ ${invField("حداقل موجودی","برای هشدار موجودی کم",`<input id="prdMin" type="text" class="num-input" inputmode="numeric" placeholder="۰" value="${Number(p?.minStock)||""}">`)}
  </div>
  <button class="primary" onclick="saveProduct('${p?.id||""}')">💾 ذخیره</button></div>`)}
 function saveProduct(id){const name=$("prdName").value.trim();if(!name)return alert("نام کالا را وارد کن");const o={name,code:$("prdCode").value.trim(),buyPrice:parseMoney($("prdBuy").value),price:parseMoney($("prdPrice").value),stock:Number($("prdStock").value)||0,minStock:Number($("prdMin").value)||0};if(id){const p=data.products.find(x=>x.id===id);Object.assign(p,o);touch(p);markDirty("products",p.id,false,p,p.updatedAt)}else{const p=touch({id:uid(),...o});data.products.unshift(p);markDirty("products",p.id,false,p,p.updatedAt)}save();logEvent(id?"ویرایش کالا":"افزودن کالا",name,id?"edit":"create");closeModal()}
@@ -1639,7 +1671,8 @@ function renderStockAdjustList(){
  const q=($("stockAdjSearch")?.value||"").trim().toLowerCase();
  const isLow=p=>Number(p.minStock)>0&&Number(p.stock)<=Number(p.minStock);
  const list=[...data.products].filter(p=>!q||String(p.name||"").toLowerCase().includes(q)||String(p.code||"").toLowerCase().includes(q)).sort((a,b)=>(isLow(a)?0:1)-(isLow(b)?0:1));
- box.innerHTML=list.map(p=>`<div class="item stock-adj-row${isLow(p)?" item-low":""}"><div><b>📦 ${esc(p.name)}</b><div class="meta">موجودی فعلی: ${fa(p.stock||0)}${isLow(p)?" • ⚠️ موجودی کم":""}</div></div><div class="stock-adj-controls"><input type="number" min="1" inputmode="numeric" placeholder="تعداد" id="qtyAdj_${p.id}" class="stock-adj-qty" onkeydown="if(event.key==='Enter')increaseStock('${p.id}')"><button type="button" class="primary" onclick="increaseStock('${p.id}')">＋</button></div></div>`).join("")||empty(q?"کالایی با این جستجو پیدا نشد":"هنوز کالایی ثبت نشده است");
+ box.innerHTML=list.map(p=>`<div class="item stock-adj-row${isLow(p)?" item-low":""}"><div><b>📦 ${esc(p.name)}</b><div class="meta">موجودی فعلی: ${fa(p.stock||0)}${isLow(p)?" • ⚠️ موجودی کم":""}</div></div><div class="stock-adj-controls"><input type="text" min="1" inputmode="numeric" class="num-input stock-adj-qty" placeholder="تعداد" id="qtyAdj_${p.id}" onkeydown="if(event.key==='Enter')increaseStock('${p.id}')"><button type="button" class="primary" onclick="increaseStock('${p.id}')">＋</button></div></div>`).join("")||empty(q?"کالایی با این جستجو پیدا نشد":"هنوز کالایی ثبت نشده است");
+ bindAmountInputs(box);
 }
 function increaseStock(id){
  const input=$("qtyAdj_"+id);const qty=Number(input?.value);
@@ -1738,7 +1771,7 @@ function openPerson(id=null){
  const p=id&&data.people.find(x=>x.id===id);
  const instCount=p?.installments?.count||1;
  const instFreq=p?.installments?.frequency||"monthly";
- openModal(`<h2>${p?"ویرایش بدهکار/بستانکار":"بدهکار / بستانکار"}</h2><div class="form"><select id="pt"><option value="debt" ${p?.type==="debt"?"selected":""}>من بدهکارم</option><option value="credit" ${p?.type==="credit"?"selected":""}>من طلبکارم</option></select><input id="pn" placeholder="نام شخص" value="${esc(p?.name||"")}"><input id="pa" type="text" inputmode="numeric" class="amt-input" placeholder="مبلغ کل" value="${fmtAmtValue(p?.amount)}">${simpleDateField("pd",jalaliInputValue(p?.due||""))}${invField("تعداد اقساط","مثلاً ۴ قسط؛ برنامه خودش اقساط را می‌چیند",`<input id="pInstCount" type="number" min="1" value="${instCount}">`)}${invField("فاصله اقساط","تاریخ و اعلان هر قسط خودکار ساخته می‌شود",`<select id="pInstFreq"><option value="monthly" ${instFreq==="monthly"?"selected":""}>ماهانه</option><option value="weekly" ${instFreq==="weekly"?"selected":""}>هفتگی</option></select>`)}<textarea id="pnote" placeholder="توضیحات">${esc(p?.note||"")}</textarea><button class="primary" onclick="savePerson('${p?.id||""}')">${p?"ذخیره تغییرات":"ذخیره"}</button></div>`)
+ openModal(`<h2>${p?"ویرایش بدهکار/بستانکار":"بدهکار / بستانکار"}</h2><div class="form"><select id="pt"><option value="debt" ${p?.type==="debt"?"selected":""}>من بدهکارم</option><option value="credit" ${p?.type==="credit"?"selected":""}>من طلبکارم</option></select><input id="pn" placeholder="نام شخص" value="${esc(p?.name||"")}"><input id="pa" type="text" inputmode="numeric" class="amt-input" placeholder="مبلغ کل" value="${fmtAmtValue(p?.amount)}">${simpleDateField("pd",jalaliInputValue(p?.due||""))}${invField("تعداد اقساط","مثلاً ۴ قسط؛ برنامه خودش اقساط را می‌چیند",`<input id="pInstCount" type="text" class="num-input" inputmode="numeric" min="1" value="${instCount}">`)}${invField("فاصله اقساط","تاریخ و اعلان هر قسط خودکار ساخته می‌شود",`<select id="pInstFreq"><option value="monthly" ${instFreq==="monthly"?"selected":""}>ماهانه</option><option value="weekly" ${instFreq==="weekly"?"selected":""}>هفتگی</option></select>`)}<textarea id="pnote" placeholder="توضیحات">${esc(p?.note||"")}</textarea><button class="primary" onclick="savePerson('${p?.id||""}')">${p?"ذخیره تغییرات":"ذخیره"}</button></div>`)
 }
 function localDateKey(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`}
 function generateInstallments(amount,count,startISO,frequency="monthly"){
@@ -2758,7 +2791,7 @@ function empty(s){return `<div class="card" style="text-align:center">${s}</div>
 
 function invoiceDateLabel(v){return jalaliLabel(v)}
 function invField(label,hint,inner){return `<div class="field"><span class="field-cap">${esc(label)}</span>${inner}${hint?`<small class="field-hint">${esc(hint)}</small>`:""}</div>`}
-function invoiceRowHTML(item,i){return `<div class="invoice-row"><input type="hidden" class="inv-product" value="${esc(item?.productId||"")}"><div class="inv-desc-wrap"><input class="inv-desc" autocomplete="off" placeholder="نام کالا یا خدمت (تایپ کن تا از انبار پیشنهاد بیاید)" value="${esc(item?.desc||"")}" oninput="onInvDescInput(this)" onfocus="onInvDescInput(this)" onblur="hideInvSuggestions(this)"><div class="inv-suggest"></div></div><input class="inv-qty" oninput="updateInvoiceLiveTotal()" type="number" min="0" step="any" placeholder="تعداد" value="${Number(item?.qty)||""}"><input class="inv-price amt-input" oninput="this.dataset.userEdited='1';updateInvoiceLiveTotal()" type="text" inputmode="numeric" placeholder="قیمت هر واحد" value="${fmtAmtValue(item?.price)}"><button type="button" class="danger-icon" title="حذف ردیف" onclick="this.parentElement.remove();updateInvoiceLiveTotal()">🗑</button></div>`}
+function invoiceRowHTML(item,i){return `<div class="invoice-row"><input type="hidden" class="inv-product" value="${esc(item?.productId||"")}"><div class="inv-desc-wrap"><input class="inv-desc" autocomplete="off" placeholder="نام کالا یا خدمت (تایپ کن تا از انبار پیشنهاد بیاید)" value="${esc(item?.desc||"")}" oninput="onInvDescInput(this)" onfocus="onInvDescInput(this)" onblur="hideInvSuggestions(this)"><div class="inv-suggest"></div></div><input class="inv-qty num-input" data-decimal="1" oninput="normalizeNumInputEl(this);updateInvoiceLiveTotal()" type="text" inputmode="decimal" min="0" placeholder="تعداد" value="${Number(item?.qty)||""}"><input class="inv-price amt-input" oninput="this.dataset.userEdited='1';updateInvoiceLiveTotal()" type="text" inputmode="numeric" placeholder="قیمت هر واحد" value="${fmtAmtValue(item?.price)}"><button type="button" class="danger-icon" title="حذف ردیف" onclick="this.parentElement.remove();updateInvoiceLiveTotal()">🗑</button></div>`}
 function addInvoiceRow(pref={}){const box=$("invoiceRows");if(!box)return;const div=document.createElement("div");div.innerHTML=invoiceRowHTML(pref,box.children.length);const el=div.firstElementChild;box.appendChild(el);bindAmountInputs(el)}
 /* v3.3: جایگزین select کالا شد با سرچ زنده روی همون فیلد «توضیحات» —
  * هرچی تایپ کنی، لیست کالاهای انبار (از طریق <datalist>) فیلتر و پیشنهاد
@@ -2848,9 +2881,9 @@ function openInvoice(id=null){
  <div class="inv-hide-daily" style="${hideDaily}">
  <div class="two-fields">
  ${invField("تخفیف مبلغی","مبلغ ثابتی که از جمع کل کم می‌شود (تومان)",`<input id="invDiscount" oninput="updateInvoiceLiveTotal()" type="text" inputmode="numeric" class="amt-input" placeholder="۰" value="${fmtAmtValue(inv?.discount)}">`)}
- ${invField("تخفیف درصدی","درصدی که بعد از تخفیف مبلغی کم می‌شود (٪)",`<input id="invDiscountPercent" oninput="updateInvoiceLiveTotal()" type="number" min="0" max="100" placeholder="۰" value="${Number(inv?.discountPercent)||0}">`)}
+ ${invField("تخفیف درصدی","درصدی که بعد از تخفیف مبلغی کم می‌شود (٪)",`<input id="invDiscountPercent" class="num-input" inputmode="numeric" oninput="normalizeNumInputEl(this);updateInvoiceLiveTotal()" type="text" min="0" max="100" placeholder="۰" value="${Number(inv?.discountPercent)||0}">`)}
  </div>
- ${invField("مالیات بر ارزش‌افزوده","درصدی که بعد از کسر تخفیف به قیمت اضافه می‌شود (٪)",`<input id="invTax" oninput="updateInvoiceLiveTotal()" type="number" min="0" placeholder="۰" value="${Number(inv?.taxRate)||0}">`)}
+ ${invField("مالیات بر ارزش‌افزوده","درصدی که بعد از کسر تخفیف به قیمت اضافه می‌شود (٪)",`<input id="invTax" class="num-input" inputmode="numeric" oninput="normalizeNumInputEl(this);updateInvoiceLiveTotal()" type="text" min="0" placeholder="۰" value="${Number(inv?.taxRate)||0}">`)}
  </div>
  ${invField("آدرس","اختیاری؛ آدرس مشتری",`<textarea id="invAddress" placeholder="مثلاً: تهران، خیابان ...">${esc(inv?.address||cust?.address||"")}</textarea>`)}
  <div class="invoice-table-head"><span>توضیحات / نام کالا</span><span>تعداد</span><span>مبلغ واحد</span><span></span></div>
