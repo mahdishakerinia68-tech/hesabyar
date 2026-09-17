@@ -1,20 +1,15 @@
 {
-  "name": "hesabdar",
-  "version": "2.0.0",
+  "name": "hesabyar",
+  "version": "1.2.4",
   "private": true,
+  "description": "حساب‌یار - Web/PWA personal and business accounting application",
   "scripts": {
     "sync": "npx cap sync",
     "android": "npx cap open android",
-    "ios": "npx cap open ios"
-  },
-  "dependencies": {
-    "@capacitor/core": "^7.4.3",
-    "@capacitor/android": "^7.4.3",
-    "@capacitor/ios": "^7.4.3",
-    "@capacitor/local-notifications": "^7.0.2",
-    "@capacitor/push-notifications": "^7.0.2"
-  },
-  "devDependencies": {
-    "@capacitor/cli": "^7.4.3"
+    "ios": "npx cap open ios",
+    "check": "node --check app.js",
+    "check:sw": "node --check sw.js",
+    "check:bridges": "node --check capacitor-biometric-bridge.js && node --check capacitor-filesystem-bridge.js && node --check capacitor-local-notifications-bridge.js",
+    "validate": "npm run check && npm run check:sw && npm run check:bridges"
   }
 }

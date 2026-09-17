@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="1.2.3";
+const APP_VERSION="1.2.4";
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v1";
 const AUTO_BACKUP_MS=6*60*60*1000;
@@ -113,7 +113,9 @@ const SYNC_INTERVAL=5000;
 // Firebase project configuration supplied for this app.
 // This is safe to ship in a web app; access is protected by Firebase Authentication + Firestore Rules.
 const DEFAULT_SYNC_CONFIG={
-  apiKey:"AIzaSyAj80ZFjd8nqVwgIIdPTbUbDXoCPwFSxh4",
+  // Firebase API keys are intentionally not committed to the repository.
+  // Existing users keep their locally stored sync configuration.
+  apiKey:"",
   authDomain:"hesabdari-fd3a3.firebaseapp.com",
   projectId:"hesabdari-fd3a3",
   storageBucket:"hesabdari-fd3a3.firebasestorage.app",
@@ -2393,18 +2395,69 @@ const DEEPSEEK_URL_DEFAULT="https://api.deepseek.com/chat/completions";
 const SMART_NOTE_URL_STORAGE="hesabdar-smartnote-url-v1";
 const SMART_NOTE_MODEL_STORAGE="hesabdar-smartnote-model-v1";
 function anthropicKey(){return (localStorage.getItem(ANTHROPIC_KEY_STORAGE)||"").trim()}
-function smartNoteUrl(){return (localStorage.getItem(SMART_NOTE_URL_STORAGE)||"").trim()||DEEPSEEK_URL_DEFAULT}
+function smartNoteUrl() {
+  const custom = (
+    localStorage.getItem(SMART_NOTE_URL_STORAGE) || ""
+  ).trim();
+
+  if (!custom) {
+    return DEEPSEEK_URL_DEFAULT;
+  }
+
+  try {
+    const url = new URL(custom);
+
+    if (url.protocol !== "https:") {
+      return DEEPSEEK_URL_DEFAULT;
+    }
+
+    return url.href;
+  } catch {
+    return DEEPSEEK_URL_DEFAULT;
+  }
+}
 function smartNoteModel(){return (localStorage.getItem(SMART_NOTE_MODEL_STORAGE)||"").trim()||DEEPSEEK_MODEL_DEFAULT}
-function saveAnthropicKey(){
-  const v=$("anthropicKeyInput")?.value.trim();
-  if(!v)return alert("کلید API را وارد کن");
-  localStorage.setItem(ANTHROPIC_KEY_STORAGE,v);
-  const urlV=$("smartNoteUrlInput")?.value.trim();
-  if(urlV)localStorage.setItem(SMART_NOTE_URL_STORAGE,urlV);else localStorage.removeItem(SMART_NOTE_URL_STORAGE);
-  const modelV=$("smartNoteModelInput")?.value.trim();
-  if(modelV)localStorage.setItem(SMART_NOTE_MODEL_STORAGE,modelV);else localStorage.removeItem(SMART_NOTE_MODEL_STORAGE);
-  if($("anthropicKeyInput"))$("anthropicKeyInput").value="";
-  renderSettingsFeatures();alert("تنظیمات ذخیره شد.")
+function saveAnthropicKey() {
+  const value = $("anthropicKeyInput")?.value.trim();
+
+  if (!value) {
+    return alert("کلید API را وارد کن");
+  }
+
+  if (value.length < 20) {
+    return alert("کلید API کوتاه یا نامعتبر است");
+  }
+
+  const urlValue = $("smartNoteUrlInput")?.value.trim();
+  if (urlValue) {
+    try {
+      const parsedUrl = new URL(urlValue);
+      if (parsedUrl.protocol !== "https:") {
+        return alert("آدرس API باید با HTTPS شروع شود");
+      }
+      localStorage.setItem(SMART_NOTE_URL_STORAGE, parsedUrl.href);
+    } catch {
+      return alert("آدرس API معتبر نیست");
+    }
+  } else {
+    localStorage.removeItem(SMART_NOTE_URL_STORAGE);
+  }
+
+  localStorage.setItem(ANTHROPIC_KEY_STORAGE, value);
+
+  const modelValue = $("smartNoteModelInput")?.value.trim();
+  if (modelValue) {
+    localStorage.setItem(SMART_NOTE_MODEL_STORAGE, modelValue);
+  } else {
+    localStorage.removeItem(SMART_NOTE_MODEL_STORAGE);
+  }
+
+  if ($("anthropicKeyInput")) {
+    $("anthropicKeyInput").value = "";
+  }
+
+  renderSettingsFeatures();
+  alert("تنظیمات API فقط روی همین دستگاه ذخیره شد.");
 }
 function clearAnthropicKey(){if(!anthropicKey())return alert("کلیدی ثبت نشده است");if(!confirm("کلید و تنظیمات هوش مصنوعی حذف شود؟"))return;localStorage.removeItem(ANTHROPIC_KEY_STORAGE);localStorage.removeItem(SMART_NOTE_URL_STORAGE);localStorage.removeItem(SMART_NOTE_MODEL_STORAGE);renderSettingsFeatures();alert("کلید حذف شد.")}
 
@@ -3336,7 +3389,24 @@ function render(){
     the dashboard could sit higher than the real sum of all accounts even though every single
     transaction and every per-account balance was correct. Now it sums the same accountBalance()
     used everywhere else, so the total always matches. */
- const inc=data.transactions.filter(t=>t.type==="income").reduce((s,t)=>s+(Number(t.amount)||0),0),exp=data.transactions.filter(t=>t.type==="expense").reduce((s,t)=>s+(Number(t.amount)||0),0),totalBalance=data.accounts.reduce((s,a)=>s+accountBalance(a.id),0);
+ const now = new Date();
+ const currentMonth = now.getMonth();
+ const currentYear = now.getFullYear();
+ const currentMonthTransactions = data.transactions.filter(t => {
+  if (!t || t.type === "transfer") return false;
+  const date = new Date(t.date);
+  return !Number.isNaN(date.getTime()) &&
+   date.getMonth() === currentMonth &&
+   date.getFullYear() === currentYear;
+ });
+ const inc = currentMonthTransactions
+  .filter(t => t.type === "income")
+  .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+ const exp = currentMonthTransactions
+  .filter(t => t.type === "expense")
+  .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+ const totalBalance = data.accounts
+  .reduce((sum, account) => sum + accountBalance(account.id), 0);
  if($("balance"))$("balance").textContent=money(totalBalance);if($("income"))$("income").textContent=money(inc);if($("expense"))$("expense").textContent=money(exp);
  if($("recent"))$("recent").innerHTML=data.transactions.slice(0,6).map(txHTML).join("")||empty("هنوز تراکنشی ثبت نشده");
  if($("accountList")&&pageActive("accounts"))$("accountList").innerHTML=data.accounts.map(a=>`<div class="item account-item"><div class="account-main"><b>${esc(a.name)}</b><div class="meta">${esc(a.bank||"حساب شخصی")}${a.sender?" • فرستنده: "+esc(a.sender):""}</div>${cardActions(a)}</div><div><strong>${money(accountBalance(a.id))}</strong>${actionButtons("openAccount","deleteAccount",a.id)}<button type="button" title="گزارش Excel" onclick="exportAccountExcel('${a.id}')">📊</button></div></div>`).join("")||empty("هنوز حسابی اضافه نشده");

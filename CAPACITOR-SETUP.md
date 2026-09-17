@@ -1,30 +1,11 @@
-# حسابدار A2 — Android + iOS
+# Capacitor
 
-این پوشه برای تبدیل نسخه وب به اپ با Capacitor آماده شده است.
+Capacitor در این انتشار، **خارج از محدوده نسخه Web/PWA 1.2.4** است. هدف فعلی پروژه اجرای پایدار در مرورگر، PWA و GitHub Pages است.
 
-## نصب وابستگی‌ها
-```bash
-npm install
-npx cap add android
-npx cap add ios
-npx cap sync
-```
+فایل‌های bridge مربوط به Capacitor در مخزن برای سازگاری با کد فعلی باقی مانده‌اند، اما این نسخه workflow ساخت APK یا Android/iOS ندارد.
 
-## اندروید
-```bash
-npx cap open android
-```
-سپس در Android Studio خروجی APK یا AAB بگیر.
+## نکته درباره Update
 
-## آیفون
-روی Mac:
-```bash
-npx cap open ios
-```
-سپس پروژه را با Xcode برای iPhone/ App Store Archive کن.
+نسخه 1.2.4 قابلیت update از GitHub را به عنوان قابلیت فعال برنامه معرفی نمی‌کند. به‌روزرسانی نسخه وب از طریق انتشار فایل‌های جدید سایت و Service Worker انجام می‌شود.
 
-## اعلان‌ها
-پکیج‌های Local Notifications و Push Notifications اضافه شده‌اند. منطق یادآوری زمان‌دار از Local Notifications رسمی Capacitor استفاده می‌کند. در Android/iOS native، اعلان‌ها در سطح سیستم زمان‌بندی می‌شوند و به اجرای دائمی برنامه در پس‌زمینه وابسته نیستند. در Android 12+ ممکن است اجازه Exact Alarm توسط سیستم درخواست شود. در مرورگر/PWA محدودیت سیستم‌عامل اجازه تضمین اعلان پس از بسته‌شدن کامل برنامه را نمی‌دهد.
-
-## بروزرسانی GitHub
-داخل تنظیمات برنامه، مخزن را به شکل `username/repository` وارد کن. برنامه از GitHub Releases آخرین نسخه را می‌خواند و اگر شماره نسخه جدیدتر باشد هشدار می‌دهد.
+اگر در آینده انتشار native لازم شد، تنظیمات Capacitor باید جداگانه و بدون تغییر رفتار نسخه Web/PWA طراحی و تست شود.

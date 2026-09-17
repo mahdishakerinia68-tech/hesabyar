@@ -1,47 +1,87 @@
-/* ---- Bump this whenever any of the cached ASSETS files change (new
- * version release, or the table page you're reading this for). Without
- * a bump, the "activate" cleanup below has nothing to clean up — old
- * devices keep serving the previously-cached app.js/index.html forever,
- * which is exactly why a shipped feature can be invisible on some
- * phones: they're just still running the old cached copy. Tie it to
- * APP_VERSION mentally — same number as in app.js. */
-const CACHE="hesabdar-1-2-3-offline-v1";
-const ASSETS=["./","./index.html","./style.css","./app.js","./manifest.json","./logo.png","./capacitor-local-notifications-bridge.js","./capacitor-filesystem-bridge.js","./capacitor-biometric-bridge.js"];
-self.addEventListener("install",e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting()))});
-self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
+const CACHE = "hesabdar-1-2-4-offline-v2";
+const ASSETS = [
+  "./",
+  "./index.html",
+  "./style.css",
+  "./app.js",
+  "./manifest.json",
+  "./logo.png",
+  "./capacitor-local-notifications-bridge.js",
+  "./capacitor-filesystem-bridge.js",
+  "./capacitor-biometric-bridge.js"
+];
 
-/* ---- Cache-first / stale-while-revalidate for the app shell ----
- * The old strategy re-fetched every file over the network (cache:"no-store")
- * before showing anything, even though the file was already cached. On a
- * slow connection that produced a visible delay: raw/unstyled HTML for a
- * couple of seconds until CSS/JS finally arrived. Now cached assets are
- * served instantly from the cache, while a fresh copy is fetched quietly
- * in the background to keep the cache up to date for next time. ---- */
-self.addEventListener("fetch",e=>{
- if(e.request.method!=="GET")return;
- const url=new URL(e.request.url);
- if(url.origin!==self.location.origin){return}
- e.respondWith(
-  caches.match(e.request).then(cached=>{
-   const network=fetch(e.request).then(r=>{
-    if(r&&r.ok){const copy=r.clone();caches.open(CACHE).then(c=>c.put(e.request,copy)).catch(()=>{})}
-    return r;
-   }).catch(()=>null);
-   if(cached)return cached;
-   return network.then(r=>r||caches.match("./index.html"));
-  })
- );
+self.addEventListener("install", event => {
+  event.waitUntil(
+    caches.open(CACHE)
+      .then(cache => cache.addAll(ASSETS))
+      .then(() => self.skipWaiting())
+  );
 });
 
-/* v1.1: tapping a reminder notification opens the exact linked debtor/creditor. */
-self.addEventListener("notificationclick",e=>{
- e.notification.close();
- const rid=e.notification?.data?.reminderId;
- const url=new URL("./",self.location.origin);
- if(rid)url.searchParams.set("reminder",rid);
- e.waitUntil((async()=>{
-   const clients=await self.clients.matchAll({type:"window",includeUncontrolled:true});
-   for(const c of clients){if("focus" in c){await c.focus();if(rid&&"navigate" in c)await c.navigate(url.href);return;}}
-   if(self.clients.openWindow)await self.clients.openWindow(url.href);
- })());
+self.addEventListener("activate", event => {
+  event.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(
+        keys.filter(key => key !== CACHE).map(key => caches.delete(key))
+      ))
+      .then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener("fetch", event => {
+  if (event.request.method !== "GET") return;
+
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin) return;
+
+  // Always prefer the network for the document so a released version is
+  // discovered promptly. Offline users still get the cached application shell.
+  if (event.request.mode === "navigate" || url.pathname.endsWith("/index.html")) {
+    event.respondWith(
+      fetch(event.request, { cache: "no-store" })
+        .then(response => {
+          if (response && response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE).then(cache => cache.put("./index.html", copy)).catch(() => {});
+          }
+          return response;
+        })
+        .catch(() => caches.match("./index.html").then(response => response || caches.match("./")))
+    );
+    return;
+  }
+
+  // Only same-origin application assets are eligible for the offline cache.
+  event.respondWith(
+    caches.match(event.request).then(cached => {
+      if (cached) return cached;
+      return fetch(event.request).then(response => {
+        if (response && response.ok && url.origin === self.location.origin) {
+          const copy = response.clone();
+          caches.open(CACHE).then(cache => cache.put(event.request, copy)).catch(() => {});
+        }
+        return response;
+      });
+    })
+  );
+});
+
+self.addEventListener("notificationclick", event => {
+  event.notification.close();
+  const reminderId = event.notification?.data?.reminderId;
+  const url = new URL("./", self.location.origin);
+  if (reminderId) url.searchParams.set("reminder", reminderId);
+
+  event.waitUntil((async () => {
+    const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    for (const client of clients) {
+      if ("focus" in client) {
+        await client.focus();
+        if (reminderId && "navigate" in client) await client.navigate(url.href);
+        return;
+      }
+    }
+    if (self.clients.openWindow) await self.clients.openWindow(url.href);
+  })());
 });
