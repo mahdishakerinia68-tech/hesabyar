@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="1.2.5";
+const APP_VERSION="1.2.6";
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v1";
 const AUTO_BACKUP_MS=6*60*60*1000;
@@ -2495,11 +2495,22 @@ async function analyzeSmartNote(){
 فقط و فقط یک JSON خام با این ساختار برگردان، بدون هیچ توضیح اضافه و بدون بک‌تیک یا کد بلاک:
 {"items":[{"kind":"debt|credit|reminder|expense|income","person":"نام شخص یا خالی","title":"عنوان کوتاه","amount":عدد به تومان یا 0 اگر نامشخص,"date":"YYYY/MM/DD شمسی یا خالی","note":"توضیح کوتاه اختیاری"}]}
 اگر متن هیچ مورد قابل استخراجی نداشت، items را آرایه خالی بگذار.`;
-    const res=await fetch(smartNoteUrl(),{
-      method:"POST",
-      headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},
-      body:JSON.stringify({model:smartNoteModel(),max_tokens:1024,temperature:0,messages:[{role:"system",content:sys},{role:"user",content:text}]})
-    });
+    const controller=new AbortController();
+    const timeoutId=setTimeout(()=>controller.abort(),30000);
+    let res;
+    try{
+      res=await fetch(smartNoteUrl(),{
+        method:"POST",
+        headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},
+        body:JSON.stringify({model:smartNoteModel(),max_tokens:1024,temperature:0,messages:[{role:"system",content:sys},{role:"user",content:text}]}),
+        signal:controller.signal
+      });
+    }catch(fetchErr){
+      if(fetchErr?.name==="AbortError")throw new Error("زمان درخواست به پایان رسید (۳۰ ثانیه). اتصال اینترنت را بررسی کن.");
+      throw fetchErr;
+    }finally{
+      clearTimeout(timeoutId);
+    }
     if(!res.ok){const errBody=await res.text().catch(()=>"")
       ;throw new Error("HTTP "+res.status+" "+errBody.slice(0,200))}
     const data2=await res.json();

@@ -1,6 +1,6 @@
 # حساب‌یار / HesabYar
 
-**نسخه فعلی: 1.2.5**
+**نسخه فعلی: 1.2.6**
 
 این نسخه با تمرکز بر **Web / PWA / مرورگر موبایل / GitHub Pages** نگهداری می‌شود. ساخت APK، Android و iOS در محدوده نسخه وب فعلی نیست.
 
@@ -35,7 +35,12 @@ python3 -m http.server 8080
 ## اعتبارسنجی
 
 ```bash
+npm ci
 npm run validate
 ```
 
-این دستور syntax فایل اصلی، Service Worker و bridgeهای موجود را بررسی می‌کند.
+این دستور syntax فایل اصلی، Service Worker و bridgeهای موجود را بررسی می‌کند. این پروژه هیچ dependency واقعی ندارد؛ `package-lock.json` صرفاً برای اجرای پایدار `npm ci` در CI نگهداری می‌شود.
+
+## انتشار فایل ZIP
+
+فایل‌های release (مثل `hesabyar-*.zip`) در مخزن Git نگهداری نمی‌شوند. هر نسخه باید به‌صورت یک GitHub Release منتشر شود و فایل ZIP به آن Release پیوست شود، نه به شاخه اصلی کد.
