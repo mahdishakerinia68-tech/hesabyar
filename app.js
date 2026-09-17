@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="1.1.2";
+const APP_VERSION="1.1.3";
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v1";
 const AUTO_BACKUP_MS=6*60*60*1000;
@@ -139,7 +139,10 @@ function setAutoBackupEnabled(v){localStorage.setItem(AUTO_BACKUP_ENABLED_KEY,v?
 const AUTO_BACKUP_DIRECTORY="ExternalStorage";
 const AUTO_BACKUP_FOLDER="Download/حسابداری";
 const AUTO_BACKUP_LAST_FILE_KEY="hesabdar-auto-backup-last-file-v1";
-function backupFileName(){const d=new Date(),p=n=>String(n).padStart(2,"0");return `hesabdar-backup-${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}.json`}
+function backupFileName(){
+ const d=new Date(),p=n=>String(n).padStart(2,"0");
+ return `hesabdar-backup-${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.json`;
+}
 async function pruneOldBackupFiles(fs){
  try{
   const res=await fs.readdir({path:AUTO_BACKUP_FOLDER,directory:AUTO_BACKUP_DIRECTORY});
@@ -189,7 +192,7 @@ function createAutoBackup(reason="زمان‌بندی"){
   while(list.length>5)list.pop();
   localStorage.setItem(AUTO_BACKUP_KEY,JSON.stringify(list));
   localStorage.setItem(AUTO_BACKUP_KEY+"-last",new Date().toISOString());
-  writeAutoBackupFile(JSON.parse(raw)).then(res=>{
+  writeAutoBackupFile(backupPayload()).then(res=>{
    if(res?.ok){localStorage.setItem(AUTO_BACKUP_LAST_FILE_KEY,JSON.stringify({filename:res.filename,where:res.where,at:new Date().toISOString()}));renderSettingsFeatures()}
   }).catch(e=>console.warn("auto backup file",e));
   return true;
@@ -740,8 +743,17 @@ async function syncSave(){
 }
 async function pushToCloud(){
   if(!sync.user){if(!await ensureSyncReady())return;if(!sync.user)return alert("اول با حساب همگام‌سازی وارد شو");}
-  try{await pushRest();setSyncStatus("☁️ اطلاعات این گوشی به ابر منتقل شد — "+dataSummary(data));alert("ارسال با موفقیت انجام شد\n"+dataSummary(data));}
-  catch(e){alert("ارسال ناموفق: "+(e.code||'')+"\n"+e.message)}
+  try{
+   // Manual send is a MERGE, not a replace: first fetch the latest shared
+   // records, merge them with this phone, then upload the unified dataset.
+   const remote=await pullRest();
+   mergeCloud(remote||[]);
+   localStorage.setItem(KEY,JSON.stringify(data));
+   markAllLocalDirty();
+   await pushRest();
+   setSyncStatus("☁️ اطلاعات دو گوشی با هم ادغام و ذخیره شد — "+dataSummary(data));
+   alert("ارسال و ادغام با موفقیت انجام شد\n"+dataSummary(data));
+  }catch(e){alert("ارسال ناموفق: "+(e.code||'')+"\n"+e.message)}
 }
 async function pullFromCloud(){
   if(!sync.user){if(!await ensureSyncReady())return;if(!sync.user)return alert("اول با حساب همگام‌سازی وارد شو");}
@@ -2562,7 +2574,22 @@ function saveQuickRows(){
   for(const row of rows){const amount=parseMoney(row.querySelector(".quick-amount")?.value);if(!amount)continue;const category=row.querySelector(".quick-cat")?.value||"سایر";const title=row.querySelector(".quick-title")?.value.trim()||category;const accountID=row.querySelector(".quick-account")?.value||data.accounts[0]?.id;if(!accountID)continue;const nt=touch({id:uid(),title,amount,type:quickTxType,category,accountID,date:new Date().toISOString(),source:"quick"});data.transactions.unshift(nt);markDirty("transactions",nt.id,false,nt,nt.updatedAt);logEvent(quickTxType==="expense"?"ثبت هزینه سریع":"ثبت دریافتی سریع",`${title} • ${money(amount)} • ${data.accounts.find(a=>a.id===accountID)?.name||""}`,"create");count++}
   if(!count)return alert("مبلغ حداقل یک مورد را وارد کن");save();closeModal();render();
 }
-function accountBalance(id){let a=data.accounts.find(x=>x.id===id),v=Number(a?.balance)||0;data.transactions.forEach(t=>{const amt=Number(t.amount)||0;if(t.type==="income"&&t.accountID===id)v+=amt;if(t.type==="expense"&&t.accountID===id)v-=amt;if(t.type==="transfer"){if(t.from===id)v-=amt;if(t.destinationType!=="other"&&t.to===id)v+=amt}});return v}
+function accountBalance(id){
+ let a=data.accounts.find(x=>x.id===id),v=Number(a?.balance)||0;
+ data.transactions.forEach(t=>{
+  const amt=Number(t.amount)||0;
+  if(t.type==="income"&&t.accountID===id)v+=amt;
+  if(t.type==="expense"&&t.accountID===id)v-=amt;
+  if(t.type==="transfer"){
+   // Backward compatibility: older transfers used accountID as the source.
+   const fromId=t.from||t.accountID||"";
+   const toId=t.to||"";
+   if(fromId===id)v-=amt;
+   if(t.destinationType!=="other"&&toId===id)v+=amt;
+  }
+ });
+ return v;
+}
 function actionButtons(editFn,deleteFn,id){return `<div class="actions"><button type="button" title="ویرایش" onclick="${editFn}(\'${id}\')">✏️</button><button type="button" class="danger-icon" title="حذف" onclick="${deleteFn}(\'${id}\')">🗑</button></div>`}
 /* v3.11: transfer row markup pulled into its own function so it can be
    reused both in the transactions list (txHTML) and in a dedicated list
@@ -2576,7 +2603,7 @@ function transferItemHTML(t){
  }else{
   destLabel=`🏦 ${esc(data.accounts.find(a=>a.id===t.to)?.name||"")}`;
  }
- return `<div class="item"><div><b>↔ ${esc(t.title)}</b><div class="meta">از ${esc(data.accounts.find(a=>a.id===t.from)?.name||"")} ← ${destLabel}</div><div class="meta">${jalaliDateTimeInput(t.date)}</div></div><div><strong>${money(t.amount)}</strong>${actionButtons("openTransfer","deleteTx",t.id)}</div></div>`;
+ return `<div class="item"><div><b>↔ ${esc(t.title)}</b><div class="meta">از ${esc(data.accounts.find(a=>a.id===(t.from||t.accountID))?.name||"")} ← ${destLabel}</div><div class="meta">${jalaliDateTimeInput(t.date)}</div></div><div><strong>${money(t.amount)}</strong>${actionButtons("openTransfer","deleteTx",t.id)}</div></div>`;
 }
 function txImagesOf(t){return (t?.images&&t.images.length)?t.images:(t?.image?[t.image]:[])}
 function txHTML(t){if(t.type==="transfer")return transferItemHTML(t);let a=data.accounts.find(x=>x.id===t.accountID),sign=t.type==="income"?"+":"−";const recurBadge=t.recurring&&t.recurring!=="none"?` • 🔁 ${t.recurring==="monthly"?"ماهانه":"هفتگی"}`:t.source==="recurring"?" • 🔁 خودکار":"";const imgs=txImagesOf(t);const thumb=imgs.length?`<div class="tx-thumb-wrap" onclick="viewImage('${t.id}')"><img class="tx-thumb" src="${imgs[0]}" alt="پیوست">${imgs.length>1?`<span class="tx-thumb-count">${fa(imgs.length)}</span>`:""}</div>`:"";return `<div class="item"><div><b>${esc(t.title)}</b><div class="meta">${esc(t.category||"")} • ${a?esc(a.name):""} • ${t.source==="bank"?"بانکی":t.source==="recurring"?"تکرارشونده":"دستی"}${recurBadge}</div><div class="meta">${jalaliDateTimeInput(t.date)}</div>${thumb}</div><div><strong class="${t.type}">${sign}${money(t.amount)}</strong>${actionButtons("openTx","deleteTx",t.id)}</div></div>`}
