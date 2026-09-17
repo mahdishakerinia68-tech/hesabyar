@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="1.1.1";
+const APP_VERSION="1.1.2";
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v1";
 const AUTO_BACKUP_MS=6*60*60*1000;
@@ -625,7 +625,16 @@ async function pushRest(items=null){
 }
 async function pullRest(){
   if(!sync.user||!sync.db)throw new Error("همگام‌سازی آماده نیست");
-  const snap=await recordsCollection().get();
+  // Always read the true latest data from the Firestore server when possible,
+  // instead of a device's own local cache. Two phones (iPhone/Android/...)
+  // signed into the same account share one "users/{uid}/records" collection
+  // already — but without this, a device could still show its own last-seen
+  // snapshot for a moment instead of the actual latest merged state written
+  // by another device/platform. Falls back to the normal (cache-allowed) read
+  // when offline, so nothing breaks without a connection.
+  let snap;
+  try{snap=await recordsCollection().get({source:"server"})}
+  catch(e){snap=await recordsCollection().get()}
   return snap.docs.map(d=>d.data());
 }
 function recordsFromLocal(){

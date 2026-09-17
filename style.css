@@ -145,6 +145,13 @@ main{padding:0}
 .item{
   background:var(--card);border:.5px solid var(--sep);padding:13px 14px;border-radius:var(--radius);
   margin:8px 0;display:flex;justify-content:space-between;align-items:center;gap:10px;box-shadow:var(--shadow);
+  position:relative;
+}
+.item::before{
+  content:"";position:absolute;top:10%;bottom:10%;inset-inline-start:0;width:3px;border-radius:3px;
+  background:linear-gradient(180deg, var(--blue), color-mix(in srgb, var(--blue) 25%, transparent));
+  box-shadow:0 0 9px 1px color-mix(in srgb, var(--blue) 50%, transparent);
+  opacity:.75;pointer-events:none;
 }
 .item.compact{padding:10px 12px}
 .item b{font-weight:700;font-size:14.5px;overflow-wrap:break-word;word-break:break-word}
