@@ -2842,6 +2842,32 @@ function invoiceCustomerPick(sel){
  if(phoneEl)phoneEl.value=c.phone||"";
  if(addrEl)addrEl.value=c.address||"";
 }
+/* v3.5: درست مثل سرچ کالا داخل ردیف‌های فاکتور، اسم مشتری هم همین‌طور
+ * سرچ زنده می‌شود؛ تا حروف تایپ می‌شود از لیست پرونده‌های مشتری فیلتر و
+ * پیشنهاد می‌آید و با کلیک روی هرکدوم، نام/تلفن/آدرس همان مشتری خودکار
+ * پر می‌شود و به پرونده‌اش هم وصل می‌شود (بدون نیاز به select جداگانه). */
+function onInvCustomerNameInput(input){
+ const val=input.value.trim().toLowerCase();
+ const box=$("invCustomerSuggest");
+ const sel=$("invCustomer");
+ if(sel && !(val && data.customers.some(c=>(c.name||"").trim().toLowerCase()===val)))sel.value="";
+ if(!box)return;
+ const matches=val?data.customers.filter(c=>(c.name||"").toLowerCase().includes(val)).slice(0,8):[];
+ box.innerHTML=matches.map(c=>`<button type="button" onmousedown="event.preventDefault()" onclick="pickInvCustomerSuggestion('${c.id}')">${esc(c.name)}${c.phone?` <small>${esc(c.phone)}</small>`:""}</button>`).join("");
+}
+function hideInvCustomerSuggestions(){
+ setTimeout(()=>{const box=$("invCustomerSuggest");if(box)box.innerHTML=""},150);
+}
+function pickInvCustomerSuggestion(customerId){
+ const c=data.customers.find(x=>x.id===customerId);if(!c)return;
+ const nameEl=$("invCustomerName"),phoneEl=$("invPhone"),addrEl=$("invAddress"),sel=$("invCustomer"),box=$("invCustomerSuggest");
+ if(nameEl)nameEl.value=c.name||"";
+ if(phoneEl)phoneEl.value=c.phone||"";
+ if(addrEl && !addrEl.value.trim())addrEl.value=c.address||"";
+ if(sel)sel.value=c.id;
+ if(box)box.innerHTML="";
+ nameEl?.focus();
+}
 
 function openInvoice(id=null){
  const inv=id&&data.invoices.find(x=>x.id===id);
@@ -2861,7 +2887,7 @@ function openInvoice(id=null){
  ${invField("نام فروشنده / فروشگاه","اسمی که بالای فاکتور چاپ می‌شود",`<input id="invSeller" placeholder="نام فروشگاه یا کسب‌وکار شما" value="${esc(inv?.seller||(inv?"":data.branding?.storeName||""))}">`)}
  </div>
  <div class="two-fields">
- ${invField("نام مشتری","اسم کسی که فاکتور برایش صادر می‌شود",`<input id="invCustomerName" placeholder="نام و نام خانوادگی مشتری" value="${esc(inv?.customerName||cust?.name||"")}">`)}
+ ${invField("نام مشتری","اسم کسی که فاکتور برایش صادر می‌شود؛ تایپ کن تا از لیست مشتری‌ها پیشنهاد بیاید",`<div class="inv-desc-wrap"><input id="invCustomerName" autocomplete="off" placeholder="نام و نام خانوادگی مشتری" value="${esc(inv?.customerName||cust?.name||"")}" oninput="onInvCustomerNameInput(this)" onfocus="onInvCustomerNameInput(this)" onblur="hideInvCustomerSuggestions(this)"><div class="inv-suggest" id="invCustomerSuggest"></div></div>`)}
  ${invField("شماره تماس","شماره تماس مشتری برای این فاکتور",`<input id="invPhone" inputmode="tel" placeholder="مثلاً: ۰۹۱۲xxxxxxx" value="${esc(inv?.phone||cust?.phone||"")}">`)}
  </div>
  <div class="inv-hide-daily" style="${hideDaily}">
@@ -2870,7 +2896,7 @@ function openInvoice(id=null){
  <div class="inv-hide-daily" style="${hideDaily}">
  <div class="two-fields">
  ${invField("تاریخ فاکتور","تاریخ صدور به تقویم شمسی",simpleDateField("invDate",jalaliInputValue(inv?.date)||todayJalali()))}
- ${invField("شماره فاکتور","اختیاری؛ برای پیگیری و مرتب کردن فاکتورها",`<input id="invNo" placeholder="مثلاً: ۱۰۰۱" value="${esc(inv?.number||"")}">`)}
+ ${invField("شماره فاکتور","اختیاری؛ بعد از اولین فاکتور، خودش یکی یکی بالا می‌رود",`<input id="invNo" placeholder="مثلاً: ۱۰۰۱" value="${esc(inv?(inv.number||""):nextInvoiceNumber())}">`)}
  </div>
  <div class="two-fields">
  ${invField("وضعیت پرداخت","بر اساس مبلغ دریافتی به‌صورت خودکار هم به‌روزرسانی می‌شود",`<select id="invStatus"><option value="unpaid" ${inv?.status!=="paid"&&inv?.status!=="partial"?"selected":""}>🔴 پرداخت نشده</option><option value="partial" ${inv?.status==="partial"?"selected":""}>🟡 پرداخت بخشی</option><option value="paid" ${inv?.status==="paid"?"selected":""}>🟢 پرداخت کامل</option></select>`)}
@@ -2913,6 +2939,19 @@ function setInvoiceType(type){
  if($("invType"))$("invType").value=t;
  document.querySelectorAll("#invTypeTabs button").forEach(b=>b.classList.toggle("active",b.dataset.type===t));
  document.querySelectorAll(".inv-hide-daily").forEach(el=>el.style.display=t==="daily"?"none":"");
+}
+/* v3.5: شماره فاکتور فاکتور جدید خودکار محاسبه می‌شود: اولین فاکتوری که
+ * کاربر خودش دستی شماره‌گذاری کرده، مبنا قرار می‌گیرد و از فاکتور بعدی
+ * به بعد، یکی یکی بالا می‌رود (بر اساس بزرگ‌ترین شماره‌ی عددیِ ثبت‌شده
+ * تا الان، +۱). اگر تا حالا هیچ فاکتوری شماره نداشته، خالی می‌ماند تا
+ * کاربر اولین شماره را خودش تعیین کند. */
+function nextInvoiceNumber(){
+ let max=0,found=false;
+ (data.invoices||[]).forEach(x=>{
+  const n=parseInt(toEnDigits(String(x.number||"")).replace(/[^\d]/g,""),10);
+  if(!isNaN(n)){found=true;if(n>max)max=n}
+ });
+ return found?String(max+1):"";
 }
 function saveInvoice(id){
  const type=$("invType")?.value==="daily"?"daily":"customer";
