@@ -342,7 +342,7 @@
 
     <div class="item accordion-card page-accordion settings-group" id="stgGroup-ai" data-acc-id="stg-ai">
       <button class="accordion-head settings-acc-head" type="button" aria-expanded="false" onclick="toggleAccordion(this,event)">
-        <div class="settings-group-head"><span>✨</span><div><h3>یادداشت هوشمند (هوش مصنوعی)</h3><p class="hint">برای استفاده از «یادداشت هوشمند»، کلید API شخصی خودت را از هر سرویس سازگار با فرمت OpenAI (مثل دیپ‌سیک، اوپن‌ای‌آی و…) اینجا وارد کن. آدرس و نام مدل اختیاری هستند و پیش‌فرض روی دیپ‌سیک تنظیم شده‌اند. همه این اطلاعات فقط روی همین گوشی ذخیره می‌شود.</p></div></div>
+        <div class="settings-group-head"><span>✨</span><div><h3>یادداشت هوشمند (هوش مصنوعی)</h3><p class="hint">برای استفاده از «یادداشت هوشمند»، کلید API شخصی خودت را از هر سرویس سازگار با فرمت OpenAI (مثل دیپ‌سیک، اوپن‌ای‌آی و…) اینجا وارد کن. آدرس و نام مدل اختیاری هستند و پیش‌فرض روی دیپ‌سیک تنظیم شده‌اند. همه این اطلاعات فقط روی همین گوشی ذخیره می‌شود.</p><p class="hint" style="color:var(--danger,#c0392b)">⚠️ توجه امنیتی: این برنامه هیچ سرور واسط (Backend) ندارد، پس کلید API مستقیماً از همین گوشی به سرویس هوش مصنوعی ارسال می‌شود و روی دستگاه (در حافظه مرورگر) ذخیره است. اگر کسی به گوشی دسترسی فنی پیدا کند، این کلید قابل استخراج است. فقط کلیدی با محدودیت مصرف/بودجه پایین وارد کن و آن را جای دیگری استفاده نکن.</p></div></div>
         <span class="acc-arrow">⌄</span>
       </button>
       <div class="accordion-body">
@@ -456,7 +456,7 @@
 <script src="app.js"></script>
 <script>
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("sw.js?v=1-2-7", {
+  navigator.serviceWorker.register("sw.js?v=1-2-8", {
     updateViaCache: "none"
   }).catch(console.error);
 }

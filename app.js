@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="1.2.7";
+const APP_VERSION="1.2.8";
 const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v1";
 const AUTO_BACKUP_MS=6*60*60*1000;
@@ -212,7 +212,7 @@ function maybeAutoBackup(reason){
 }
 function getAutoBackupFileInfo(){try{return JSON.parse(localStorage.getItem(AUTO_BACKUP_LAST_FILE_KEY)||"null")}catch{return null}}
 function restoreLatestAutoBackup(){try{const list=JSON.parse(localStorage.getItem(AUTO_BACKUP_KEY)||"[]"); if(!list.length)return alert("هنوز پشتیبان خودکاری وجود ندارد."); if(!confirm("آخرین پشتیبان خودکار جایگزین اطلاعات فعلی شود؟"))return; data=list[0].data; normalizeData(); save(); logEvent("بازیابی پشتیبان خودکار",new Date(list[0].at).toLocaleString("fa-IR"),"settings"); alert("آخرین پشتیبان خودکار بازیابی شد.")}catch(e){alert("پشتیبان خودکار قابل بازیابی نیست.")}}
-function normalizeData(){data=data||blankData(); for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats","audit","trash"]){data[k]??=[];} data.pin=typeof data.pin==="string"?data.pin:""; data.pinHash=typeof data.pinHash==="string"?data.pinHash:""; data.pinSalt=typeof data.pinSalt==="string"?data.pinSalt:""; data.patternHash=typeof data.patternHash==="string"?data.patternHash:""; data.patternSalt=typeof data.patternSalt==="string"?data.patternSalt:""; data.lockMethod=(data.lockMethod==="pattern")?"pattern":"pin"; data.biometricEnabled=!!data.biometricEnabled; data.webauthnCredId=typeof data.webauthnCredId==="string"?data.webauthnCredId:""; data.lang=(data.lang==="en")?"en":"fa"; data.branding??={storeName:"",logo:"",stamp:"",signature:""}; data.yearSettlements??={}; data._sync??={tombstones:{}}; data._sync.tombstones??={}; for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats"]){for(const r of data[k]){r.id??=uid();r.updatedAt??=new Date().toISOString();}} for(const c of [...data.expenseCats,...data.incomeCats]){c.children??=[];for(const ch of c.children){ch.id??=uid();}} data.notes.forEach((n,i)=>{if(typeof n.order!=="number")n.order=i;}); data.reminders.forEach((r,i)=>{if(typeof r.order!=="number")r.order=i;});}
+function normalizeData(){data=data||blankData(); data.schemaVersion=Number(data.schemaVersion)||1; for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats","audit","trash"]){data[k]??=[];} data.pin=typeof data.pin==="string"?data.pin:""; data.pinHash=typeof data.pinHash==="string"?data.pinHash:""; data.pinSalt=typeof data.pinSalt==="string"?data.pinSalt:""; data.patternHash=typeof data.patternHash==="string"?data.patternHash:""; data.patternSalt=typeof data.patternSalt==="string"?data.patternSalt:""; data.lockMethod=(data.lockMethod==="pattern")?"pattern":"pin"; data.biometricEnabled=!!data.biometricEnabled; data.webauthnCredId=typeof data.webauthnCredId==="string"?data.webauthnCredId:""; data.lang=(data.lang==="en")?"en":"fa"; data.branding??={storeName:"",logo:"",stamp:"",signature:""}; data.yearSettlements??={}; data._sync??={tombstones:{}}; data._sync.tombstones??={}; for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats"]){for(const r of data[k]){r.id??=uid();r.updatedAt??=new Date().toISOString();}} for(const c of [...data.expenseCats,...data.incomeCats]){c.children??=[];for(const ch of c.children){ch.id??=uid();}} data.notes.forEach((n,i)=>{if(typeof n.order!=="number")n.order=i;}); data.reminders.forEach((r,i)=>{if(typeof r.order!=="number")r.order=i;});}
 /* ---- Language switch (v5.9) -------------------------------------------
  * Translates the app's static "chrome" — menu, page section headers, and
  * settings group titles — between Persian and English, and switches
@@ -501,6 +501,22 @@ window.addEventListener("unhandledrejection",e=>{console.error(e.reason)});
 window.addEventListener("online",async()=>{if(sync.db)sync.db.enableNetwork().catch(console.error);setSyncStatus("🌐 اینترنت برقرار شد؛ در حال بررسی اتصال دو گوشی..."); if(!sync.auth)await initSync(); if(sync.dirty&&sync.dirty.size)syncSave(); await verifyTwoPhoneConnection(true);});
 window.addEventListener("offline",()=>setSyncStatus("⚠️ اینترنت دستگاه قطع است"));
 
+/* v1.2.8: زیرساخت migration نسخه‌به‌نسخه‌ی داده — غیرمخرب: قبل از هر
+ * migration یک کپی اضطراری از داده خام نگه‌داشته می‌شود و در صورت خطا،
+ * همان داده‌ی اصلی (بدون migration) برگردانده می‌شود، نه داده خالی.
+ * فعلاً migration واقعی‌ای لازم نیست (این اولین نسخه‌ای‌ست که
+ * schemaVersion دارد)؛ تابع‌های migrateVXToVY آینده اینجا اضافه می‌شوند. */
+const CURRENT_SCHEMA_VERSION=1;
+function migrateData(input){
+ let raw;
+ try{raw=JSON.parse(JSON.stringify(input||{}))}catch(e){return input}
+ try{
+  let d=raw,version=Number(d.schemaVersion)||1;
+  // مثال برای آینده: if(version<2) d=migrateV1ToV2(d);
+  d.schemaVersion=CURRENT_SCHEMA_VERSION;
+  return d;
+ }catch(e){console.warn("data migration failed, keeping original data",e);return input}
+}
 let data;
 try{
   let raw=localStorage.getItem(KEY);
@@ -514,7 +530,7 @@ try{
       }
     }
   }
-  data=raw?JSON.parse(raw):null;
+  data=raw?migrateData(JSON.parse(raw)):null;
 }catch{data=null}
 data=data||blankData();
 normalizeData();
@@ -646,6 +662,9 @@ async function pullRest(){
   catch(e){snap=await recordsCollection().get()}
   return snap.docs.map(d=>d.data());
 }
+/* v1.2.8: مقایسه زمانی رکوردها بر اساس Date.parse به‌جای مقایسه رشته‌ای
+ * (localeCompare)، تا فرمت‌های زمانی متفاوت هم درست مقایسه شوند. */
+function compareUpdatedAt(a,b){const ta=Date.parse(a||"")||0,tb=Date.parse(b||"")||0;return ta===tb?0:(ta>tb?1:-1)}
 function recordsFromLocal(){
   const ks=["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats","audit"],out=[];
   for(const k of ks) for(const r of (data[k]||[])) out.push({id:recordDocId(k,r.id),type:k,record:r,updatedAt:r.updatedAt||new Date().toISOString(),deleted:false});
@@ -657,7 +676,7 @@ async function reconcileInitial(remote){
   const outgoing=[];
   for(const local of recordsFromLocal()){
     const r=remoteMap.get(local.id);
-    if(!r || String(local.updatedAt)>String(r.updatedAt||r.record?.updatedAt||"")) outgoing.push(local);
+    if(!r || compareUpdatedAt(local.updatedAt,r.updatedAt||r.record?.updatedAt||"")>0) outgoing.push(local);
   }
   if(outgoing.length) await pushRest(outgoing);
 }
@@ -670,7 +689,7 @@ function mergeCloud(remote){
   for(const x of remoteMap.values()){
     const type=x.type,id=x.record.id,arr=data[type]; if(!Array.isArray(arr))continue;
     const local=arr.find(r=>r.id===id); const localTs=local?.updatedAt||data._sync.tombstones?.[type]?.[id]||""; const remoteTs=x.updatedAt||x.record.updatedAt||""; const localBy=String(local?.updatedBy||""); const remoteBy=String(x.updatedBy||x.record?.updatedBy||"");
-    const timeCmp=String(remoteTs).localeCompare(String(localTs));
+    const timeCmp=compareUpdatedAt(remoteTs,localTs);
     if(timeCmp<0 || (timeCmp===0 && remoteBy<=localBy))continue;
     if(x.deleted){
       if(local){arr.splice(arr.indexOf(local),1);changed=true}
@@ -823,6 +842,8 @@ async function logoutSync(){try{const email=sync.user?.email||"";await sync.auth
 
 function normalize(s){return String(s||"").replace(/[۰-۹]/g,d=>"۰۱۲۳۴۵۶۷۸۹".indexOf(d)).replace(/[٬،]/g,",").replace(/\s+/g," ").trim()}
 function parseMoney(v){return Number(toEnDigits(String(v)).replace(/[^\d]/g,""))||0}
+/* v1.2.8: اعتبارسنجی مقادیر مالی مثبت (مبلغ تراکنش/چک/فاکتور/بدهی و ...). */
+function positiveMoney(value,label="مبلغ"){const n=parseMoney(value);if(!Number.isFinite(n)||n<=0)throw new Error(label+" باید بیشتر از صفر باشد");return n}
 
 function bytesToB64(bytes){let s="";for(const b of new Uint8Array(bytes))s+=String.fromCharCode(b);return btoa(s)}
 function b64ToBytes(s){const bin=atob(s);const out=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)out[i]=bin.charCodeAt(i);return out}
@@ -849,9 +870,44 @@ function patternDown(ev,onDone){ev.preventDefault();const svg=ev.currentTarget;p
 function patternMove(ev,svg){const p=patternPointFromEvent(svg,ev);for(let i=0;i<9;i++){const c=patternDotXY(i);if(!patternPath.includes(i)&&Math.hypot(p.x-c.x,p.y-c.y)<26)patternPath.push(i)}patternRedraw(svg)}
 function patternUp(svg,onDone){onDone([...patternPath])}
 function patternKeyOf(path){return path.join("-")}
+/* v1.2.8: امنیت تغییر/حذف قفل — قبل از تغییر یا حذف رمز عددی یا الگو،
+ * باید همان رمز/الگوی فعلی (یا بیومتریک) تأیید شود؛ صرفاً confirm() برای
+ * حذف قفل کافی نیست. بعد از ۳ تلاش ناموفق پیاپی، حداقل ۳۰ ثانیه قفل
+ * می‌شود تا حدس زدن پشت‌سرهم دشوارتر شود. */
+const LOCK_LOCKOUT_KEY="hesabdar-lock-lockout-v1";
+const LOCK_LOCKOUT_MS=30000;
+function lockoutState(){try{return JSON.parse(localStorage.getItem(LOCK_LOCKOUT_KEY)||"null")||{fails:0,until:0}}catch{return {fails:0,until:0}}}
+function setLockoutState(s){try{localStorage.setItem(LOCK_LOCKOUT_KEY,JSON.stringify(s))}catch(e){}}
+function lockoutRemainingMs(){const s=lockoutState();return Math.max(0,(s.until||0)-Date.now())}
+function registerLockFail(){const s=lockoutState();s.fails=(s.fails||0)+1;if(s.fails>=3){s.until=Date.now()+LOCK_LOCKOUT_MS;s.fails=0}setLockoutState(s)}
+function registerLockSuccess(){setLockoutState({fails:0,until:0})}
+async function promptPatternVerification(title="برای ادامه، الگوی فعلی را بکش"){
+ return new Promise(resolve=>{
+  openModal(`<h2>🔗 تایید هویت</h2><p class="hint">${esc(title)}</p><div class="pattern-wrap">${patternSVG()}</div><p id="patVerifyMsg" class="hint"></p><button type="button" class="ghost-btn" id="patVerifyCancel">انصراف</button>`);
+  const svg=$("patternSvg");let done=false;
+  $("patVerifyCancel").onclick=()=>{if(done)return;done=true;closeModal();resolve(null)};
+  svg.onpointerdown=e=>patternDown(e,path=>{if(done)return;done=true;closeModal();resolve(path)});
+ });
+}
+async function verifyExistingLock(reason="برای ادامه، هویتت را تایید کن"){
+ if(lockoutRemainingMs()>0){alert(`به‌خاطر چند تلاش ناموفق، ${Math.ceil(lockoutRemainingMs()/1000)} ثانیه دیگر دوباره تلاش کن.`);return false}
+ let ok=false;
+ if(data.patternHash&&data.patternSalt){
+  const path=await promptPatternVerification(reason);
+  ok=path?await verifyPattern(path):false;
+ }else if(data.pinHash||data.pin){
+  const p=prompt(reason+" (رمز عددی فعلی):");
+  if(p===null)return false;
+  ok=await verifyPin(p);
+ }else{
+  ok=true;
+ }
+ if(ok)registerLockSuccess();else registerLockFail();
+ return ok;
+}
 async function openPatternSetup(){
- const old=data.pinHash||data.pin;
- if(old){const p=prompt("برای تغییر روش قفل، رمز عددی فعلی را وارد کن:")||"";if(!(await verifyPin(p)))return alert("رمز فعلی اشتباه است")}
+ const old=data.pinHash||data.pin||data.patternHash;
+ if(old){if(!(await verifyExistingLock("برای تغییر روش قفل، رمز/الگوی فعلی را تایید کن")))return alert("تایید هویت ناموفق بود")}
  const step={first:null};
  const body=`<h2>🔗 تعیین رمز الگو</h2><p class="hint">حداقل ۴ نقطه را به هم وصل کن.</p><div id="patSetupWrap" class="pattern-wrap">${patternSVG()}</div><p id="patSetupMsg" class="hint"></p>`;
  openModal(body);
@@ -1055,9 +1111,11 @@ function showLock(){
  if(data.lockMethod==="pattern"&&data.patternHash){
   const svg=$("patternSvg");
   svg.onpointerdown=e=>patternDown(e,async path=>{
+   if(lockoutRemainingMs()>0){$("lockMsg").textContent=`${Math.ceil(lockoutRemainingMs()/1000)} ثانیه دیگر دوباره تلاش کن`;patternPath=[];patternRedraw(svg);return}
    const ok=await verifyPattern(path).catch(()=>false);
-   if(ok){$("lock")?.remove();setTimeout(showWhatsNewOnce,180);return}
-   $("lockMsg").textContent="الگو اشتباه است";patternPath=[];patternRedraw(svg);
+   if(ok){registerLockSuccess();$("lock")?.remove();setTimeout(showWhatsNewOnce,180);return}
+   registerLockFail();
+   $("lockMsg").textContent=lockoutRemainingMs()>0?`رمز اشتباه بود؛ ${Math.ceil(lockoutRemainingMs()/1000)} ثانیه صبر کن`:"الگو اشتباه است";patternPath=[];patternRedraw(svg);
   });
  }else{
   $("unlockBtn").onclick=unlock;
@@ -1065,7 +1123,13 @@ function showLock(){
  }
  if(bioBtn)$("bioUnlockBtn").onclick=async()=>{const ok=await biometricVerify().catch(()=>false);if(ok)$("lock")?.remove();else alert("تایید بیومتریک انجام نشد")};
 }
-async function unlock(){const input=$("pinInput");if(!input)return;const ok=await verifyPin(input.value).catch(()=>false);if(!ok)return alert("رمز اشتباه است");$("lock")?.remove();setTimeout(showWhatsNewOnce,180)}
+async function unlock(){
+ const input=$("pinInput");if(!input)return;
+ if(lockoutRemainingMs()>0)return alert(`به‌خاطر چند تلاش ناموفق، ${Math.ceil(lockoutRemainingMs()/1000)} ثانیه دیگر دوباره تلاش کن.`);
+ const ok=await verifyPin(input.value).catch(()=>false);
+ if(!ok){registerLockFail();return alert(lockoutRemainingMs()>0?`رمز اشتباه بود؛ ${Math.ceil(lockoutRemainingMs()/1000)} ثانیه صبر کن`:"رمز اشتباه است")}
+ registerLockSuccess();$("lock")?.remove();setTimeout(showWhatsNewOnce,180)
+}
 async function setPin(){
  if(data.lockMethod==="pattern"&&data.patternHash){alert("در حال حاضر قفل الگو فعال است. برای تغییر به رمز عددی، اول با «حذف رمز ورود» آن را غیرفعال کن.");return}
  const old=data.pinHash||data.pin?(prompt("رمز فعلی را وارد کن:")||""):"";
@@ -1080,8 +1144,8 @@ async function setPin(){
 }
 async function removePin(){
  if(!hasLockCode())return alert("هنوز رمزی فعال نیست");
- if(data.lockMethod==="pattern"){if(!confirm("رمز الگو حذف شود؟"))return}
- else{const p=prompt("رمز فعلی را وارد کن:");if(!(await verifyPin(p||"")))return alert("رمز فعلی اشتباه است")}
+ if(!(await verifyExistingLock("برای حذف قفل، رمز/الگوی فعلی را تایید کن")))return alert("تایید هویت ناموفق بود؛ قفل حذف نشد");
+ if(!confirm("رمز/الگوی ورود حذف شود؟"))return;
  data.pin="";data.pinHash="";data.pinSalt="";data.patternHash="";data.patternSalt="";data.biometricEnabled=false;data.webauthnCredId="";data.lockMethod="pin";save();logEvent("حذف رمز ورود","قفل برنامه غیرفعال شد","settings");alert("رمز حذف شد");renderSettingsFeatures();
 }
 
@@ -1632,7 +1696,7 @@ function openProduct(id=null){const p=id&&data.products.find(x=>x.id===id);openM
  ${invField("حداقل موجودی","برای هشدار موجودی کم",`<input id="prdMin" type="text" class="num-input" inputmode="numeric" placeholder="۰" value="${Number(p?.minStock)||""}">`)}
  </div>
  <button class="primary" onclick="saveProduct('${p?.id||""}')">💾 ذخیره</button></div>`)}
-function saveProduct(id){const name=$("prdName").value.trim();if(!name)return alert("نام کالا را وارد کن");const o={name,code:$("prdCode").value.trim(),buyPrice:parseMoney($("prdBuy").value),price:parseMoney($("prdPrice").value),stock:Number($("prdStock").value)||0,minStock:Number($("prdMin").value)||0};if(id){const p=data.products.find(x=>x.id===id);Object.assign(p,o);touch(p);markDirty("products",p.id,false,p,p.updatedAt)}else{const p=touch({id:uid(),...o});data.products.unshift(p);markDirty("products",p.id,false,p,p.updatedAt)}save();logEvent(id?"ویرایش کالا":"افزودن کالا",name,id?"edit":"create");closeModal()}
+function saveProduct(id){const name=$("prdName").value.trim();if(!name)return alert("نام کالا را وارد کن");const o={name,code:$("prdCode").value.trim(),buyPrice:parseMoney($("prdBuy").value),price:parseMoney($("prdPrice").value),stock:Math.max(0,Number($("prdStock").value)||0),minStock:Math.max(0,Number($("prdMin").value)||0)};if(id){const p=data.products.find(x=>x.id===id);Object.assign(p,o);touch(p);markDirty("products",p.id,false,p,p.updatedAt)}else{const p=touch({id:uid(),...o});data.products.unshift(p);markDirty("products",p.id,false,p,p.updatedAt)}save();logEvent(id?"ویرایش کالا":"افزودن کالا",name,id?"edit":"create");closeModal()}
 function deleteProduct(id){if(!confirm("این کالا حذف شود؟"))return;const p=data.products.find(x=>x.id===id);removeRecord("products",id);logEvent("حذف کالا",p?.name||id,"delete")}
 /* v2.3 fix: renderProducts() existed but was never wired into render()'s
    per-page dispatch (every other page — customers, invoices, checks... —
@@ -1683,7 +1747,7 @@ function increaseStock(id){
  renderStockAdjustList();
  if(pageActive("products"))renderProducts();
 }
-function adjustStockForInvoice(inv,dir){for(const it of inv?.items||[]){if(!it.productId)continue;const p=data.products.find(x=>x.id===it.productId);if(p){p.stock=Math.max(0,Number(p.stock||0)+(dir*Number(it.qty||0)));touch(p);markDirty("products",p.id,false,p,p.updatedAt)}}}
+function adjustStockForInvoice(inv,dir){for(const it of inv?.items||[]){if(!it.productId)continue;const p=data.products.find(x=>x.id===it.productId);if(p){const next=Number(p.stock||0)+(dir*Number(it.qty||0));if(next<0)logEvent("کسری موجودی",`${p.name} • موجودی به ${fa(next)} می‌رسید و روی صفر نگه داشته شد`,"stock",false);p.stock=Math.max(0,next);touch(p);markDirty("products",p.id,false,p,p.updatedAt)}}}
 
 function openCustomer(id=null){const c=id&&data.customers.find(x=>x.id===id);openModal(`<h2>${c?"ویرایش مشتری":"مشتری جدید"}</h2><div class="form"><input id="cname" placeholder="نام مشتری" value="${esc(c?.name||"")}"><input id="cphone" inputmode="tel" placeholder="شماره تماس" value="${esc(c?.phone||"")}"><textarea id="caddress" placeholder="آدرس">${esc(c?.address||"")}</textarea><textarea id="cnote" placeholder="توضیحات">${esc(c?.note||"")}</textarea><button class="primary" onclick="saveCustomer('${c?.id||""}')">💾 ذخیره</button></div>`)}
 function saveCustomer(id){const name=$("cname").value.trim();if(!name)return alert("نام مشتری را وارد کن");const o={name,phone:$("cphone").value.trim(),address:$("caddress").value.trim(),note:$("cnote").value.trim()};if(id){const c=data.customers.find(x=>x.id===id);Object.assign(c,o);touch(c);markDirty("customers",c.id,false,c,c.updatedAt)}else{const c=touch({id:uid(),...o});data.customers.unshift(c);markDirty("customers",c.id,false,c,c.updatedAt)}save();logEvent(id?"ویرایش مشتری":"ایجاد مشتری",name,id?"edit":"create");closeModal()}
@@ -1876,7 +1940,9 @@ function previewPersonPaymentImage(input){
 }
 async function confirmPersonPayment(id){
   const p=data.people.find(x=>x.id===id);if(!p)return;
-  const n=parseMoney($("ppAmount")?.value||"");if(!n)return alert("مبلغ نامعتبر است");
+  const n=parseMoney($("ppAmount")?.value||"");if(!n||n<=0)return alert("مبلغ نامعتبر است");
+  const remaining=Math.max(0,(Number(p.amount)||0)-(Number(p.paid)||0));
+  if(n>remaining)return alert(`مبلغ پرداخت (${money(n)}) بیشتر از مانده (${money(remaining)}) است`);
   const accountID=$("ppAccount")?.value;if(!accountID)return alert("حساب را انتخاب کنید");
   let receipt=null;const file=$("ppImage")?.files?.[0];
   if(file){try{receipt=await compressImage(file,1200,.72)}catch(e){console.warn(e)}}
@@ -1979,6 +2045,8 @@ function previewInstImage(input){
 async function confirmInstallmentPayment(personId,instId){
   const p=data.people.find(x=>x.id===personId);if(!p?.installments)return;
   const it=p.installments.items.find(x=>x.id===instId);if(!it)return;
+  if(it.paid)return alert("این قسط قبلاً پرداخت شده است");
+  if(!(Number(it.amount)>0))return alert("مبلغ قسط نامعتبر است");
   const accountID=$("instAccount")?.value;if(!accountID)return alert("حساب را انتخاب کنید");
   let receipt=it.receipt||null;const file=$("instImage")?.files?.[0];
   if(file){try{receipt=await compressImage(file,1000,.6)}catch(e){console.warn(e)}}
@@ -2958,6 +3026,13 @@ function saveInvoice(id){
  const name=$("invName").value.trim()||(type==="daily"?"فاکتور روزانه":"فاکتور جدید"), seller=$("invSeller").value.trim(),date=jalaliToISO($("invDate").value)||new Date().toISOString().slice(0,10),number=$("invNo").value.trim();
  const items=[...document.querySelectorAll("#invoiceRows .invoice-row")].map(r=>({productId:r.querySelector(".inv-product")?.value||"",desc:r.querySelector(".inv-desc")?.value.trim()||"",qty:Number(r.querySelector(".inv-qty")?.value)||0,price:parseMoney(r.querySelector(".inv-price")?.value)})).filter(x=>x.desc||x.qty||x.price);
  if(!items.length)return alert("حداقل یک ردیف فاکتور وارد کن");
+ if(items.some(x=>!(x.qty>0)))return alert("تعداد هر ردیف کالا/خدمت باید بزرگ‌تر از صفر باشد");
+ /* v1.2.8: قیمت خرید هر کالا در لحظه‌ی فروش snapshot می‌شود (costPriceAtSale)
+    تا گزارش سودآوری بعداً با تغییر قیمت خرید فعلی کالا دستکاری نشود. */
+ for(const it of items){if(it.productId){const pr=data.products.find(x=>x.id===it.productId);it.costPriceAtSale=Number(pr?.buyPrice)||0}}
+ /* کمبود موجودی مانع ثبت فاکتور نمی‌شود، ولی باید به کاربر هشدار داده شود. */
+ const shortages=items.filter(it=>{if(!it.productId)return false;const pr=data.products.find(x=>x.id===it.productId);if(!pr)return false;const already=id?(data.invoices.find(v=>v.id===id)?.items||[]).filter(x=>x.productId===it.productId).reduce((s,x)=>s+(Number(x.qty)||0),0):0;return Number(it.qty||0)>Number(pr.stock||0)+already});
+ if(shortages.length&&!confirm(`موجودی این کالاها کافی نیست: ${shortages.map(x=>x.desc).join("، ")}. با این حال فاکتور ثبت شود؟`))return;
  const discount=Math.max(0,parseMoney($("invDiscount").value)),discountPercent=Math.min(100,Math.max(0,Number($("invDiscountPercent").value)||0)),taxRate=Math.max(0,Number($("invTax").value)||0);let paid=Math.max(0,parseMoney($("invPaid").value));
  const customerName=$("invCustomerName")?.value.trim()||"";
  const phone=$("invPhone")?.value.trim()||"";
@@ -3551,7 +3626,7 @@ function productProfitData(){
   for(const it of inv.items||[]){
    if(!it.productId)continue;
    const p=data.products.find(x=>x.id===it.productId);if(!p)continue;
-   const qty=Number(it.qty)||0,revenue=qty*(Number(it.price)||0),cost=qty*(Number(p.buyPrice)||0);
+   const qty=Number(it.qty)||0,revenue=qty*(Number(it.price)||0),unitCost=Number(it.costPriceAtSale)||Number(p.buyPrice)||0,cost=qty*unitCost;
    const s=stats.get(p.id)||{name:p.name,qty:0,revenue:0,cost:0};
    s.qty+=qty;s.revenue+=revenue;s.cost+=cost;
    stats.set(p.id,s);
@@ -3570,6 +3645,29 @@ function renderProductProfit(){
  box.innerHTML=`<div class="report-sub-title">🥇 پرسودترین کالاها</div>${top.map(rowHTML).join("")}<div class="report-sub-title">🥶 کم‌سودترین کالاها</div>${bottom.map(rowHTML).join("")}`;
 }
 function backupPayload(){return {format:"hesabdar-backup",version:2,appVersion:APP_VERSION,createdAt:new Date().toISOString(),data:JSON.parse(JSON.stringify(data))}}
+/* v1.2.8: رمزنگاری بکاپ — بکاپ خروجی (که قرار است بین گوشی‌ها منتقل شود)
+ * با AES-GCM رمزنگاری می‌شود؛ کلید با PBKDF2/SHA-256 از رمز عبور بکاپ
+ * ساخته می‌شود و هرگز خودِ رمز یا کلید ذخیره نمی‌شود، فقط salt/iv/متن
+ * رمزشده داخل فایل می‌ماند. */
+async function deriveAesKey(password,saltB64){
+ const salt=saltB64?b64ToBytes(saltB64):crypto.getRandomValues(new Uint8Array(16));
+ const base=await crypto.subtle.importKey("raw",new TextEncoder().encode(password),"PBKDF2",false,["deriveKey"]);
+ const key=await crypto.subtle.deriveKey({name:"PBKDF2",salt,iterations:120000,hash:"SHA-256"},base,{name:"AES-GCM",length:256},false,["encrypt","decrypt"]);
+ return {key,salt:bytesToB64(salt)};
+}
+async function encryptBackupPayload(payload,password){
+ const {key,salt}=await deriveAesKey(password);
+ const iv=crypto.getRandomValues(new Uint8Array(12));
+ const plain=new TextEncoder().encode(JSON.stringify(payload));
+ const cipherBuf=await crypto.subtle.encrypt({name:"AES-GCM",iv},key,plain);
+ return {format:"hesabdar-encrypted-backup",version:1,appVersion:APP_VERSION,createdAt:new Date().toISOString(),salt,iv:bytesToB64(iv),ciphertext:bytesToB64(cipherBuf)};
+}
+async function decryptBackupPayload(container,password){
+ const {key}=await deriveAesKey(password,container.salt);
+ const iv=b64ToBytes(container.iv),cipherBytes=b64ToBytes(container.ciphertext);
+ const plainBuf=await crypto.subtle.decrypt({name:"AES-GCM",iv},key,cipherBytes);
+ return JSON.parse(new TextDecoder().decode(plainBuf));
+}
 /* Bug fix: this used to only do the browser <a download> trick, which
  * relies on the WebView actually handing the click off to Android's
  * download manager. On a Capacitor native build that hand-off is
@@ -3582,11 +3680,17 @@ function backupPayload(){return {format:"hesabdar-backup",version:2,appVersion:A
  * path so the button either genuinely saves a file, or clearly reports
  * failure instead of lying about success. */
 async function exportData(){
- const res=await writeAutoBackupFile(backupPayload());
+ const password=prompt("این بکاپ حاوی اطلاعات مالی شماست. یک رمز عبور برای رمزنگاری فایل تعیین کن (حداقل ۴ کاراکتر؛ این رمز فقط پیش خودت می‌ماند و بدون آن فایل قابل بازیابی نیست):");
+ if(password===null)return;
+ if(password.trim().length<4)return alert("رمز عبور بکاپ باید حداقل ۴ کاراکتر باشد.");
+ let payload;
+ try{payload=await encryptBackupPayload(backupPayload(),password.trim())}
+ catch(e){console.warn("backup encrypt",e);return alert("رمزنگاری بکاپ انجام نشد. دوباره تلاش کن.")}
+ const res=await writeAutoBackupFile(payload);
  if(res?.ok){
-  logEvent("پشتیبان‌گیری","فایل پشتیبان JSON صادر شد • "+res.filename,"settings");
+  logEvent("پشتیبان‌گیری","فایل پشتیبان رمزنگاری‌شده صادر شد • "+res.filename,"settings");
   const where=res.method==="filesystem"?`در پوشه ${res.where} با نام ${res.filename} `:"";
-  alert(`فایل پشتیبان ${where}ساخته شد. آن را به گوشی دیگر منتقل کن و از گزینه بازیابی انتخابش کن.`);
+  alert(`فایل پشتیبان رمزنگاری‌شده ${where}ساخته شد. آن را به گوشی دیگر منتقل کن و هنگام بازیابی، همین رمز عبور را وارد کن. این رمز را حتماً جایی یادداشت کن؛ بدون آن بازیابی ممکن نیست.`);
  }else{
   alert("پشتیبان‌گیری انجام نشد. دوباره تلاش کن؛ اگر باز هم نشد، از «بازیابی آخرین بکاپ خودکار» به‌عنوان جایگزین استفاده کن.");
  }
@@ -3621,12 +3725,25 @@ async function importData(e){
  const input=e?.target,file=input?.files?.[0];if(!file)return;const finish=()=>{if(input)input.value=""};
  try{
   const raw=await readBackupFile(file),parsed=JSON.parse(raw);
-  const restored=parsed?.format==="hesabdar-backup"&&parsed.data&&typeof parsed.data==="object"?parsed.data:parsed;
+  let restored;
+  if(parsed?.format==="hesabdar-encrypted-backup"&&parsed.salt&&parsed.iv&&parsed.ciphertext){
+   let decrypted=null;
+   for(let attempt=0;attempt<3&&!decrypted;attempt++){
+    const pass=prompt(attempt===0?"این بکاپ رمزنگاری‌شده است. رمز عبور بکاپ را وارد کن:":"رمز عبور اشتباه بود؛ دوباره تلاش کن:");
+    if(pass===null){finish();return}
+    try{const inner=await decryptBackupPayload(parsed,pass.trim());decrypted=inner?.data&&typeof inner.data==="object"?inner.data:inner}catch(e){decrypted=null}
+   }
+   if(!decrypted)throw new Error("wrong-password");
+   restored=decrypted;
+  }else{
+   restored=parsed?.format==="hesabdar-backup"&&parsed.data&&typeof parsed.data==="object"?parsed.data:parsed;
+   if(!confirm("این فایل پشتیبان رمزنگاری‌نشده است (نسخه قدیمی). ادامه می‌دهی؟"))return finish();
+  }
   if(!restored||typeof restored!=="object"||Array.isArray(restored))throw new Error("invalid-backup");
   const previousLock={pin:data.pin,pinHash:data.pinHash,pinSalt:data.pinSalt,patternHash:data.patternHash,patternSalt:data.patternSalt,lockMethod:data.lockMethod,biometricEnabled:data.biometricEnabled,webauthnCredId:data.webauthnCredId};
   const wasHydrating=sync.hydrating;sync.hydrating=true;
   try{
-   data=JSON.parse(JSON.stringify(restored));normalizeData();Object.assign(data,previousLock);data.audit??=[];data.notes??=[];
+   data=JSON.parse(JSON.stringify(restored));data=migrateData(data);normalizeData();Object.assign(data,previousLock);data.audit??=[];data.notes??=[];
    // Mark the restore as a complete replacement locally before any async work.
    localStorage.setItem(KEY,JSON.stringify(data));render();
    if(sync.unsubscribe){sync.unsubscribe();sync.unsubscribe=null}
@@ -3645,7 +3762,7 @@ async function importData(e){
   }
   finish();alert("بازیابی با موفقیت انجام شد. اطلاعات فایل پشتیبان روی این گوشی جایگزین شد.");
  }catch(err){finish();console.error("backup restore",err);
-  const msg=err&&err.message==="empty-backup"?"بازیابی انجام نشد: فایل انتخاب‌شده خوانده نشد (خالی بود). اگر فایل از تلگرام/بلوتوث دریافت شده، اول آن را دانلود کن (نه فقط پیش‌نمایش) و از پوشه Download انتخابش کن.":"بازیابی انجام نشد: فایل پشتیبان خوانده یا معتبر نیست. فایل JSON اصلی را دوباره انتخاب کن.";
+  const msg=err&&err.message==="empty-backup"?"بازیابی انجام نشد: فایل انتخاب‌شده خوانده نشد (خالی بود). اگر فایل از تلگرام/بلوتوث دریافت شده، اول آن را دانلود کن (نه فقط پیش‌نمایش) و از پوشه Download انتخابش کن.":err&&err.message==="wrong-password"?"بازیابی انجام نشد: رمز عبور بکاپ اشتباه بود.":"بازیابی انجام نشد: فایل پشتیبان خوانده یا معتبر نیست. فایل JSON اصلی را دوباره انتخاب کن.";
   alert(msg)}
 }
 function clearData(){if(confirm("همه اطلاعات حذف شود؟")){const pin=data.pin,pinHash=data.pinHash,pinSalt=data.pinSalt,patternHash=data.patternHash,patternSalt=data.patternSalt,lockMethod=data.lockMethod,biometricEnabled=data.biometricEnabled,webauthnCredId=data.webauthnCredId,lang=data.lang;data=blankData();data.pin=pin;data.pinHash=pinHash;data.pinSalt=pinSalt;data.patternHash=patternHash;data.patternSalt=patternSalt;data.lockMethod=lockMethod;data.biometricEnabled=biometricEnabled;data.webauthnCredId=webauthnCredId;data.lang=lang;save();logEvent("پاک کردن اطلاعات","اطلاعات برنامه پاک شد","delete");}}
