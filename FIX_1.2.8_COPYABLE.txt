@@ -1,0 +1,252 @@
+حساب‌یار — برنامه اصلاحات نسخه ۱.۲.۸
+====================================
+
+هدف
+----
+این فایل فهرست اصلاحات ضروری نسخه ۱.۲.۸ است. قبل از انتشار، همه موارد باید انجام و تست شوند.
+
+۱) یکسان‌سازی نسخه
+-------------------
+در همه فایل‌ها فقط از نسخه ۱.۲.۸ استفاده شود:
+
+- app.js:
+  const APP_VERSION="1.2.8";
+- index.html:
+  version-pill و appVersionText برابر 1.2.8 باشند.
+- sw.js:
+  const CACHE = "hesabdar-1-2-8-offline-v2";
+- index.html:
+  navigator.serviceWorker.register("sw.js?v=1-2-8", { updateViaCache: "none" })
+- نام Artifact در GitHub Actions:
+  HesabYar-1.2.8-APK
+
+۲) اصلاح امنیت قفل الگو
+-----------------------
+در openPatternSetup و removePin، اگر patternHash وجود دارد، قبل از تغییر یا حذف الگو باید الگوی فعلی یا بیومتریک تأیید شود.
+
+منطق پیشنهادی:
+
+async function verifyExistingLock(){
+  if(data.patternHash && data.patternSalt){
+    const path=await promptPatternVerification();
+    return path ? await verifyPattern(path) : false;
+  }
+  if(data.pinHash || data.pin){
+    const p=prompt("رمز فعلی را وارد کن:")||"";
+    return verifyPin(p);
+  }
+  return true;
+}
+
+- حذف قفل الگو فقط با verifyExistingLock انجام شود.
+- تغییر الگو فقط با verifyExistingLock انجام شود.
+- confirm به‌تنهایی برای حذف قفل کافی نیست.
+- پس از سه خطای متوالی، حداقل ۳۰ ثانیه تأخیر اعمال شود.
+
+۳) جلوگیری از پرداخت بیشتر از مانده
+-----------------------------------
+در confirmPersonPayment قبل از ساخت تراکنش:
+
+const remaining=Math.max(0,(Number(p.amount)||0)-(Number(p.paid)||0));
+if(n<=0)return alert("مبلغ نامعتبر است");
+if(n>remaining)return alert("مبلغ پرداخت بیشتر از مانده است");
+
+در confirmInstallmentPayment نیز مبلغ قسط باید مثبت باشد و دوباره پرداخت‌شده نباشد:
+
+if(it.paid)return alert("این قسط قبلاً پرداخت شده است");
+if(Number(it.amount)<=0)return alert("مبلغ قسط نامعتبر است");
+
+۴) اصلاح موجودی انبار
+----------------------
+موجودی فاکتور باید قبل و بعد از ویرایش به‌صورت دقیق محاسبه شود. هر آیتم فاکتور هنگام ذخیره باید Snapshot قیمت خرید داشته باشد:
+
+{
+  productId,
+  desc,
+  qty,
+  price,
+  costPriceAtSale: Number(product?.buyPrice)||0
+}
+
+در گزارش سودآوری از costPriceAtSale استفاده شود، نه قیمت فعلی محصول.
+
+- حذف فاکتور: فقط مقدار همان فاکتور یک‌بار به موجودی برگردانده شود.
+- بازیابی فاکتور: فقط مقدار همان فاکتور یک‌بار از موجودی کم شود.
+- ویرایش فاکتور: ابتدا اثر نسخه قدیمی برگردانده شود، سپس اثر نسخه جدید اعمال شود.
+- برای جلوگیری از منفی شدن موجودی، کمبود موجودی باید هشدار بدهد؛ Math.max(0, ...) نباید بدون ثبت هشدار باعث پنهان شدن کسری شود.
+
+۵) بررسی ورودی‌های مالی
+-----------------------
+همه ورودی‌های زیر باید غیرمنفی و معتبر باشند:
+
+- مبلغ تراکنش
+- قیمت خرید و فروش
+- تعداد کالا
+- مبلغ فاکتور
+- تخفیف
+- مالیات
+- مبلغ چک
+- مبلغ بدهی و طلب
+
+نمونه:
+
+function positiveMoney(value,label="مبلغ"){
+  const n=parseMoney(value);
+  if(!Number.isFinite(n)||n<=0)throw new Error(label+" باید بیشتر از صفر باشد");
+  return n;
+}
+
+درصد تخفیف و مالیات باید بین صفر و صد محدود شوند.
+تعداد کالا باید بزرگ‌تر از صفر باشد.
+
+۶) رمزنگاری بکاپ
+-----------------
+بکاپ JSON خام نباید برای اطلاعات مالی حساس استفاده شود. قبل از exportData، داده با AES-GCM رمزنگاری شود و کلید با PBKDF2/SHA-256 از رمز عبور بکاپ ساخته شود.
+
+ساختار پیشنهادی:
+
+{
+  format:"hesabdar-encrypted-backup",
+  version:1,
+  salt:"base64",
+  iv:"base64",
+  ciphertext:"base64"
+}
+
+بکاپ قدیمی فقط در صورت تشخیص format:"hesabdar-backup" با هشدار کاربر پذیرفته شود.
+
+۷) API هوش مصنوعی
+------------------
+کلید API نباید در localStorage نگه‌داری شود. راه‌حل نهایی:
+
+- ایجاد Backend/Proxy امن.
+- نگه‌داری کلید فقط در Secret Manager سرور.
+- ارسال متن کاربر از برنامه به Backend.
+- محدودیت نرخ درخواست.
+- اعتبارسنجی پاسخ JSON در سمت سرور و کلاینت.
+
+تا قبل از ایجاد Backend، در README و رابط کاربری صریحاً هشدار داده شود که کلید در دستگاه قابل استخراج است.
+
+۸) اصلاح Firebase Sync
+----------------------
+- زمان‌ها با Date.parse مقایسه شوند، نه localeCompare رشته‌ای.
+- برای هر رکورد revision عددی و updatedBy ذخیره شود.
+- حذف‌ها دارای tombstone باشند.
+- tombstoneها فقط بعد از اطمینان از دریافت همه دستگاه‌ها پاک شوند.
+- تصاویر از Firestore document جدا شوند و در Firebase Storage ذخیره شوند.
+- اندازه رکورد قبل از upload بررسی شود.
+- audit به‌صورت جداگانه و با سقف مشخص همگام شود.
+
+نمونه مقایسه:
+
+function compareUpdatedAt(a,b){
+  const ta=Date.parse(a||"")||0;
+  const tb=Date.parse(b||"")||0;
+  return ta===tb?0:(ta>tb?1:-1);
+}
+
+۹) انتقال localStorage به IndexedDB
+------------------------------------
+localStorage فقط برای تنظیمات کوچک استفاده شود. اطلاعات زیر باید در IndexedDB ذخیره شوند:
+
+- transactions
+- invoices
+- people
+- customers
+- products
+- checks
+- notes
+- reminders
+- audit
+- تصاویر پیوست
+
+ذخیره کامل JSON در هر save حذف شود و فقط رکورد تغییرکرده ذخیره شود.
+
+۱۰) اصلاح Capacitor و Android CI
+--------------------------------
+package.json باید dependencyهای ثابت داشته باشد:
+
+"dependencies": {
+  "@capacitor/core": "^6.2.0",
+  "@capacitor/android": "^6.2.0",
+  "@capacitor/cli": "^6.2.0"
+}
+
+همه نسخه‌ها باید با یک نسخه سازگار باشند. پوشه android باید با npx cap add android ساخته و در مخزن نگه‌داری شود، یا در CI قبل از sync ساخته شود.
+
+Workflow فقط در مسیر زیر نگه‌داری شود:
+
+.github/workflows/android.yml
+
+فایل تکراری زیر حذف شود:
+
+.github/workflows/.github/workflows/android.yml
+
+مراحل پیشنهادی CI:
+
+npm ci
+npm run validate
+npx cap doctor
+npx cap sync android
+cd android
+./gradlew assembleDebug
+
+۱۱) اصلاح Service Worker
+------------------------
+- برای app.js و style.css از Cache-First بدون نسخه استفاده نشود.
+- فایل‌های اصلی Network-First باشند.
+- خطای fetch برای همه درخواست‌ها fallback داشته باشد.
+- نسخه cache با نسخه برنامه هماهنگ باشد.
+- در هر انتشار، CACHE تغییر کند.
+
+۱۲) migration داده
+------------------
+مهاجرت داده باید نسخه‌به‌نسخه و غیرمخرب باشد:
+
+function migrateData(input){
+  let d=structuredClone(input||blankData());
+  const version=Number(d.schemaVersion||1);
+  if(version<2)d=migrateV1ToV2(d);
+  if(version<3)d=migrateV2ToV3(d);
+  if(version<4)d=migrateV3ToV4(d);
+  d.schemaVersion=4;
+  return d;
+}
+
+قبل از migration از داده خام یک کپی اضطراری گرفته شود. در صورت خطا، داده قبلی نباید پاک شود.
+
+۱۳) تست‌های لازم
+----------------
+این تست‌ها باید قبل از انتشار موفق شوند:
+
+- accountBalance برای درآمد، هزینه و انتقال
+- invoiceSubtotal و invoiceTotal
+- invoiceRemaining
+- پرداخت بیشتر از مانده
+- پرداخت قسط و لغو پرداخت قسط
+- کسر موجودی هنگام فروش
+- برگشت موجودی هنگام حذف فاکتور
+- ویرایش فاکتور بدون دوباره‌کسر شدن موجودی
+- بازیابی از زباله‌دان
+- jalaliToISO و تبدیل معکوس
+- mergeCloud در تعارض دو دستگاه
+- migration نسخه‌های قدیمی
+- باز کردن و حذف قفل PIN و Pattern
+- export/import بکاپ رمزنگاری‌شده
+
+۱۴) کنترل نسخه نهایی
+--------------------
+قبل از Release این موارد بررسی شود:
+
+- npm run validate
+- نبود API Key واقعی در Git history
+- نبود فایل ZIP و بکاپ حاوی اطلاعات واقعی در مخزن
+- نبود console.log حاوی اطلاعات حساس
+- تست روی Chrome Android
+- تست روی Safari iOS
+- تست APK روی Android 10، 12 و 14
+- تست حالت آفلاین
+- تست ذخیره، بازیابی، همگام‌سازی و قطع اینترنت
+- بررسی Lighthouse و حجم اولیه برنامه
+
+نسخه نهایی مورد انتظار: ۱.۲.۸
