@@ -1,0 +1,2 @@
+export function invoiceStockDelta(invoice, sign=-1){const out=new Map();for(const item of invoice?.items||[]){if(!item.productId)continue;const q=Number(item.qty)||0;out.set(item.productId,(out.get(item.productId)||0)+sign*q);}return out;}
+export function calculateStockDifference(oldInvoice,newInvoice){const out=new Map();for(const [id,q] of invoiceStockDelta(oldInvoice,1))out.set(id,(out.get(id)||0)+q);for(const [id,q] of invoiceStockDelta(newInvoice,-1))out.set(id,(out.get(id)||0)+q);return out;}
