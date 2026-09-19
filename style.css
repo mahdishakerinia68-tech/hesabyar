@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap');
+/* t1: فونت وزیرمتن حالا از index.html و بدون مسدود کردن رندر بارگذاری می‌شود؛ اگر در دسترس نبود (آفلاین/فیلتر) فونت‌های سیستم جایگزین می‌شوند. */
 
 /* ===== "فیروزه و دوات" design tokens — Persian turquoise & ink theme ===== */
 :root{
@@ -814,3 +814,12 @@ button,.nav,a,input,select,textarea{touch-action:manipulation}
 .inst-list-head{display:flex;justify-content:space-between;align-items:center;margin:16px 2px 8px;font-size:13px}.inst-list-head span{font-size:11px;color:var(--label2)}
 .inst-card{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px;border:1px solid var(--sep);border-radius:16px;background:var(--card);margin:8px 0;transition:.15s}.inst-card.paid{opacity:.78}.inst-card.overdue{border-color:color-mix(in srgb,var(--red) 45%,var(--sep))}.inst-card.soon{border-color:color-mix(in srgb,#e09a24 48%,var(--sep))}.inst-card-main{display:flex;align-items:flex-start;gap:9px;min-width:0}.inst-number{width:32px;height:32px;border-radius:11px;background:var(--bg3);display:grid;place-items:center;font-weight:900;font-size:12px;flex:none}.inst-card.paid .inst-number{background:color-mix(in srgb,#20a56a 16%,var(--bg3))}.inst-card-info{min-width:0}.inst-title-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.inst-title-row b{font-size:13px}.inst-status{font-size:9px;border-radius:999px;padding:3px 6px;font-weight:800}.inst-status.paid{background:rgba(32,165,106,.12);color:#16804f}.inst-status.pending{background:var(--bg3);color:var(--label2)}.inst-status.soon{background:rgba(224,154,36,.13);color:#9b650b}.inst-status.overdue{background:rgba(210,70,70,.12);color:var(--red)}.inst-due{font-size:10px;color:var(--label2);margin-top:4px}.inst-receipt{display:flex;align-items:center;gap:5px;margin-top:5px;font-size:9px;color:var(--label2)}.inst-receipt .tx-thumb{width:28px;height:28px;border-radius:7px}.inst-card-side{text-align:end;min-width:112px}.inst-card-side>strong{display:block;font-size:13px;margin-bottom:6px}.inst-card-side .actions{display:flex;justify-content:flex-end;gap:4px;flex-wrap:wrap}.inst-card-side button{font-size:10px;padding:6px 8px;border-radius:9px;min-height:30px}.inst-receipt-btn{background:var(--bg3);color:var(--label);border:1px solid var(--sep)}
 @media(max-width:430px){.inst-card{align-items:flex-start}.inst-card-side{min-width:94px}.inst-card-side button{font-size:9px;padding:5px 6px}.inst-stats b{font-size:10px}.inst-hero{padding:13px}.inst-total strong{font-size:21px}}
+
+
+/* ===== t1: دسترس‌پذیری ===== */
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focus-visible,.nav:focus-visible{
+  outline:3px solid var(--blue);outline-offset:2px;
+}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;scroll-behavior:auto !important}
+}

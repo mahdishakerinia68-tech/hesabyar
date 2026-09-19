@@ -1,16 +1,15 @@
 {
   "name": "hesabyar",
-  "version": "1.2.8",
+  "version": "1.2.9-t1",
   "private": true,
-  "description": "حساب‌یار - Web/PWA personal and business accounting application",
+  "description": "حساب‌یار - Web/PWA personal and business accounting application (build t1)",
+  "type": "module",
   "scripts": {
+    "check": "node --check app.js && node --check sw.js && node --check src/core/storage-runtime.js && node --check capacitor-biometric-bridge.js && node --check capacitor-filesystem-bridge.js && node --check capacitor-local-notifications-bridge.js",
+    "validate": "npm run check && node scripts/security-check.mjs",
     "build": "npm run validate",
-    "sync": "npx cap sync",
-    "android": "npx cap open android",
-    "ios": "npx cap open ios",
-    "check": "node --check app.js",
-    "check:sw": "node --check sw.js",
-    "check:bridges": "node --check capacitor-biometric-bridge.js && node --check capacitor-filesystem-bridge.js && node --check capacitor-local-notifications-bridge.js",
-    "validate": "npm run check && npm run check:sw && npm run check:bridges"
+    "test": "node tests/run.mjs && node tests/e2e-smoke.mjs",
+    "test:browser": "node tests/e2e-browser.mjs",
+    "e2e": "node tests/e2e-smoke.mjs"
   }
 }

@@ -1,9 +1,10 @@
-const CACHE = "hesabdar-1-2-8-offline-v2";
+const CACHE = "hesabdar-t1-offline-v1";
 const ASSETS = [
   "./",
   "./index.html",
   "./style.css",
   "./app.js",
+  "./src/core/storage-runtime.js",
   "./manifest.json",
   "./logo.png",
   "./capacitor-local-notifications-bridge.js",
@@ -12,11 +13,11 @@ const ASSETS = [
 ];
 
 self.addEventListener("install", event => {
-  event.waitUntil(
-    caches.open(CACHE)
-      .then(cache => cache.addAll(ASSETS))
-      .then(() => self.skipWaiting())
-  );
+  event.waitUntil((async()=>{
+    const cache=await caches.open(CACHE);
+    for(const asset of ASSETS){try{const response=await fetch(asset,{cache:"no-store"});if(response&&response.ok&&response.type==="basic")await cache.put(asset,response.clone());}catch(e){}}
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener("activate", event => {
@@ -76,7 +77,7 @@ self.addEventListener("fetch", event => {
     caches.match(event.request).then(cached => {
       if (cached) return cached;
       return fetch(event.request).then(response => {
-        if (response && response.ok && url.origin === self.location.origin) {
+        if (response && response.ok && response.type === "basic" && url.origin === self.location.origin) {
           const copy = response.clone();
           caches.open(CACHE).then(cache => cache.put(event.request, copy)).catch(() => {});
         }

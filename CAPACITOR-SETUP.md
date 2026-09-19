@@ -1,11 +1,12 @@
 # Capacitor
 
-Capacitor در این انتشار، **خارج از محدوده نسخه Web/PWA 1.2.8** است. هدف فعلی پروژه اجرای پایدار در مرورگر، PWA و GitHub Pages است.
+Capacitor خارج از محدوده‌ی نسخه‌ی Web/PWA است و dependencyهای آن در `package.json` نیستند. فایل‌های `capacitor-*-bridge.js` و `capacitor.config.ts` فقط برای سازگاری کد باقی مانده‌اند؛ روی وب بدون Capacitor هیچ کاری نمی‌کنند.
 
-فایل‌های bridge مربوط به Capacitor در مخزن برای سازگاری با کد فعلی باقی مانده‌اند، اما این نسخه workflow ساخت APK یا Android/iOS ندارد.
+اگر در آینده انتشار native لازم شد:
 
-## نکته درباره Update
+```bash
+npm i @capacitor/core @capacitor/cli @capacitor/android @capacitor/filesystem @capacitor/local-notifications
+npx cap add android && npx cap sync android
+```
 
-نسخه 1.2.8 قابلیت update از GitHub را به عنوان قابلیت فعال برنامه معرفی نمی‌کند. به‌روزرسانی نسخه وب از طریق انتشار فایل‌های جدید سایت و Service Worker انجام می‌شود.
-
-اگر در آینده انتشار native لازم شد، تنظیمات Capacitor باید جداگانه و بدون تغییر رفتار نسخه Web/PWA طراحی و تست شود.
+سپس یک workflow جداگانه برای Gradle اضافه و روی دستگاه واقعی تست کنید. رفتار نسخه‌ی Web/PWA نباید تغییر کند.

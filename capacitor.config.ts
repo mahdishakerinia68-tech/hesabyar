@@ -1,9 +1,13 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 const config: CapacitorConfig = {
-  appId: 'ir.hesabdar.app',
-  appName: 'حسابدار',
+  appId: 'com.hesabyar.app',
+  appName: 'حساب‌یار',
   webDir: '.',
   bundledWebRuntime: false,
-  server: { androidScheme: 'https' }
+  plugins: {
+    LocalNotifications: { smallIcon: 'ic_stat_icon_config_sample' }
+  },
+  ios: { contentInset: 'automatic' },
+  android: { allowMixedContent: false }
 };
 export default config;

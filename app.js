@@ -1,9 +1,8 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="1.2.8";
-const AUTO_BACKUP_KEY="hesabdar-auto-backups-v1";
-const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v1";
+const APP_VERSION="t1";
+const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v2";
 const AUTO_BACKUP_MS=6*60*60*1000;
 const APP_MODE_KEY="hesabdar-app-mode-v1";
 function appMode(){return localStorage.getItem(APP_MODE_KEY)||"business"}
@@ -105,7 +104,6 @@ function openAppModeSheet(){
   </div>`);
   applyAppMode();
 }
-const ANTHROPIC_KEY_STORAGE="hesabdar-anthropic-key-v1";
 const DEVICE_ID_KEY="hesabdar-device-id-v1";
 const DEVICE_PRESENCE_MS=45*1000;
 const DEVICE_PRESENCE_INTERVAL=20*1000;
@@ -126,7 +124,13 @@ const DEFAULT_SYNC_CONFIG={
 let sync={app:null,auth:null,db:null,user:null,unsubscribe:null,ready:false,saving:false,queued:false,hydrating:false,authListener:false,dirty:new Map()};
 function syncConfig(){try{return JSON.parse(localStorage.getItem(SYNC_KEY)||"null")||DEFAULT_SYNC_CONFIG}catch{return DEFAULT_SYNC_CONFIG}}
 function autoBackupEnabled(){return localStorage.getItem(AUTO_BACKUP_ENABLED_KEY)!=="false"}
-function setAutoBackupEnabled(v){localStorage.setItem(AUTO_BACKUP_ENABLED_KEY,v?"true":"false"); if(v) createAutoBackup("فعال‌سازی پشتیبان خودکار"); logEvent(v?"پشتیبان خودکار فعال شد":"پشتیبان خودکار غیرفعال شد",v?"از این پس هر ۶ ساعت یک فایل پشتیبان واقعی داخل گوشی ساخته می‌شود":"پشتیبان‌گیری خودکار خاموش شد","settings",false); renderSettingsFeatures()}
+/* t1: پشتیبان واقعیِ خودکار نمی‌تواند بدون رمز کاربر ساخته شود (بکاپ‌ها رمزنگاری‌شده‌اند)،
+ * پس این گزینه اکنون «یادآوری پشتیبان‌گیری» است و هیچ ادعای ساخت فایل خودکار ندارد. */
+const LAST_BACKUP_KEY="hesabdar-last-backup-at-v1";
+const BACKUP_REMIND_DAYS=7;
+function getAutoBackupInfo(){try{const v=localStorage.getItem(LAST_BACKUP_KEY);if(!v)return null;const d=new Date(v);return isNaN(d.getTime())?null:d}catch(e){return null}}
+function markBackupDone(){try{localStorage.setItem(LAST_BACKUP_KEY,new Date().toISOString())}catch(e){}renderSettingsFeatures()}
+function setAutoBackupEnabled(v){localStorage.setItem(AUTO_BACKUP_ENABLED_KEY,v?"true":"false");logEvent(v?"یادآوری پشتیبان‌گیری فعال شد":"یادآوری پشتیبان‌گیری غیرفعال شد",v?"اگر بیش از ۷ روز پشتیبان نگیری، هنگام اجرای برنامه یادآوری می‌شود":"یادآوری پشتیبان‌گیری خاموش شد","settings",false);renderSettingsFeatures()}
 /* ---- Real file auto-backup -----------------------------------------
  * On a Capacitor build (native app), this writes an actual .json file
  * into a "حسابداری" folder inside the device's shared Downloads folder
@@ -140,7 +144,6 @@ function setAutoBackupEnabled(v){localStorage.setItem(AUTO_BACKUP_ENABLED_KEY,v?
  * safety net for the in-app "restore last backup" button. ---- */
 const AUTO_BACKUP_DIRECTORY="ExternalStorage";
 const AUTO_BACKUP_FOLDER="Download/حسابداری";
-const AUTO_BACKUP_LAST_FILE_KEY="hesabdar-auto-backup-last-file-v1";
 function backupFileName(){
  const d=new Date(),p=n=>String(n).padStart(2,"0");
  return `hesabdar-backup-${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.json`;
@@ -185,34 +188,17 @@ async function writeAutoBackupFile(payload){
   return {ok:true,method:"download",filename,where:"Download"};
  }catch(e){console.warn("auto backup file download failed",e);return {ok:false}}
 }
-function createAutoBackup(reason="زمان‌بندی"){
- try{
-  if(!autoBackupEnabled())return false;
-  const raw=JSON.stringify(data);
-  const list=JSON.parse(localStorage.getItem(AUTO_BACKUP_KEY)||"[]");
-  list.unshift({at:new Date().toISOString(),reason,data:JSON.parse(raw)});
-  while(list.length>5)list.pop();
-  localStorage.setItem(AUTO_BACKUP_KEY,JSON.stringify(list));
-  localStorage.setItem(AUTO_BACKUP_KEY+"-last",new Date().toISOString());
-  writeAutoBackupFile(backupPayload()).then(res=>{
-   if(res?.ok){localStorage.setItem(AUTO_BACKUP_LAST_FILE_KEY,JSON.stringify({filename:res.filename,where:res.where,at:new Date().toISOString()}));renderSettingsFeatures()}
-  }).catch(e=>console.warn("auto backup file",e));
-  return true;
- }catch(e){console.warn("auto backup",e);return false}
-}
-function getAutoBackupInfo(){try{const last=localStorage.getItem(AUTO_BACKUP_KEY+"-last");return last?new Date(last):null}catch{return null}}
-/* Runs a backup only if none has ever run, or the last one was 6+ hours
- * ago — so opening the app doesn't force a backup (and a possible
- * Filesystem error) every single time, only on the intended schedule. */
-function maybeAutoBackup(reason){
- if(!autoBackupEnabled())return false;
+/* یادآوری پشتیبان‌گیری: فقط هنگام اجرای برنامه و فقط اگر داده‌ی واقعی وجود دارد. */
+let _backupRemindShown=false;
+function maybeBackupReminder(){
+ if(_backupRemindShown||!autoBackupEnabled()||!hasUserRecords(data))return false;
  const last=getAutoBackupInfo();
- if(last&&Date.now()-last.getTime()<AUTO_BACKUP_MS)return false;
- return createAutoBackup(reason);
+ if(last&&Date.now()-last.getTime()<BACKUP_REMIND_DAYS*24*60*60*1000)return false;
+ _backupRemindShown=true;
+ setTimeout(()=>{try{alert(last?"⚠️ بیش از ۷ روز از آخرین پشتیبان‌گیری گذشته است. از «تنظیمات ← پشتیبان‌گیری دستی» یک پشتیبان رمزنگاری‌شده بگیر.":"⚠️ هنوز از اطلاعات پشتیبان نگرفته‌ای. از «تنظیمات ← پشتیبان‌گیری دستی» یک پشتیبان رمزنگاری‌شده بگیر.")}catch(e){}},1500);
+ return true;
 }
-function getAutoBackupFileInfo(){try{return JSON.parse(localStorage.getItem(AUTO_BACKUP_LAST_FILE_KEY)||"null")}catch{return null}}
-function restoreLatestAutoBackup(){try{const list=JSON.parse(localStorage.getItem(AUTO_BACKUP_KEY)||"[]"); if(!list.length)return alert("هنوز پشتیبان خودکاری وجود ندارد."); if(!confirm("آخرین پشتیبان خودکار جایگزین اطلاعات فعلی شود؟"))return; data=list[0].data; normalizeData(); save(); logEvent("بازیابی پشتیبان خودکار",new Date(list[0].at).toLocaleString("fa-IR"),"settings"); alert("آخرین پشتیبان خودکار بازیابی شد.")}catch(e){alert("پشتیبان خودکار قابل بازیابی نیست.")}}
-function normalizeData(){data=data||blankData(); data.schemaVersion=Number(data.schemaVersion)||1; for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats","audit","trash"]){data[k]??=[];} data.pin=typeof data.pin==="string"?data.pin:""; data.pinHash=typeof data.pinHash==="string"?data.pinHash:""; data.pinSalt=typeof data.pinSalt==="string"?data.pinSalt:""; data.patternHash=typeof data.patternHash==="string"?data.patternHash:""; data.patternSalt=typeof data.patternSalt==="string"?data.patternSalt:""; data.lockMethod=(data.lockMethod==="pattern")?"pattern":"pin"; data.biometricEnabled=!!data.biometricEnabled; data.webauthnCredId=typeof data.webauthnCredId==="string"?data.webauthnCredId:""; data.lang=(data.lang==="en")?"en":"fa"; data.branding??={storeName:"",logo:"",stamp:"",signature:""}; data.yearSettlements??={}; data._sync??={tombstones:{}}; data._sync.tombstones??={}; for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats"]){for(const r of data[k]){r.id??=uid();r.updatedAt??=new Date().toISOString();}} for(const c of [...data.expenseCats,...data.incomeCats]){c.children??=[];for(const ch of c.children){ch.id??=uid();}} data.notes.forEach((n,i)=>{if(typeof n.order!=="number")n.order=i;}); data.reminders.forEach((r,i)=>{if(typeof r.order!=="number")r.order=i;});}
+function normalizeData(){data=data||blankData(); data.schemaVersion=Number(data.schemaVersion)||1; for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats","audit","trash"]){data[k]??=[];} data.pin=""; data.pinHash=typeof data.pinHash==="string"?data.pinHash:""; data.pinSalt=typeof data.pinSalt==="string"?data.pinSalt:""; data.patternHash=typeof data.patternHash==="string"?data.patternHash:""; data.patternSalt=typeof data.patternSalt==="string"?data.patternSalt:""; data.lockMethod=(data.lockMethod==="pattern")?"pattern":"pin"; data.biometricEnabled=!!data.biometricEnabled; data.webauthnCredId=typeof data.webauthnCredId==="string"?data.webauthnCredId:""; data.lang=(data.lang==="en")?"en":"fa"; data.branding??={storeName:"",logo:"",stamp:"",signature:""}; data.yearSettlements??={}; data._sync??={tombstones:{}}; data._sync.tombstones??={}; data._sync.tombstoneRevisions??={}; for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats"]){for(const r of data[k]){r.id??=uid();r.updatedAt??=new Date().toISOString();}} for(const c of [...data.expenseCats,...data.incomeCats]){c.children??=[];for(const ch of c.children){ch.id??=uid();}} data.notes.forEach((n,i)=>{if(typeof n.order!=="number")n.order=i;}); data.reminders.forEach((r,i)=>{if(typeof r.order!=="number")r.order=i;});}
 /* ---- Language switch (v5.9) -------------------------------------------
  * Translates the app's static "chrome" — menu, page section headers, and
  * settings group titles — between Persian and English, and switches
@@ -223,7 +209,7 @@ const I18N_EN={
  "page.home":"Home","page.recent":"Recent Transactions","page.accounts":"Accounts & Banks","page.transfer":"Transfer Between Accounts","page.bankMsg":"Bank SMS","page.transactions":"Transactions","page.products":"📦 Products & Inventory","page.customers":"👥 Customers","page.people":"Debts / Credits","page.reminders":"Reminders","page.notes":"📝 Notes","page.checks":"Checks","page.categories":"Expense Categories","page.reports":"Dashboard & Reports","page.audit":"📋 Activity Log","page.invoices":"📦 Invoice Box","page.settings":"Settings",
  "menu.title":"Menu","menu.main":"Main","menu.finance":"Finance","menu.notesGroup":"Notes & Reminders","menu.other":"Other",
  "nav.home":"Home","nav.transactions":"Transactions","nav.invoices":"Invoices","nav.reports":"Reports","nav.accounts":"Accounts","nav.people":"Debts/Credits","nav.customers":"Customers","nav.products":"Products","nav.checks":"Checks","nav.reminders":"Reminders","nav.notes":"Notes","nav.categories":"Categories","nav.settings":"Settings",
- "stg.branding.title":"Store & Invoice Branding","stg.year.title":"Fiscal Year","stg.notif.title":"Notifications","stg.backup.title":"Backup & Updates","stg.github.title":"Update from GitHub","stg.manualBackup.title":"Manual Backup","stg.sync.title":"Two-Device Sync","stg.security.title":"Login Security","stg.lang.title":"App Language","stg.lang.hint":"The menu, page titles and settings section will be shown in this language."
+ "stg.branding.title":"Store & Invoice Branding","stg.year.title":"Fiscal Year","stg.notif.title":"Notifications","stg.backup.title":"Backup Reminder","stg.github.title":"Update from GitHub","stg.manualBackup.title":"Manual Backup","stg.sync.title":"Two-Device Sync","stg.security.title":"Login Security","stg.lang.title":"App Language","stg.lang.hint":"The menu, page titles and settings section will be shown in this language."
 };
 function applyLanguage(){
  const lang=data.lang==="en"?"en":"fa";
@@ -287,13 +273,10 @@ function updateSettingsDots(){
  set("dotSync",!sync?.user);
  set("dotBranding",!(data.branding?.storeName||data.branding?.logo));
 }
-function renderSettingsFeatures(){const e=$("autoBackupToggle");if(e)e.checked=autoBackupEnabled(); const last=$("autoBackupLast"); if(last){const d=getAutoBackupInfo();const f=getAutoBackupFileInfo();last.textContent=d?"آخرین پشتیبان: "+d.toLocaleString("fa-IR")+(f?.filename?` • فایل: ${f.filename} (${f.where})`:""):"هنوز پشتیبان خودکاری ساخته نشده";} const v=$("appVersionText");if(v)v.textContent=APP_VERSION; const vp=$("versionPill");if(vp)vp.textContent=APP_VERSION;updateSettingsDots();renderColorThemeSwatches();
+function renderSettingsFeatures(){const e=$("autoBackupToggle");if(e)e.checked=autoBackupEnabled(); const last=$("autoBackupLast"); if(last){const d=getAutoBackupInfo();last.textContent=d?"آخرین پشتیبان: "+d.toLocaleString("fa-IR"):"هنوز پشتیبان‌گیری نکرده‌ای";} const v=$("appVersionText");if(v)v.textContent=APP_VERSION; const vp=$("versionPill");if(vp)vp.textContent=APP_VERSION;updateSettingsDots();renderColorThemeSwatches();
  const bio=$("biometricToggle");if(bio)bio.checked=!!data.biometricEnabled;
  const mh=$("securityMethodHint");if(mh)mh.textContent=hasLockCode()?("روش فعلی: "+(data.lockMethod==="pattern"?"رمز الگو":"رمز عددی")+(data.biometricEnabled?" + بیومتریک":"")):"هنوز رمزی برای ورود تنظیم نشده.";
  const lt=$("langToggle");if(lt){lt.textContent=data.lang==="en"?"فا":"EN";lt.setAttribute("aria-label",data.lang==="en"?"تغییر زبان به فارسی":"Switch language to English")}
- const aiStatus=$("anthropicKeyStatus");if(aiStatus)aiStatus.textContent=anthropicKey()?"🟢 کلید API تنظیم شده است":"🔴 هنوز کلیدی تنظیم نشده";
- const su=$("smartNoteUrlInput");if(su&&!su.value)su.value=localStorage.getItem(SMART_NOTE_URL_STORAGE)||"";
- const sm=$("smartNoteModelInput");if(sm&&!sm.value)sm.value=localStorage.getItem(SMART_NOTE_MODEL_STORAGE)||"";
  applyAppMode();
 }
 function setSyncStatus(t){const e=$("syncStatus");if(e)e.textContent=t||"";const b=$("syncBadge");if(!b)return;const s=String(t||"");let cls="offline",label="☁️ آفلاین";if(s.includes("آنلاین")||s.includes("انجام شد")||s.includes("متصل است")){cls="online";label="☁️ متصل"}else if(s.includes("⚠️")||s.includes("ناموفق")){cls="error";label="⚠️ خطای اتصال"}else if(s.includes("در حال")||s.includes("بررسی")){cls="pending";label="☁️ در حال اتصال..."}else if(s.includes("وارد شوید")||s.includes("ابتدا")){cls="offline";label="☁️ واردنشده"}b.textContent=label;b.className="sync-badge "+cls}
@@ -372,7 +355,7 @@ function purgeOldTrash(){
  const cutoff=Date.now()-TRASH_DAYS*86400000;
  const before=data.trash.length;
  data.trash=data.trash.filter(t=>new Date(t.deletedAt).getTime()>=cutoff);
- if(data.trash.length!==before)localStorage.setItem(KEY,JSON.stringify(data));
+ if(data.trash.length!==before)persistLocal();
 }
 function trashDaysLeft(t){const passed=(Date.now()-new Date(t.deletedAt).getTime())/86400000;return Math.max(0,Math.ceil(TRASH_DAYS-passed))}
 function restoreFromTrash(trashId){
@@ -382,7 +365,7 @@ function restoreFromTrash(trashId){
  data[t.type]??=[];
  if(!data[t.type].some(x=>x.id===rec.id)){
   data[t.type].push(rec);
-  if(t.type==="invoices")adjustStockForInvoice(rec,-1);
+  if(t.type==="invoices"){adjustStockForInvoice(rec,-1);syncTransactionForInvoice(rec);syncPersonForInvoice(rec);}
   if(data._sync?.tombstones?.[t.type])delete data._sync.tombstones[t.type][rec.id];
   touch(rec);markDirty(t.type,rec.id,false,rec,rec.updatedAt);
  }
@@ -396,14 +379,14 @@ function deleteFromTrashForever(trashId){
  if(!confirm("این مورد برای همیشه پاک شود؟ دیگر قابل بازگردانی نیست."))return;
  const i=data.trash.findIndex(t=>t.trashId===trashId);if(i<0)return;
  data.trash.splice(i,1);
- localStorage.setItem(KEY,JSON.stringify(data));syncSave();
+ persistLocal();syncSave();
  if(pageActive("trash"))renderTrash();
 }
 function emptyTrashNow(){
  if(!data.trash?.length)return;
  if(!confirm(`${fa(data.trash.length)} مورد برای همیشه پاک شود؟ دیگر قابل بازگردانی نیست.`))return;
  data.trash=[];
- localStorage.setItem(KEY,JSON.stringify(data));syncSave();
+ persistLocal();syncSave();
  if(pageActive("trash"))renderTrash();
 }
 function trashTypeIcon(type){return {transactions:"☷",invoices:"🧾",checks:"✓"}[type]||"🗑"}
@@ -413,7 +396,7 @@ function renderTrash(){
  const empty1=$("trashEmptyBtn");if(empty1)empty1.style.display=data.trash?.length?"":"none";
  box.innerHTML=(data.trash||[]).map(t=>`<div class="item trash-row"><div><b>${trashTypeIcon(t.type)} ${esc(t.label)}</b><div class="meta">حذف‌شده: ${jalaliLabel(t.deletedAt)} • ${fa(trashDaysLeft(t))} روز تا حذف همیشگی</div></div><div class="actions"><button class="primary" onclick="restoreFromTrash('${t.trashId}')">↩️ بازگردانی</button><button onclick="deleteFromTrashForever('${t.trashId}')" class="danger-icon">🗑</button></div></div>`).join("")||empty("زباله‌دان خالی است");
 }
-async function upsertReminderForNote(note,renderAfter=true){if(!note?.id)return;const linked=(data.reminders||[]).filter(x=>x.sourceNoteId===note.id);let r=linked[0];for(const duplicate of linked.slice(1)){await cancelNativeReminder(duplicate.id);removeRecordSilent("reminders",duplicate.id)}if(!note.date){if(r){await cancelNativeReminder(r.id);removeRecordSilent("reminders",r.id);if(renderAfter)save();else{localStorage.setItem(KEY,JSON.stringify(data));syncSave()}}return}const o={title:note.title||"یادداشت",amount:0,date:note.date,repeat:note.repeat&&note.repeat!=="none"?note.repeat:"once",type:"note",sourceNoteId:note.id,body:reminderBodyFromNote(note)};if(r){Object.assign(r,o);touch(r);markDirty("reminders",r.id,false,r,r.updatedAt)}else{r=touch({id:uid(),...o});data.reminders.push(r);markDirty("reminders",r.id,false,r,r.updatedAt)}if(renderAfter)save();else{localStorage.setItem(KEY,JSON.stringify(data));syncSave()}await cancelNativeReminder(r.id);await scheduleNativeReminder(r);if((r.type||"")==="note" && (r.repeat||"once")==="once") await addToAndroidClock(r)}
+async function upsertReminderForNote(note,renderAfter=true){if(!note?.id)return;const linked=(data.reminders||[]).filter(x=>x.sourceNoteId===note.id);let r=linked[0];for(const duplicate of linked.slice(1)){await cancelNativeReminder(duplicate.id);removeRecordSilent("reminders",duplicate.id)}if(!note.date){if(r){await cancelNativeReminder(r.id);removeRecordSilent("reminders",r.id);if(renderAfter)save();else{persistLocal();syncSave()}}return}const o={title:note.title||"یادداشت",amount:0,date:note.date,repeat:note.repeat&&note.repeat!=="none"?note.repeat:"once",type:"note",sourceNoteId:note.id,body:reminderBodyFromNote(note)};if(r){Object.assign(r,o);touch(r);markDirty("reminders",r.id,false,r,r.updatedAt)}else{r=touch({id:uid(),...o});data.reminders.push(r);markDirty("reminders",r.id,false,r,r.updatedAt)}if(renderAfter)save();else{persistLocal();syncSave()}await cancelNativeReminder(r.id);await scheduleNativeReminder(r);if((r.type||"")==="note" && (r.repeat||"once")==="once") await addToAndroidClock(r)}
 async function syncAllNotesToReminders(){let changed=false;const noteIds=new Set((data.notes||[]).map(n=>n.id));for(const n of data.notes||[]){const before=(data.reminders||[]).length;await upsertReminderForNote(n);if((data.reminders||[]).length!==before)changed=true}for(const r of [...(data.reminders||[])]){if(r.sourceNoteId&&!noteIds.has(r.sourceNoteId)){await cancelNativeReminder(r.id);removeRecordSilent("reminders",r.id);changed=true}}if(changed)save();else render();if(sync.db)syncSave()}
 async function removeReminderForNote(noteId){const matches=(data.reminders||[]).filter(r=>r.sourceNoteId===noteId);for(const r of matches){await cancelNativeReminder(r.id);removeRecordSilent("reminders",r.id)}if(matches.length)save()}
 
@@ -506,18 +489,16 @@ window.addEventListener("offline",()=>setSyncStatus("⚠️ اینترنت دس�
  * همان داده‌ی اصلی (بدون migration) برگردانده می‌شود، نه داده خالی.
  * فعلاً migration واقعی‌ای لازم نیست (این اولین نسخه‌ای‌ست که
  * schemaVersion دارد)؛ تابع‌های migrateVXToVY آینده اینجا اضافه می‌شوند. */
-const CURRENT_SCHEMA_VERSION=1;
+const CURRENT_SCHEMA_VERSION=4;
+function migrateV1ToV2(d){d.attachments??=[];return d}
+function migrateV2ToV3(d){d._sync??={tombstones:{}};d._sync.tombstones??={};return d}
+function migrateV3ToV4(d){d._sync.tombstoneRevisions??={};return d}
 function migrateData(input){
- let raw;
- try{raw=JSON.parse(JSON.stringify(input||{}))}catch(e){return input}
- try{
-  let d=raw,version=Number(d.schemaVersion)||1;
-  // مثال برای آینده: if(version<2) d=migrateV1ToV2(d);
-  d.schemaVersion=CURRENT_SCHEMA_VERSION;
-  return d;
- }catch(e){console.warn("data migration failed, keeping original data",e);return input}
+ let data;try{data=structuredClone(input||blankData())}catch(e){console.warn("data migration clone failed",e);return input}
+ try{const version=Number(data.schemaVersion)||1;if(version<2)data=migrateV1ToV2(data);if(version<3)data=migrateV2ToV3(data);if(version<4)data=migrateV3ToV4(data);for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats","audit","attachments","trash"])data[k]??=[];data.schemaVersion=CURRENT_SCHEMA_VERSION;return data}catch(e){console.warn("data migration failed; original preserved",e);return input}
 }
 let data;
+let legacyLoaded=false,legacyCorrupt=false;
 try{
   let raw=localStorage.getItem(KEY);
   if(!raw){
@@ -525,18 +506,23 @@ try{
       const legacy=localStorage.getItem(legacyKey);
       if(legacy){
         raw=legacy;
-        try{localStorage.setItem(KEY,legacy)}catch(e){console.warn("storage migration",e)}
+        
         break;
       }
     }
   }
-  data=raw?migrateData(JSON.parse(raw)):null;
+  if(raw){legacyLoaded=true;try{data=migrateData(JSON.parse(raw))}catch(parseErr){legacyCorrupt=true;data=null;console.error("legacy data unreadable; original copy is kept",parseErr)}}
 }catch{data=null}
 data=data||blankData();
 normalizeData();
-data.accounts??=[];
-if(!data.accounts.some(a=>String(a.name||"").trim()==="کیف پول نقدی")){const cash=touch({id:uid(),name:"کیف پول نقدی",bank:"",sender:"",card:"",balance:0,default:true});data.accounts.unshift(cash);localStorage.setItem(KEY,JSON.stringify(data));}
-data.transactions??=[];data.people??=[];data.customers??=[];data.products??=[];data.reminders??=[];data.notes??=[];data.checks??=[];data.invoices??=[];data.audit??=[];data.trash??=[];data.expenseCats??=defaultsExpense.map((name,i)=>({id:"e"+i,name,children:[]}));data.incomeCats??=defaultsIncome.map((name,i)=>({id:"i"+i,name,children:[]}));data.pin=typeof data.pin==="string"?data.pin:"";data.pinHash=typeof data.pinHash==="string"?data.pinHash:"";data.pinSalt=typeof data.pinSalt==="string"?data.pinSalt:"";data.patternHash=typeof data.patternHash==="string"?data.patternHash:"";data.patternSalt=typeof data.patternSalt==="string"?data.patternSalt:"";data.lockMethod=(data.lockMethod==="pattern")?"pattern":"pin";data.biometricEnabled=!!data.biometricEnabled;data.webauthnCredId=typeof data.webauthnCredId==="string"?data.webauthnCredId:"";data.lang=(data.lang==="en")?"en":"fa";data.branding??={storeName:"",logo:"",stamp:"",signature:""};data.branding.storeName??="";data.branding.logo??="";data.branding.stamp??="";data.branding.signature??="";data.yearSettlements??={};data._sync??={tombstones:{}};data._sync.tombstones??={};for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats"]){for(const r of data[k]){r.id??=uid();r.updatedAt??=new Date().toISOString()}}for(const c of [...data.expenseCats,...data.incomeCats]){c.children??=[];for(const ch of c.children){ch.id??=uid()}}
+function ensureCashAccount(){
+ data.accounts??=[];
+ if(data.accounts.some(a=>String(a.name||"").trim()==="کیف پول نقدی"))return false;
+ const cash=touch({id:uid(),name:"کیف پول نقدی",bank:"",sender:"",card:"",balance:0,default:true});
+ data.accounts.unshift(cash);persistLocal();return true;
+}
+/* ensureCashAccount() از initApp صدا زده می‌شود (بعد از خواندن داده‌ی ذخیره‌شده). */
+data.transactions??=[];data.people??=[];data.customers??=[];data.products??=[];data.reminders??=[];data.notes??=[];data.checks??=[];data.invoices??=[];data.audit??=[];data.trash??=[];data.expenseCats??=defaultsExpense.map((name,i)=>({id:"e"+i,name,children:[]}));data.incomeCats??=defaultsIncome.map((name,i)=>({id:"i"+i,name,children:[]}));data.pin="";data.pinHash=typeof data.pinHash==="string"?data.pinHash:"";data.pinSalt=typeof data.pinSalt==="string"?data.pinSalt:"";data.patternHash=typeof data.patternHash==="string"?data.patternHash:"";data.patternSalt=typeof data.patternSalt==="string"?data.patternSalt:"";data.lockMethod=(data.lockMethod==="pattern")?"pattern":"pin";data.biometricEnabled=!!data.biometricEnabled;data.webauthnCredId=typeof data.webauthnCredId==="string"?data.webauthnCredId:"";data.lang=(data.lang==="en")?"en":"fa";data.branding??={storeName:"",logo:"",stamp:"",signature:""};data.branding.storeName??="";data.branding.logo??="";data.branding.stamp??="";data.branding.signature??="";data.yearSettlements??={};data._sync??={tombstones:{}};data._sync.tombstones??={};for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats"]){for(const r of data[k]){r.id??=uid();r.updatedAt??=new Date().toISOString()}}for(const c of [...data.expenseCats,...data.incomeCats]){c.children??=[];for(const ch of c.children){ch.id??=uid()}}
 // Normalize older people records so saved debtors/creditors always render correctly.
 for(const p of data.people){if(p.type==="debtor"||p.type==="debtors"||p.type==="بدهکار")p.type="debt";if(p.type==="creditor"||p.type==="creditors"||p.type==="طلبکار"||p.type==="بستانکار")p.type="credit";if(p.type!=="debt"&&p.type!=="credit")p.type="debt";p.amount=Number(p.amount)||0;p.paid=Number(p.paid)||0;p.name=String(p.name||"").trim()} 
 // v3.10: older checks از قبل از اتصال چک به حساب — مقادیر پیش‌فرض بگیرند تا خطا ندهند.
@@ -562,7 +548,7 @@ function scheduleAuditFlush(doSync){
   if(_auditFlushTimer)return;
   _auditFlushTimer=setTimeout(()=>{
     _auditFlushTimer=null;
-    try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){console.warn("audit flush",e)}
+    try{persistLocal()}catch(e){console.warn("audit flush",e)}
     const s=_auditFlushSync;_auditFlushSync=false;
     if(s)syncSave();
   },300);
@@ -582,20 +568,58 @@ function renderAudit(){
   box.innerHTML=logs.map(e=>`<div class="audit-item"><div class="audit-icon">${auditIcon(e.kind)}</div><div class="audit-main"><b>${esc(e.action)}</b>${e.detail?`<div class="meta">${esc(e.detail)}</div>`:""}<small>${new Intl.DateTimeFormat("fa-IR-u-ca-persian",{dateStyle:"short",timeStyle:"short"}).format(new Date(e.at))}</small></div></div>`).join("")||empty("هنوز گزارشی ثبت نشده است");
 }
 function clearAudit(){if(!data.audit?.length)return alert("گزارشی برای پاک کردن وجود ندارد");if(confirm("همه گزارش‌های فعالیت پاک شوند؟")){const old=data.audit.slice();data.audit=[];for(const e of old)markDirty("audit",e.id,true,{id:e.id},new Date().toISOString());save();logEvent("گزارش‌ها پاک شدند","سابقه فعالیت قبلی حذف شد","system")}}
-function persistLocal(){try{localStorage.setItem(KEY,JSON.stringify(data));return true}catch(e){console.warn("localStorage save failed",e);return false}}
+/* ---- ذخیره‌سازی (t1) ---------------------------------------------------
+ * ذخیره‌ها در صف serial انجام می‌شوند و چند درخواست پشت‌سرهم به یک نوشتن
+ * ادغام می‌شوند (نوشتن همیشه آخرین وضعیت data را می‌خواند). خطا فقط یک بار
+ * و بعد از شکست واقعی نوشتن گزارش می‌شود، نه به‌صورت الکی. */
 const STORAGE_FULL_MSG="⚠️ حافظه ذخیره‌سازی دستگاه پر شده و تغییرات ذخیره نشد.\nبرای آزاد شدن فضا از تنظیمات، یک پشتیبان بگیر و چند عکس پیوست قدیمی (رسید/تراکنش) را حذف کن.";
+const STORAGE_FAIL_MSG="⚠️ ذخیره اطلاعات روی این دستگاه انجام نشد.\nقبل از بستن برنامه از تنظیمات یک پشتیبان بگیر.";
+let storageWriteQueue=Promise.resolve();
+let _persistScheduled=false,_persistFailureShown=false,_lastAttachmentRecords=null;
+/* storageReady: تا پایان خواندن (hydrate) از IndexedDB هیچ نوشتنی انجام نمی‌شود؛ وگرنه داده‌ی خالیِ اولیه
+ * می‌توانست قبل از خواندن، اطلاعات ذخیره‌شده‌ی کاربر را بازنویسی کند. */
+let storageReady=false,_persistDeferred=false,storageMode="indexeddb";
+function isQuotaError(e){return !!e&&(e.name==="QuotaExceededError"||e.code===22||/quota/i.test(String(e.message||"")))}
+function onPersistFailure(err){
+  console.error("storage save failed",err);
+  const recs=_lastAttachmentRecords;_lastAttachmentRecords=null;
+  if(isQuotaError(err)&&recs){
+    let stripped=false;
+    recs.forEach(r=>{if(r&&(r.image||r.receipt||(r.images&&r.images.length))){delete r.image;delete r.receipt;delete r.images;stripped=true}});
+    if(stripped){persistLocal();render();alert("⚠️ حجم عکس پیوست بیش از فضای خالی دستگاه بود؛ اطلاعات بدون عکس ذخیره شد.");return}
+  }
+  if(_persistFailureShown)return;
+  _persistFailureShown=true;
+  alert(isQuotaError(err)?STORAGE_FULL_MSG:STORAGE_FAIL_MSG);
+}
+function persistLocal(){
+  if(!storageReady){_persistDeferred=true;return true}
+  if(storageMode==="localStorage"){
+    try{localStorage.setItem(KEY,JSON.stringify(data));_persistFailureShown=false;return true}
+    catch(e){onPersistFailure(e);return false}
+  }
+  if(!globalThis.HesabYarStorage){onPersistFailure(new Error("IndexedDB storage runtime unavailable"));return false}
+  if(_persistScheduled)return true;
+  _persistScheduled=true;
+  storageWriteQueue=storageWriteQueue.then(()=>{_persistScheduled=false;return HesabYarStorage.saveSnapshot(data)}).then(()=>{_persistFailureShown=false;_lastAttachmentRecords=null}).catch(onPersistFailure);
+  return true;
+}
+/* منتظر می‌ماند تا همه‌ی نوشتن‌های در صف تمام شوند. */
+function flushPersist(){return storageWriteQueue}
 function save(){
- if(!persistLocal()){alert(STORAGE_FULL_MSG);return}
- maybeAutoBackup("ذخیره زمان‌بندی‌شده"); render();syncSave()
+ persistLocal(); render();syncSave()
 }
 /* اگر رکورد تازه یک عکس پیوست دارد و فضای ذخیره‌سازی پر است، عکس را حذف و دوباره تلاش می‌کند
    تا خود اطلاعات (مثلاً تراکنش) به‌جای شکست کامل، بدون عکس ذخیره شود. */
 function saveWithAttachments(records){
- if(persistLocal()){maybeAutoBackup("ذخیره زمان‌بندی‌شده");render();syncSave();return true}
- let stripped=false;
- (Array.isArray(records)?records:[records]).forEach(r=>{if(r&&(r.image||r.receipt||(r.images&&r.images.length))){delete r.image;delete r.receipt;delete r.images;stripped=true}});
- if(stripped&&persistLocal()){maybeAutoBackup("ذخیره زمان‌بندی‌شده");render();syncSave();alert("⚠️ حجم عکس پیوست بیش از فضای خالی دستگاه بود؛ اطلاعات بدون عکس ذخیره شد.");return true}
- alert(STORAGE_FULL_MSG);return false
+ _lastAttachmentRecords=Array.isArray(records)?records:[records];
+ persistLocal();render();syncSave();return true
+}
+/* رکوردهای واقعیِ کاربر (بدون حساب پیش‌فرض «کیف پول نقدی») — برای یادآوری پشتیبان‌گیری. */
+function hasUserRecords(d){
+  if(!d||typeof d!=="object")return false;
+  if(["transactions","people","reminders","notes","checks","invoices","customers","products"].some(k=>Array.isArray(d[k])&&d[k].length>0))return true;
+  return Array.isArray(d.accounts)&&d.accounts.length>1;
 }
 function hasMeaningfulData(d){
   if(!d||typeof d!=="object")return false;
@@ -615,7 +639,7 @@ function recordDocId(type,id){return `${type}__${id}`}
 function allSyncRecords(){
   const ks=["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats","audit"];
   const out=[];
-  for(const k of ks) for(const r of (data[k]||[])) out.push({id:recordDocId(k,r.id),type:k,record:r,updatedAt:r.updatedAt||new Date().toISOString(),deleted:false});
+  for(const k of ks) for(const r of (data[k]||[])) out.push({id:recordDocId(k,r.id),type:k,record:r,revision:Number(r.revision)||0,updatedAt:r.updatedAt||new Date().toISOString(),updatedBy:r.updatedBy||deviceId(),deviceId:r.deviceId||deviceId(),deleted:false});
   for(const k of ks) for(const [id,dt] of Object.entries(data._sync?.tombstones?.[k]||{})) out.push({id:recordDocId(k,id),type:k,record:{id},updatedAt:dt,deleted:true});
   return out;
 }
@@ -632,7 +656,7 @@ function markAllLocalDirty(){
   for(const k of ks) for(const r of (data[k]||[])) markDirty(k,r.id,false,r,r.updatedAt);
   for(const k of ks) for(const [id,dt] of Object.entries(data._sync?.tombstones?.[k]||{})) markDirty(k,id,true,{id},dt);
 }
-function cloudPayload(x){return {type:x.type,record:x.record,updatedAt:x.updatedAt,deleted:x.deleted,updatedBy:sync.user.uid};}
+function cloudPayload(x){return {id:x.id,type:x.type,record:x.record,revision:Number(x.record?.revision||0),updatedAt:x.updatedAt,updatedBy:x.record?.updatedBy||sync.user.uid,deviceId:x.record?.deviceId||deviceId(),deleted:x.deleted};}
 async function commitChunks(items){
   const col=recordsCollection();
   for(let i=0;i<items.length;i+=450){
@@ -664,10 +688,10 @@ async function pullRest(){
 }
 /* v1.2.8: مقایسه زمانی رکوردها بر اساس Date.parse به‌جای مقایسه رشته‌ای
  * (localeCompare)، تا فرمت‌های زمانی متفاوت هم درست مقایسه شوند. */
-function compareUpdatedAt(a,b){const ta=Date.parse(a||"")||0,tb=Date.parse(b||"")||0;return ta===tb?0:(ta>tb?1:-1)}
+function compareUpdatedAt(a,b){const ar=Number(a?.revision)||0,br=Number(b?.revision)||0;if(ar!==br)return ar>br?1:-1;const ta=Date.parse(typeof a==="string"?a:a?.updatedAt||"")||0,tb=Date.parse(typeof b==="string"?b:b?.updatedAt||"")||0;if(ta!==tb)return ta>tb?1:-1;const ad=String(a?.deviceId||""),bd=String(b?.deviceId||"");return ad===bd?0:(ad>bd?1:-1)}
 function recordsFromLocal(){
   const ks=["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats","audit"],out=[];
-  for(const k of ks) for(const r of (data[k]||[])) out.push({id:recordDocId(k,r.id),type:k,record:r,updatedAt:r.updatedAt||new Date().toISOString(),deleted:false});
+  for(const k of ks) for(const r of (data[k]||[])) out.push({id:recordDocId(k,r.id),type:k,record:r,revision:Number(r.revision)||0,updatedAt:r.updatedAt||new Date().toISOString(),updatedBy:r.updatedBy||deviceId(),deviceId:r.deviceId||deviceId(),deleted:false});
   for(const k of ks) for(const [id,dt] of Object.entries(data._sync?.tombstones?.[k]||{})) out.push({id:recordDocId(k,id),type:k,record:{id},updatedAt:dt,deleted:true});
   return out;
 }
@@ -689,7 +713,7 @@ function mergeCloud(remote){
   for(const x of remoteMap.values()){
     const type=x.type,id=x.record.id,arr=data[type]; if(!Array.isArray(arr))continue;
     const local=arr.find(r=>r.id===id); const localTs=local?.updatedAt||data._sync.tombstones?.[type]?.[id]||""; const remoteTs=x.updatedAt||x.record.updatedAt||""; const localBy=String(local?.updatedBy||""); const remoteBy=String(x.updatedBy||x.record?.updatedBy||"");
-    const timeCmp=compareUpdatedAt(remoteTs,localTs);
+    const timeCmp=compareUpdatedAt({revision:x.revision||x.record?.revision,updatedAt:remoteTs,deviceId:x.deviceId||x.record?.deviceId},{revision:local?.revision||0,updatedAt:localTs,deviceId:localBy});
     if(timeCmp<0 || (timeCmp===0 && remoteBy<=localBy))continue;
     if(x.deleted){
       if(local){arr.splice(arr.indexOf(local),1);changed=true}
@@ -709,7 +733,7 @@ function mergeCloud(remote){
 async function hydrateSync(){
   if(!sync.user||!sync.db)return;
   sync.hydrating=true;
-  try{const remote=await pullRest();mergeCloud(remote);localStorage.setItem(KEY,JSON.stringify(data));await reconcileInitial(remote);render();setSyncStatus("☁️ آنلاین • همگام‌سازی لحظه‌ای")}
+  try{const remote=await pullRest();mergeCloud(remote);persistLocal();await reconcileInitial(remote);render();setSyncStatus("☁️ آنلاین • همگام‌سازی لحظه‌ای")}
   catch(e){console.error(e);setSyncStatus("⚠️ دریافت اولیه ناموفق: "+(e.code||e.message))}
   finally{sync.hydrating=false}
 }
@@ -753,7 +777,7 @@ async function initSync(){
       sync.unsubscribe=recordsCollection().onSnapshot(snap=>{
         if(sync.hydrating)return;
         const remote=snap.docs.map(d=>d.data());
-        if(mergeCloud(remote)){localStorage.setItem(KEY,JSON.stringify(data));render();syncSave();syncAllNotesToReminders().catch(console.error);syncAllPeopleToReminders().catch(console.error);rescheduleAllNativeReminders().catch(console.error)}
+        if(mergeCloud(remote)){persistLocal();render();syncSave();syncAllNotesToReminders().catch(console.error);syncAllPeopleToReminders().catch(console.error);rescheduleAllNativeReminders().catch(console.error)}
         setSyncStatus("☁️ آنلاین • همگام‌سازی لحظه‌ای")
       },e=>setSyncStatus("⚠️ همگام‌سازی: "+(e.code||e.message)));
       sync.timer=setInterval(syncTick,SYNC_INTERVAL);
@@ -773,7 +797,7 @@ async function pushToCloud(){
    // records, merge them with this phone, then upload the unified dataset.
    const remote=await pullRest();
    mergeCloud(remote||[]);
-   localStorage.setItem(KEY,JSON.stringify(data));
+   persistLocal();
    markAllLocalDirty();
    await pushRest();
    setSyncStatus("☁️ اطلاعات دو گوشی با هم ادغام و ذخیره شد — "+dataSummary(data));
@@ -785,7 +809,7 @@ async function pullFromCloud(){
   try{
     const remote=await pullRest();
     if(!remote||!remote.length)return alert("هنوز اطلاعاتی در ابر وجود ندارد");
-    mergeCloud(remote);localStorage.setItem(KEY,JSON.stringify(data));render();setSyncStatus("☁️ اطلاعات از ابر دریافت شد — "+dataSummary(data));alert("اطلاعات ابری دریافت شد\n"+dataSummary(data));
+    mergeCloud(remote);persistLocal();render();setSyncStatus("☁️ اطلاعات از ابر دریافت شد — "+dataSummary(data));alert("اطلاعات ابری دریافت شد\n"+dataSummary(data));
   }catch(e){alert("دریافت ناموفق: "+(e.code||'')+"\n"+e.message)}
 }
 function openSyncSettings(){
@@ -844,6 +868,8 @@ function normalize(s){return String(s||"").replace(/[۰-۹]/g,d=>"۰۱۲۳۴۵۶
 function parseMoney(v){return Number(toEnDigits(String(v)).replace(/[^\d]/g,""))||0}
 /* v1.2.8: اعتبارسنجی مقادیر مالی مثبت (مبلغ تراکنش/چک/فاکتور/بدهی و ...). */
 function positiveMoney(value,label="مبلغ"){const n=parseMoney(value);if(!Number.isFinite(n)||n<=0)throw new Error(label+" باید بیشتر از صفر باشد");return n}
+function nonNegativeMoney(value,label="مبلغ"){const n=parseMoney(value);if(!Number.isFinite(n)||n<0)throw new Error(label+" نمی‌تواند منفی باشد");return n}
+function validPercent(value,label="درصد"){const n=Number(value);if(!Number.isFinite(n)||n<0||n>100)throw new Error(label+" باید بین صفر و صد باشد");return n}
 
 function bytesToB64(bytes){let s="";for(const b of new Uint8Array(bytes))s+=String.fromCharCode(b);return btoa(s)}
 function b64ToBytes(s){const bin=atob(s);const out=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)out[i]=bin.charCodeAt(i);return out}
@@ -851,9 +877,9 @@ async function hashPin(pin,saltB64){const salt=saltB64?b64ToBytes(saltB64):crypt
 /* v1.2.7: رمز عددی همیشه با ارقام انگلیسی هش/ذخیره می‌شود؛ اگر کاربر هنگام
  * ورود یا تعیین رمز از کیبورد فارسی/عربی استفاده کند، اول به رقم انگلیسی
  * تبدیل می‌شود تا با رمز قبلی (صرف‌نظر از کیبورد) مطابقت داشته باشد. */
-async function verifyPin(pin){pin=toEnDigits(String(pin??""));if(data.pinHash&&data.pinSalt){const x=await hashPin(pin,data.pinSalt);return x.hash===data.pinHash}return pin===String(data.pin||"")}
-async function migratePinSecurity(){if(!data.pin||data.pinHash)return;try{const x=await hashPin(data.pin);data.pinHash=x.hash;data.pinSalt=x.salt;data.pin="";localStorage.setItem(KEY,JSON.stringify(data));}catch(e){console.warn("PIN security migration",e)}}
-function hasLockCode(){return !!(data.pinHash||data.pin||data.patternHash)}
+async function verifyPin(pin){pin=toEnDigits(String(pin??""));if(!(data.pinHash&&data.pinSalt))return false;const x=await hashPin(pin,data.pinSalt);return x.hash===data.pinHash}
+async function migratePinSecurity(){if(!data.pin||data.pinHash)return;try{const x=await hashPin(data.pin);data.pinHash=x.hash;data.pinSalt=x.salt;data.pin="";persistLocal();}catch(e){console.warn("PIN security migration",e)}}
+function hasLockCode(){return !!((data.pinHash&&data.pinSalt)||(data.patternHash&&data.patternSalt))}
 
 /* ---- Pattern lock (v5.9) --------------------------------------------
  * A 3x3 connect-the-dots pattern, drawn like an Android unlock pattern.
@@ -967,121 +993,16 @@ function showWhatsNewOnce(){
  if(localStorage.getItem(WHATS_NEW_KEY)==="1")return;
  localStorage.setItem(WHATS_NEW_KEY,"1");
  openModal(`<div class="whats-new">
-  <div class="whats-new-badge">نسخه ${toFaDigits(APP_VERSION)}</div>
+  <div class="whats-new-badge">نسخه ${esc(APP_VERSION)}</div>
   <h2>🎉 به حساب‌یار خوش آمدی</h2>
   <p class="hint">این صفحه فقط یک‌بار در اولین اجرای این نسخه نمایش داده می‌شود.</p>
   <div class="whats-new-section">
-   <h3>🛠 تغییرات این نسخه (۱.۲.۵)</h3>
+   <h3>🛠 تغییرات این نسخه</h3>
    <ul>
-    <li>🧾 رفع باگ اقساط بدهکار/بستانکار: تا قبل از این، وقتی از فرم ویرایشِ یک بدهکار/بستانکار «تعداد اقساط» را عوض می‌کردی، کل برنامه‌ی اقساط از نو ساخته می‌شد و اقساطی که از قبل پرداخت شده بودند (و تراکنشِ واقعی‌شان روی موجودی حساب اثر گذاشته بود) به‌حالت «پرداخت‌نشده» برمی‌گشتند. حالا با تغییر تعداد اقساط، فقط اقساطِ پرداخت‌نشده کم یا زیاد می‌شوند؛ اقساطِ پرداخت‌شده و تراکنش متصل به هرکدام (و در نتیجه اثرشان روی افزایش/کاهش موجودی حساب) دست‌نخورده باقی می‌مانند.</li>
-    <li>🔒 اگر تعداد قسط جدید از تعداد اقساطِ پرداخت‌شده کمتر انتخاب شود، برنامه اجازه‌ی این کوچک‌تر شدن را نمی‌دهد و با یک پیام، تعداد را روی همان تعداد پرداخت‌شده نگه می‌دارد.</li>
-   </ul>
-  </div>
-  <div class="whats-new-section">
-   <h3>🛠 تغییرات نسخه قبل (۱.۲.۲)</h3>
-   <ul>
-    <li>👥 بدهکار/بستانکار حالا در «جدول هفتگی یادداشت‌ها» هم دیده می‌شود: اگر یک‌جا سررسید دارد، همان روز نشان داده می‌شود؛ اگر قسطی است، هر قسطِ پرداخت‌نشده سر ماه خودش (طبق همان تقسیم ماهانه‌ای که از قبل هنگام ساختن اقساط انجام می‌شد) روی روزِ سررسیدش می‌آید.</li>
-    <li>🔔 برای هر سررسید (چه بدهی، چه طلب — یک‌جا یا هر قسط جدا) یک یادآوری واقعی با اعلان روی گوشی هم ساخته می‌شود؛ با پرداخت همان قسط یا تسویه‌ی کامل، یادآوری‌اش خودش پاک می‌شود. این یادآوری‌ها زیر یک بخش جدا به‌نام «👤 سررسید بدهکار/بستانکار» در صفحه‌ی یادآوری‌ها هم قابل دیدن‌اند.</li>
-   </ul>
-  </div>
-  <div class="whats-new-section">
-   <h3>🛠 تغییرات نسخه قبل (۱.۲.۱)</h3>
-   <ul>
-    <li>✓ در چک‌لیستِ یادداشت‌ها، به‌محض تیک خوردن یک آیتم، دیگر خط‌خورده وسط لیست نمی‌ماند — از دید کنار می‌رود و زیر یک دکمهٔ «✓ تکمیل‌شده» جمع می‌شود تا لیست شلوغ نشود؛ با زدن همان دکمه هر وقت خواستی می‌توانی موارد انجام‌شده را دوباره ببینی یا تیکشان را بردار.</li>
-    <li>🎨 چهرهٔ اپ کمی خاص‌تر شد: کارت بالای صفحه (خانه) و کارت‌های یادداشت طرح تازه‌ای گرفتند و چک‌باکس آیتم‌های یادداشت هم به‌جای چک‌باکس معمولی مرورگر، یک نشان دایره‌ای مُهرمانند دارد.</li>
-   </ul>
-  </div>
-  <div class="whats-new-section">
-   <h3>🛠 تغییرات نسخه قبل (۲.۷)</h3>
-   <ul>
-    <li>⏰ جدول هفتگی یادداشت‌ها و یادآوری‌ها حالا کنار هر آیتم ساعتش را هم نشان می‌دهد و برنامه‌های هر روز بر اساس همان ساعت مرتب می‌شوند؛ یعنی هرچه زودتر باشد بالاتر از بقیه‌ی همان روز می‌نشیند.</li>
-   </ul>
-  </div>
-  <div class="whats-new-section">
-   <h3>🛠 تغییرات نسخه قبل (۲.۵)</h3>
-   <ul>
-    <li>📎 پیوست تراکنش حالا چند-عکسی شد: برای هر تراکنش (مثلاً هزینه‌ی تعمیرگاه) می‌توانی تا ۵ عکس با هم ذخیره کنی — مثلاً هم عکس فاکتور و هم عکس فیش واریزی را کنار هم نگه داری. از پنجره‌ی ثبت/ویرایش تراکنش عکس‌ها را یکی‌یکی یا چندتایی اضافه کن، هرکدام را جدا با ضربدر حذف کن، و در لیست تراکنش‌ها روی عکس بزن تا همه‌ی عکس‌های آن تراکنش را با هم ببینی.</li>
-   </ul>
-  </div>
-  <div class="whats-new-section">
-   <h3>🛠 تغییرات نسخه قبل (۲.۴)</h3>
-   <ul>
-    <li>حالا از داخل فرم ویرایش یادداشت و یادآوری (همون پنجره‌ای که با زدن روی یادداشت/یادآوری در جدول هفتگی باز می‌شود) یک دکمه «🗑 حذف» هم اضافه شد؛ یعنی دیگر لازم نیست برای حذف حتماً به لیست اصلی برگردی — همان‌جا هم می‌توانی حذف کنی و هم تغییرات را ذخیره کنی.</li>
-    <li>آیتم‌های زیرمجموعه‌ی یادداشت، داخل همین فرم ویرایش، حالا کنار هر آیتم یک تیک (چک‌باکس) هم دارند؛ با تیک زدن یک آیتم و ذخیره‌ی فرم، همان آیتم در لیست یادداشت‌ها و در جدول هفتگی هم به‌صورت انجام‌شده (خط‌خورده) نشان داده می‌شود.</li>
-   </ul>
-  </div>
-  <div class="whats-new-section">
-   <h3>🛠 تغییرات نسخه قبل (۲.۲)</h3>
-   <ul>
-    <li>تاریخ سررسید در لیست بدهکار/طلبکار حالا مشخص می‌کند برای «پرداخت» است یا «واریز»: برای شخصی که به او بدهکاری «سررسید پرداخت» و برای شخصی که از او طلب داری «سررسید واریز» نوشته می‌شود.</li>
-    <li>در لیست چک‌ها هم همین برچسب اضافه شد: چک پرداختی «سررسید پرداخت» و چک دریافتی «سررسید واریز» نشان می‌دهد.</li>
-   </ul>
-  </div>
-  <div class="whats-new-section">
-   <h3>🛠 تغییرات نسخه قبل (۲.۱)</h3>
-   <ul>
-    <li>جدول هفتگی یادداشت‌ها حالا یادآوری‌ها را هم نشان می‌دهد: هر یادآوری‌ای که برایش تاریخ و ساعت تنظیم شده باشد، زیر همان روزِ هفته با یک برچسب نارنجی 🔔 کنار یادداشت‌های همان روز (📝) نمایش داده می‌شود.</li>
-    <li>دکمه‌ی 🔔 یادآوری در صفحه‌ی خانه حالا یک صفحه‌ی ثبت سریع باز می‌کند که دقیقاً مثل تب‌های «صدور فاکتور» دو تب بالا دارد: 📝 یادداشت و 🔔 یادآوری؛ همیشه اول تب یادداشت باز می‌شود و با یک ضربه می‌توان به فرم یادآوری رفت.</li>
-   </ul>
-  </div>
-  <div class="whats-new-section">
-   <h3>🛠 تغییرات نسخه قبل (۲.۰)</h3>
-   <ul>
-    <li>رفع باگ اصلیِ «آپدیت نیومدن»: آدرس ثبت Service Worker (فایل sw.js) با یک شماره‌ی ثابت (v=5) نوشته شده بود که هیچ‌وقت عوض نمی‌شد؛ همین باعث می‌شد بعضی گوشی‌ها همون نسخه‌ی خیلی قدیمی برنامه را برای همیشه از حافظه‌ی گوشی نشون بدن، نه فقط نسخه‌ی قبلی — به همین دلیل بود که چند تا آپدیت قبلی (جدول هفتگی، رفع باگ بکاپ، جابه‌جایی دکمه‌ها) اصلاً به دست بعضی گوشی‌ها نمی‌رسید و شماره نسخه هم عوض نمی‌شد. حالا این آدرس درست تنظیم شده تا مرورگر همیشه بررسی کند نسخه‌ی جدیدتری هست یا نه.</li>
-    <li>شورت‌کات کنار «سفارشی‌سازی داشبورد» از یادداشت جدید به «📅 جدول هفتگی یادداشت‌ها» تغییر کرد؛ با یک ضربه مستقیم می‌روی صفحه‌ی یادداشت‌ها با نمایش جدول هفتگی باز شده.</li>
-   </ul>
-  </div>
-  <div class="whats-new-section">
-   <h3>🛠 تغییرات نسخه قبل (۱.۶)</h3>
-   <ul>
-    <li>چیدمان بالای صفحه: دکمه‌های تم تاریک/روشن، زبان، حالت اپ و جستجو از بالای صفحه به کنار دکمه‌ی «سفارشی‌سازی داشبورد» در صفحه‌ی خانه منتقل شدند. جای خالی‌شان در بالای صفحه حالا تاریخ امروز (شمسی) را نشان می‌دهد.</li>
-   </ul>
-  </div>
-  <div class="whats-new-section">
-   <h3>🛠 تغییرات نسخه قبل (۱.۵)</h3>
-   <ul>
-    <li>رفع باگ «پشتیبان‌گیری دستی»: دکمه‌ی 📤 پشتیبان‌گیری در تنظیمات فقط تلاش می‌کرد فایل را از طریق مرورگر دانلود کند؛ روی خیلی از گوشی‌های اندرویدی این روش بی‌صدا شکست می‌خورد و پیام «فایل ساخته شد» نشان داده می‌شد در حالی که هیچ فایلی داخل Download ساخته نمی‌شد. حالا پشتیبان‌گیری دستی از همان روش مطمئنِ پشتیبان خودکار (ذخیره‌ی مستقیم در پوشه Download/حسابداری) استفاده می‌کند و اگر واقعاً شکست بخورد، پیام خطای درست نشان می‌دهد.</li>
-   </ul>
-  </div>
-  <div class="whats-new-section">
-   <h3>🛠 تغییرات نسخه قبل (۱.۴)</h3>
-   <ul>
-    <li>رفع مشکل «جدول هفتگی نمایش داده نمی‌شد»: در بعضی گوشی‌های اندرویدی، برنامه به‌خاطر کش قدیمی (Service Worker) نسخه‌ی قبلی فایل‌ها را نشان می‌داد و تب جدول ظاهر نمی‌شد؛ حالا کش برنامه به‌روزرسانی شده و با باز کردن مجدد برنامه، آخرین نسخه به‌صورت خودکار جایگزین می‌شود.</li>
-   </ul>
-  </div>
-  <div class="whats-new-section">
-   <h3>🛠 تغییرات نسخه قبل (۱.۳)</h3>
-   <ul>
-    <li>جدول هفتگی یادداشت‌ها: در صفحه «یادداشت‌ها» یک تب «📅 جدول» اضافه شد که ۷ روز هفته (شمسی) را نشان می‌دهد و یادداشت هر روز را زیر همان روز می‌گذارد؛ با فلش‌ها می‌توان بین هفته‌ها جابه‌جا شد.</li>
-   </ul>
-  </div>
-  <div class="whats-new-section">
-   <h3>🛠 تغییرات نسخه قبل (۱.۲)</h3>
-   <ul>
-    <li>جداکننده هزارگان: در همه‌ی فیلدهای مبلغی برنامه (تراکنش، چک، فاکتور، کالا، بدهکار/بستانکار، حساب، بودجه، یادآوری و...) هنگام تایپ، هر ۳ رقم یک ویرگول می‌گیرد تا میلیون از هزار راحت تشخیص داده شود.</li>
-   </ul>
-  </div>
-  <div class="whats-new-section">
-   <h3>🛠 تغییرات نسخه قبل (۳.۱۲)</h3>
-   <ul>
-    <li>هشدار سررسید چک: چک‌های نزدیک به سررسید (یا گذشته) بالای لیست چک‌ها می‌آیند و برای هرکدام یک یادآوری خودکار با اعلان ساخته می‌شود.</li>
-    <li>زباله‌دان: حذف تراکنش، فاکتور یا چک از این پس ۳۰ روز قابل بازگردانی است (منو ← دیگر ← زباله‌دان).</li>
-    <li>صورت‌حساب PDF مشتری: از لیست مشتری‌ها، یک PDF جمع‌وجور از همه‌ی فاکتورهای یک مشتری می‌سازد و آماده‌ی اشتراک‌گذاری است.</li>
-    <li>گزارش سودآوری کالا در صفحه گزارش‌ها: پرسودترین و کم‌سودترین کالاها بر اساس فروش واقعی.</li>
-    <li>جستجوی سراسری (🔍 در نوار بالا): هم‌زمان در تراکنش، مشتری، کالا، چک و فاکتور می‌گردد.</li>
-    <li>نوار پایین ثابت با ۵ دسترسی سریع (خانه، تراکنش، فاکتور، گزارش، منو).</li>
-    <li>منو حالا جعبه جستجو دارد و عنوان هر گروه را می‌زنی تا باز شود (چون فهرست طولانی شده بود).</li>
-    <li>تنظیمات: امنیت و پشتیبان‌گیری به بالای لیست آمدند؛ کنار بخش‌های پیکربندی‌نشده (مثل رمز ورود یا اتصال ابری) یک نشانه‌ی قرمز کوچک نشان داده می‌شود.</li>
-    <li>تم رنگی قابل انتخاب: از تنظیمات ← تم رنگی، رنگ اصلی برنامه و فاکتور را از میان چند رنگ عوض کن.</li>
-   </ul>
-  </div>
-  <div class="whats-new-section">
-   <h3>🛠 تغییرات نسخه قبل (۳.۱۱)</h3>
-   <ul>
-    <li>هر چک حالا به یک حساب وصل می‌شود. با زدن «✅ ثبت نشستن»، مبلغ چک دریافتی به همان حساب اضافه یا مبلغ چک پرداختی از آن کسر می‌شود و یک تراکنش واقعی هم در «تراکنش‌ها» ثبت می‌گردد؛ «لغو نشستن» همان تراکنش را برمی‌دارد.</li>
-    <li>بخش چک‌ها و مشتری‌ها به حالت «فروشگاه» (کیوسک) هم اضافه شدند.</li>
-    <li>انتقال به «حساب دیگران» حالا روش انتقال را هم می‌پرسد: «کارت به کارت» (شماره کارت) یا «انتقال به شبا» (شماره شبا).</li>
-    <li>همه‌ی انتقال‌ها (چه بین حساب‌های خودت، چه به حساب دیگران) علاوه بر «تراکنش‌ها»، حالا در خود بخش «انتقال بین حساب‌ها» هم فهرست می‌شوند.</li>
+    <li>💾 ذخیره‌سازی اطلاعات کاملاً بازنویسی و آزمایش شد: تراکنش‌ها، فاکتورها و همه‌ی تنظیمات (رمز ورود، زبان، مهر و امضا) اکنون با هم و به‌صورت اتمیک در IndexedDB ذخیره می‌شوند.</li>
+    <li>🔁 انتقال از نسخه‌های قبلی امن است: نسخه‌ی قدیمی فقط بعد از تأیید خواندن‌مجدد پاک می‌شود.</li>
+    <li>🔔 «پشتیبان خودکار» به «یادآوری پشتیبان‌گیری» تبدیل شد؛ چون بکاپ رمزنگاری‌شده بدون رمز شما ساخته نمی‌شود، اگر بیش از ۷ روز پشتیبان نگرفته باشی یادآوری می‌شوی.</li>
+    <li>🧾 رفع خطاهایی که با هر ذخیره پیام «حافظه پر است» می‌دادند یا صفحه تنظیمات را از کار می‌انداختند.</li>
    </ul>
   </div>
   <div class="whats-new-section">
@@ -1089,7 +1010,7 @@ function showWhatsNewOnce(){
    <ul>
     <li>حساب‌ها و بانک‌ها، تراکنش‌ها، درآمد و هزینه و انتقال بین حساب‌ها.</li>
     <li>فاکتور، مشتری و محصولات، یادآوری، چک و گزارش‌ها.</li>
-    <li>پشتیبان‌گیری و بازیابی، پشتیبان خودکار و همگام‌سازی ابری دو گوشی.</li>
+    <li>پشتیبان‌گیری رمزنگاری‌شده و بازیابی، و همگام‌سازی ابری دو گوشی.</li>
     <li>اعلان‌ها، قفل عددی/الگویی و ورود بیومتریک در نسخه‌های سازگار.</li>
     <li>ماشین‌حساب، ثبت سریع تراکنش و ابزارهای کاربردی روزمره.</li>
    </ul>
@@ -1377,8 +1298,8 @@ window.addEventListener("popstate",()=>{performBack();armBackTrap()});
  },{passive:true});
 })();
 
-function touch(r){r.updatedAt=new Date().toISOString();r.updatedBy=sync.user?.uid||deviceId();return r}
-function markDeleted(type,id){data._sync??={tombstones:{}};data._sync.tombstones??={};data._sync.tombstones[type]??={};const dt=new Date().toISOString();data._sync.tombstones[type][id]=dt;markDirty(type,id,true,{id},dt)}
+function touch(r){r.revision=Math.max(0,Number(r.revision)||0)+1;r.updatedAt=new Date().toISOString();r.updatedBy=sync.user?.uid||deviceId();r.deviceId=deviceId();return r}
+function markDeleted(type,id){data._sync??={tombstones:{}};data._sync.tombstones??={};data._sync.tombstones[type]??={};const dt=new Date().toISOString();const revision=Number(data._sync.tombstoneRevisions?.[type]?.[id]||0)+1;data._sync.tombstoneRevisions??={};data._sync.tombstoneRevisions[type]??={};data._sync.tombstoneRevisions[type][id]=revision;data._sync.tombstones[type][id]=dt;markDirty(type,id,true,{id,revision,updatedAt:dt,updatedBy:sync.user?.uid||deviceId(),deviceId:deviceId()},dt)}
 function removeRecord(type,id){const i=data[type].findIndex(x=>x.id===id);if(i<0)return;data[type].splice(i,1);markDeleted(type,id);save()}
 function accountSelect(id="acc",selected=""){return `<select id="${id}">${data.accounts.map(a=>`<option value="${a.id}" ${a.id===selected?"selected":""}>${esc(a.name)}${a.bank?" • "+esc(a.bank):""}</option>`).join("")}</select>`}
 function openAccount(id=null){const a=id&&data.accounts.find(x=>x.id===id);openModal(`<h2>${a?"ویرایش حساب":"افزودن حساب"}</h2><div class="form"><input id="an" placeholder="نام حساب" value="${esc(a?.name||"")}"><input id="bank" placeholder="نام بانک" value="${esc(a?.bank||"")}"><input id="sender" placeholder="شماره فرستنده پیامک بانک" value="${esc(a?.sender||"")}"><input id="card" placeholder="شماره کارت (اختیاری)" value="${esc(a?.card||"")}"><input id="ab" type="text" inputmode="numeric" class="amt-input" placeholder="موجودی اولیه" value="${fmtAmtValue(a?.balance)}"><button class="primary" onclick="saveAccount('${a?.id||""}')">${a?"ذخیره تغییرات":"ذخیره"}</button></div>`)}
@@ -1555,7 +1476,7 @@ function processRecurringTransactions(){
     }
     if(tChanged){touch(t);markDirty("transactions",t.id,false,t,t.updatedAt)}
   });
-  if(anyChanged){localStorage.setItem(KEY,JSON.stringify(data));render()}
+  if(anyChanged){persistLocal();render()}
 }
 function compressImage(file,max=1200,quality=.72){
  return new Promise((resolve,reject)=>{
@@ -1747,7 +1668,11 @@ function increaseStock(id){
  renderStockAdjustList();
  if(pageActive("products"))renderProducts();
 }
-function adjustStockForInvoice(inv,dir){for(const it of inv?.items||[]){if(!it.productId)continue;const p=data.products.find(x=>x.id===it.productId);if(p){const next=Number(p.stock||0)+(dir*Number(it.qty||0));if(next<0)logEvent("کسری موجودی",`${p.name} • موجودی به ${fa(next)} می‌رسید و روی صفر نگه داشته شد`,"stock",false);p.stock=Math.max(0,next);touch(p);markDirty("products",p.id,false,p,p.updatedAt)}}}
+function invoiceStockDelta(invoice){const m=new Map();for(const it of invoice?.items||[]){if(!it.productId)continue;m.set(it.productId,(m.get(it.productId)||0)+(Number(it.qty)||0));}return m}
+function calculateStockDifference(oldInvoice,newInvoice){const m=new Map();for(const [id,q] of invoiceStockDelta(oldInvoice))m.set(id,(m.get(id)||0)+q);for(const [id,q] of invoiceStockDelta(newInvoice))m.set(id,(m.get(id)||0)-q);return m}
+function applyInvoiceStock(invoice){adjustStockForInvoice(invoice,-1)}
+function rollbackInvoiceStock(invoice){adjustStockForInvoice(invoice,+1)}
+function adjustStockForInvoice(inv,dir){for(const it of inv?.items||[]){if(!it.productId)continue;const p=data.products.find(x=>x.id===it.productId);if(!p)continue;const next=Number(p.stock||0)+(dir*Number(it.qty||0));if(dir<0&&next<0){logEvent("کسری موجودی",`${p.name} • کسری ${fa(Math.abs(next))}`,"stock",false);p.stock=0;}else p.stock=next;touch(p);markDirty("products",p.id,false,p,p.updatedAt)}}
 
 function openCustomer(id=null){const c=id&&data.customers.find(x=>x.id===id);openModal(`<h2>${c?"ویرایش مشتری":"مشتری جدید"}</h2><div class="form"><input id="cname" placeholder="نام مشتری" value="${esc(c?.name||"")}"><input id="cphone" inputmode="tel" placeholder="شماره تماس" value="${esc(c?.phone||"")}"><textarea id="caddress" placeholder="آدرس">${esc(c?.address||"")}</textarea><textarea id="cnote" placeholder="توضیحات">${esc(c?.note||"")}</textarea><button class="primary" onclick="saveCustomer('${c?.id||""}')">💾 ذخیره</button></div>`)}
 function saveCustomer(id){const name=$("cname").value.trim();if(!name)return alert("نام مشتری را وارد کن");const o={name,phone:$("cphone").value.trim(),address:$("caddress").value.trim(),note:$("cnote").value.trim()};if(id){const c=data.customers.find(x=>x.id===id);Object.assign(c,o);touch(c);markDirty("customers",c.id,false,c,c.updatedAt)}else{const c=touch({id:uid(),...o});data.customers.unshift(c);markDirty("customers",c.id,false,c,c.updatedAt)}save();logEvent(id?"ویرایش مشتری":"ایجاد مشتری",name,id?"edit":"create");closeModal()}
@@ -1921,7 +1846,7 @@ function savePerson(id){
     if(instCount>1)np.installments=generateInstallments(amount,instCount,due,instFreq);
     data.people.push(np);markDirty("people",np.id,false,np,np.updatedAt);
   }
-  localStorage.setItem(KEY,JSON.stringify(data));render();syncSave();logEvent(id?"ویرایش شخص":"ایجاد شخص",`${name} • ${money(amount)}`,id?"edit":"create");closeModal();
+  persistLocal();render();syncSave();logEvent(id?"ویرایش شخص":"ایجاد شخص",`${name} • ${money(amount)}`,id?"edit":"create");closeModal();
   upsertRemindersForPerson(id?data.people.find(x=>x.id===id):data.people[data.people.length-1]).catch(console.error);
 }
 function deletePerson(id){if(confirm("این مورد حذف شود؟")){const p=data.people.find(x=>x.id===id);if(p?.invoiceId){const inv=data.invoices.find(x=>x.id===p.invoiceId);if(inv){inv.personId="";touch(inv);markDirty("invoices",inv.id,false,inv,inv.updatedAt)}}removeRemindersForPerson(id).catch(console.error);removeRecord("people",id);logEvent("حذف شخص",p?.name||id,"delete")}}
@@ -1940,7 +1865,7 @@ function previewPersonPaymentImage(input){
 }
 async function confirmPersonPayment(id){
   const p=data.people.find(x=>x.id===id);if(!p)return;
-  const n=parseMoney($("ppAmount")?.value||"");if(!n||n<=0)return alert("مبلغ نامعتبر است");
+  let n;try{n=positiveMoney($("ppAmount")?.value||"","مبلغ پرداخت")}catch(e){return alert(e.message)}
   const remaining=Math.max(0,(Number(p.amount)||0)-(Number(p.paid)||0));
   if(n>remaining)return alert(`مبلغ پرداخت (${money(n)}) بیشتر از مانده (${money(remaining)}) است`);
   const accountID=$("ppAccount")?.value;if(!accountID)return alert("حساب را انتخاب کنید");
@@ -2046,7 +1971,7 @@ async function confirmInstallmentPayment(personId,instId){
   const p=data.people.find(x=>x.id===personId);if(!p?.installments)return;
   const it=p.installments.items.find(x=>x.id===instId);if(!it)return;
   if(it.paid)return alert("این قسط قبلاً پرداخت شده است");
-  if(!(Number(it.amount)>0))return alert("مبلغ قسط نامعتبر است");
+  let installmentAmount;try{installmentAmount=positiveMoney(it.amount,"مبلغ قسط")}catch(e){return alert(e.message)}
   const accountID=$("instAccount")?.value;if(!accountID)return alert("حساب را انتخاب کنید");
   let receipt=it.receipt||null;const file=$("instImage")?.files?.[0];
   if(file){try{receipt=await compressImage(file,1000,.6)}catch(e){console.warn(e)}}
@@ -2054,7 +1979,7 @@ async function confirmInstallmentPayment(personId,instId){
   if(receipt)it.receipt=receipt;
   const txType=p.type==="credit"?"income":"expense";
   const category=p.type==="credit"?"دریافت طلب":"پرداخت بدهی";
-  const nt=touch({id:uid(),title:`قسط ${p.name}`,amount:it.amount,type:txType,category,accountID,date:new Date().toISOString(),source:"installment",personId:p.id,installmentId:it.id});
+  const nt=touch({id:uid(),title:`قسط ${p.name}`,amount:installmentAmount,type:txType,category,accountID,date:new Date().toISOString(),source:"installment",personId:p.id,installmentId:it.id});
   if(receipt)nt.image=receipt;
   data.transactions.unshift(nt);markDirty("transactions",nt.id,false,nt,nt.updatedAt);
   it.txId=nt.id;
@@ -2180,9 +2105,9 @@ function noteChecklistHTML(n){
  }
  return html;
 }
-async function toggleNoteItem(noteId,itemId){const n=data.notes.find(x=>x.id===noteId);const it=n?.items?.find(x=>x.id===itemId);if(!it)return;it.done=!it.done;touch(n);markDirty("notes",n.id,false,n,n.updatedAt);localStorage.setItem(KEY,JSON.stringify(data));syncSave();await upsertReminderForNote(n,false);logEvent(it.done?"تکمیل آیتم یادداشت":"بازگردانی آیتم یادداشت",`${n.title} • ${it.text}`,"edit");const card=document.querySelector(`[data-note-card="${CSS.escape(noteId)}"]`);if(card){const list=card.querySelector(".note-checklist");if(list)list.innerHTML=noteChecklistHTML(n);const total=(n.items||[]).length,doneCount=(n.items||[]).filter(x=>x.done).length;const count=card.querySelector(".note-count");if(count)count.textContent=total?`${fa(doneCount)} / ${fa(total)}`:""}}
+async function toggleNoteItem(noteId,itemId){const n=data.notes.find(x=>x.id===noteId);const it=n?.items?.find(x=>x.id===itemId);if(!it)return;it.done=!it.done;touch(n);markDirty("notes",n.id,false,n,n.updatedAt);persistLocal();syncSave();await upsertReminderForNote(n,false);logEvent(it.done?"تکمیل آیتم یادداشت":"بازگردانی آیتم یادداشت",`${n.title} • ${it.text}`,"edit");const card=document.querySelector(`[data-note-card="${CSS.escape(noteId)}"]`);if(card){const list=card.querySelector(".note-checklist");if(list)list.innerHTML=noteChecklistHTML(n);const total=(n.items||[]).length,doneCount=(n.items||[]).filter(x=>x.done).length;const count=card.querySelector(".note-count");if(count)count.textContent=total?`${fa(doneCount)} / ${fa(total)}`:""}}
 async function deleteNote(id){if(confirm("این یادداشت و همه آیتم‌های آن حذف شود؟")){const n=data.notes.find(x=>x.id===id);await removeReminderForNote(id);removeRecord("notes",id);logEvent("حذف یادداشت",n?.title||id,"delete");closeModal()}}
-async function deleteNoteItem(noteId,itemId){const n=data.notes.find(x=>x.id===noteId);if(!n)return;if(confirm("این آیتم حذف شود؟")){n.items=(n.items||[]).filter(x=>x.id!==itemId);touch(n);markDirty("notes",n.id,false,n,n.updatedAt);localStorage.setItem(KEY,JSON.stringify(data));syncSave();await upsertReminderForNote(n,false);logEvent("حذف آیتم یادداشت",n.title,"delete");const card=document.querySelector(`[data-note-card="${CSS.escape(noteId)}"]`);if(card){const total=(n.items||[]).length,doneCount=(n.items||[]).filter(x=>x.done).length;const count=card.querySelector(".note-count");if(count)count.textContent=total?`${fa(doneCount)} / ${fa(total)}`:"";const list=card.querySelector(".note-checklist");if(list)list.innerHTML=noteChecklistHTML(n)}}}
+async function deleteNoteItem(noteId,itemId){const n=data.notes.find(x=>x.id===noteId);if(!n)return;if(confirm("این آیتم حذف شود؟")){n.items=(n.items||[]).filter(x=>x.id!==itemId);touch(n);markDirty("notes",n.id,false,n,n.updatedAt);persistLocal();syncSave();await upsertReminderForNote(n,false);logEvent("حذف آیتم یادداشت",n.title,"delete");const card=document.querySelector(`[data-note-card="${CSS.escape(noteId)}"]`);if(card){const total=(n.items||[]).length,doneCount=(n.items||[]).filter(x=>x.done).length;const count=card.querySelector(".note-count");if(count)count.textContent=total?`${fa(doneCount)} / ${fa(total)}`:"";const list=card.querySelector(".note-checklist");if(list)list.innerHTML=noteChecklistHTML(n)}}}
 function noteRepeatLabel(r){return r==="daily"?"روزانه":r==="weekly"?"هفتگی":r==="monthly"?"ماهانه":"بدون تکرار"}
 function noteItemHTML(n,it,i,total){
  const moveBtns=total>1?'<div class="reorder-btns" onclick="event.stopPropagation()"><button type="button" title="انتقال به بالا" '+(i===0?'disabled':'')+' onclick="event.stopPropagation();moveNoteItem(\''+n.id+'\',\''+it.id+'\',-1)">▲</button><button type="button" title="انتقال به پایین" '+(i===total-1?'disabled':'')+' onclick="event.stopPropagation();moveNoteItem(\''+n.id+'\',\''+it.id+'\',1)">▼</button></div>':'';
@@ -2417,18 +2342,18 @@ async function upsertReminderForCheck(check,renderAfter=true){
  const linked=(data.reminders||[]).filter(x=>x.sourceCheckId===check.id);
  let r=linked[0];
  for(const dup of linked.slice(1)){await cancelNativeReminder(dup.id);removeRecordSilent("reminders",dup.id)}
- if(check.settled||!check.date){if(r){await cancelNativeReminder(r.id);removeRecordSilent("reminders",r.id);if(renderAfter)save();else{localStorage.setItem(KEY,JSON.stringify(data));syncSave()}}return}
+ if(check.settled||!check.date){if(r){await cancelNativeReminder(r.id);removeRecordSilent("reminders",r.id);if(renderAfter)save();else{persistLocal();syncSave()}}return}
  const due=new Date(check.date);
  if(Number.isNaN(due.getTime()))return;
  const alertAt=new Date(due.getTime()-CHECK_REMINDER_DAYS_BEFORE*86400000);
  const useDate=(alertAt>new Date()?alertAt:due).toISOString();
  const o={title:`⚠️ سررسید چک ${check.type==="receive"?"دریافتی":"پرداختی"}: ${check.name}`,amount:check.amount||0,date:useDate,repeat:"once",type:"check",sourceCheckId:check.id,body:`مبلغ: ${money(check.amount||0)} • سررسید: ${jalaliLabel(check.date)}`};
  if(r){Object.assign(r,o);touch(r);markDirty("reminders",r.id,false,r,r.updatedAt)}else{r=touch({id:uid(),...o});data.reminders.push(r);markDirty("reminders",r.id,false,r,r.updatedAt)}
- if(renderAfter)save();else{localStorage.setItem(KEY,JSON.stringify(data));syncSave()}
+ if(renderAfter)save();else{persistLocal();syncSave()}
  await cancelNativeReminder(r.id);await scheduleNativeReminder(r);
 }
 async function removeReminderForCheck(checkId){const matches=(data.reminders||[]).filter(r=>r.sourceCheckId===checkId);for(const r of matches){await cancelNativeReminder(r.id);removeRecordSilent("reminders",r.id)}if(matches.length)save()}
-async function syncAllChecksToReminders(){let changed=false;const checkIds=new Set((data.checks||[]).map(c=>c.id));for(const c of data.checks||[]){const before=(data.reminders||[]).length;await upsertReminderForCheck(c,false);if((data.reminders||[]).length!==before)changed=true}for(const r of [...(data.reminders||[])]){if(r.sourceCheckId&&!checkIds.has(r.sourceCheckId)){await cancelNativeReminder(r.id);removeRecordSilent("reminders",r.id);changed=true}}if(changed){localStorage.setItem(KEY,JSON.stringify(data));syncSave();render()}}
+async function syncAllChecksToReminders(){let changed=false;const checkIds=new Set((data.checks||[]).map(c=>c.id));for(const c of data.checks||[]){const before=(data.reminders||[]).length;await upsertReminderForCheck(c,false);if((data.reminders||[]).length!==before)changed=true}for(const r of [...(data.reminders||[])]){if(r.sourceCheckId&&!checkIds.has(r.sourceCheckId)){await cancelNativeReminder(r.id);removeRecordSilent("reminders",r.id);changed=true}}if(changed){persistLocal();syncSave();render()}}
 
 /* ---- v2.7.2: سررسید بدهکار/بستانکار → یادآوری واقعی + جدول هفتگی ----
  * دقیقاً همان الگوی چک‌ها/یادداشت‌ها: هر شخص (بدهکار یا بستانکار) با سررسید
@@ -2459,10 +2384,10 @@ async function upsertRemindersForPerson(p,renderAfter=true){
   if(r){Object.assign(r,o);touch(r);markDirty("reminders",r.id,false,r,r.updatedAt)}else{r=touch({id:uid(),...o});data.reminders.push(r);markDirty("reminders",r.id,false,r,r.updatedAt)}
   await cancelNativeReminder(r.id);await scheduleNativeReminder(r);
  }
- if(renderAfter)save();else{localStorage.setItem(KEY,JSON.stringify(data));syncSave()}
+ if(renderAfter)save();else{persistLocal();syncSave()}
 }
 async function removeRemindersForPerson(personId){const matches=(data.reminders||[]).filter(r=>r.sourcePersonId===personId);for(const r of matches){await cancelNativeReminder(r.id);removeRecordSilent("reminders",r.id)}if(matches.length)save()}
-async function syncAllPeopleToReminders(){let changed=false;const peopleIds=new Set((data.people||[]).map(p=>p.id));for(const p of data.people||[]){const before=(data.reminders||[]).length;await upsertRemindersForPerson(p,false);if((data.reminders||[]).length!==before)changed=true}for(const r of [...(data.reminders||[])]){if(r.sourcePersonId&&!peopleIds.has(r.sourcePersonId)){await cancelNativeReminder(r.id);removeRecordSilent("reminders",r.id);changed=true}}if(changed){localStorage.setItem(KEY,JSON.stringify(data));syncSave();render()}}
+async function syncAllPeopleToReminders(){let changed=false;const peopleIds=new Set((data.people||[]).map(p=>p.id));for(const p of data.people||[]){const before=(data.reminders||[]).length;await upsertRemindersForPerson(p,false);if((data.reminders||[]).length!==before)changed=true}for(const r of [...(data.reminders||[])]){if(r.sourcePersonId&&!peopleIds.has(r.sourcePersonId)){await cancelNativeReminder(r.id);removeRecordSilent("reminders",r.id);changed=true}}if(changed){persistLocal();syncSave();render()}}
 /* هر سررسید فعال یک شخص (کلی یا هر قسط) که در یک روز مشخص از هفته می‌افتد؛
  * دقیقاً شبیه noteOccursOnDay اما مستقیم از data.people خوانده می‌شود تا در
  * جدول هفتگی، مثل یادداشت‌ها و یادآوری‌های مستقل، ردیف جدا نشان داده شود. */
@@ -2486,216 +2411,13 @@ function personDueItemsOnDay(day){
 }
 
 
-/* ============================================================
- * یادداشت هوشمند (Smart Note) — تحلیل متن آزاد با دیپ‌سیک (DeepSeek)
- * متن فارسی کاربر تحلیل می‌شود و مواردی مثل بدهی/طلب، یادآوری
- * یا تراکنش از آن استخراج و برای تایید نهایی به کاربر نشان داده می‌شود.
- * ============================================================ */
-const DEEPSEEK_MODEL_DEFAULT="deepseek-chat";
-const DEEPSEEK_URL_DEFAULT="https://api.deepseek.com/chat/completions";
-const SMART_NOTE_URL_STORAGE="hesabdar-smartnote-url-v1";
-const SMART_NOTE_MODEL_STORAGE="hesabdar-smartnote-model-v1";
-function anthropicKey(){return (localStorage.getItem(ANTHROPIC_KEY_STORAGE)||"").trim()}
-function smartNoteUrl() {
-  const custom = (
-    localStorage.getItem(SMART_NOTE_URL_STORAGE) || ""
-  ).trim();
-
-  if (!custom) {
-    return DEEPSEEK_URL_DEFAULT;
-  }
-
-  try {
-    const url = new URL(custom);
-
-    if (url.protocol !== "https:") {
-      return DEEPSEEK_URL_DEFAULT;
-    }
-
-    return url.href;
-  } catch {
-    return DEEPSEEK_URL_DEFAULT;
-  }
-}
-function smartNoteModel(){return (localStorage.getItem(SMART_NOTE_MODEL_STORAGE)||"").trim()||DEEPSEEK_MODEL_DEFAULT}
-function saveAnthropicKey() {
-  const value = $("anthropicKeyInput")?.value.trim();
-
-  if (!value) {
-    return alert("کلید API را وارد کن");
-  }
-
-  if (value.length < 20) {
-    return alert("کلید API کوتاه یا نامعتبر است");
-  }
-
-  const urlValue = $("smartNoteUrlInput")?.value.trim();
-  if (urlValue) {
-    try {
-      const parsedUrl = new URL(urlValue);
-      if (parsedUrl.protocol !== "https:") {
-        return alert("آدرس API باید با HTTPS شروع شود");
-      }
-      localStorage.setItem(SMART_NOTE_URL_STORAGE, parsedUrl.href);
-    } catch {
-      return alert("آدرس API معتبر نیست");
-    }
-  } else {
-    localStorage.removeItem(SMART_NOTE_URL_STORAGE);
-  }
-
-  localStorage.setItem(ANTHROPIC_KEY_STORAGE, value);
-
-  const modelValue = $("smartNoteModelInput")?.value.trim();
-  if (modelValue) {
-    localStorage.setItem(SMART_NOTE_MODEL_STORAGE, modelValue);
-  } else {
-    localStorage.removeItem(SMART_NOTE_MODEL_STORAGE);
-  }
-
-  if ($("anthropicKeyInput")) {
-    $("anthropicKeyInput").value = "";
-  }
-
-  renderSettingsFeatures();
-  alert("تنظیمات API فقط روی همین دستگاه ذخیره شد.");
-}
-function clearAnthropicKey(){if(!anthropicKey())return alert("کلیدی ثبت نشده است");if(!confirm("کلید و تنظیمات هوش مصنوعی حذف شود؟"))return;localStorage.removeItem(ANTHROPIC_KEY_STORAGE);localStorage.removeItem(SMART_NOTE_URL_STORAGE);localStorage.removeItem(SMART_NOTE_MODEL_STORAGE);renderSettingsFeatures();alert("کلید حذف شد.")}
-
-const SMART_NOTE_KIND_LABEL={debt:"من بدهکارم",credit:"من طلبکارم",reminder:"یادآوری",expense:"هزینه (پرداخت شد)",income:"دریافت (پول گرفتم)"};
-let smartNoteItems=[];
-
-function openSmartNote(){
-  if(!anthropicKey()){
-    if(confirm("برای یادداشت هوشمند اول باید یک کلید API (سازگار با OpenAI، مثل دیپ‌سیک یا هر سرویس مشابه) در تنظیمات ثبت کنی. الان به تنظیمات بروم؟")){closeModal();goToPage("settings");setTimeout(()=>$("anthropicKeyInput")?.focus(),300)}
-    return;
-  }
-  smartNoteItems=[];
-  openModal(`<h2>✨ یادداشت هوشمند</h2><p class="hint">یک متن آزاد بنویس، مثلاً «فردا باید ۲۰۰ تومن به رضا بدم» یا «از علی ۵۰۰ تومن طلب دارم، پس‌فردا یادم بنداز». هوش مصنوعی متن را می‌خواند و مواردی که پیدا کند برای تایید نشانت می‌دهد.</p><div class="form"><textarea id="smartNoteText" rows="5" placeholder="متن یادداشت را اینجا بنویس..."></textarea><button type="button" class="primary" id="smartNoteAnalyzeBtn" onclick="analyzeSmartNote()">🔎 تحلیل با هوش مصنوعی</button><div id="smartNoteResults"></div></div>`);
-}
-
-async function analyzeSmartNote(){
-  const text=$("smartNoteText")?.value.trim();
-  if(!text)return alert("اول متن یادداشت را بنویس");
-  const key=anthropicKey();
-  if(!key)return alert("کلید API تنظیم نشده است");
-  const btn=$("smartNoteAnalyzeBtn");
-  const resultsBox=$("smartNoteResults");
-  if(btn){btn.disabled=true;btn.textContent="⏳ در حال تحلیل..."}
-  if(resultsBox)resultsBox.innerHTML="";
-  try{
-    const today=todayJalali();
-    const sys=`تو یک دستیار مالی فارسی‌زبان هستی. کاربر یک یادداشت آزاد می‌نویسد و تو باید موارد مالی/یادآوری داخل آن را استخراج کنی.
-امروز به تقویم شمسی: ${today} است. تاریخ‌های نسبی مثل «فردا»، «پس‌فردا»، «هفته دیگه»، «ماه دیگه» را بر همین اساس به تاریخ شمسی دقیق (YYYY/MM/DD) تبدیل کن.
-هر مورد یکی از این نوع‌هاست:
-- "debt": کاربر باید به شخصی پول بدهد (کاربر بدهکار است)
-- "credit": شخصی باید به کاربر پول بدهد (کاربر طلبکار است)
-- "reminder": یک یادآوری ساده بدون تراکنش مالی مشخص یا با مبلغ نامشخص
-- "expense": کاربر همین حالا/همان لحظه پول خرج کرده (هزینه قطعی‌شده)
-- "income": کاربر همین حالا/همان لحظه پول دریافت کرده (درآمد قطعی‌شده)
-فقط و فقط یک JSON خام با این ساختار برگردان، بدون هیچ توضیح اضافه و بدون بک‌تیک یا کد بلاک:
-{"items":[{"kind":"debt|credit|reminder|expense|income","person":"نام شخص یا خالی","title":"عنوان کوتاه","amount":عدد به تومان یا 0 اگر نامشخص,"date":"YYYY/MM/DD شمسی یا خالی","note":"توضیح کوتاه اختیاری"}]}
-اگر متن هیچ مورد قابل استخراجی نداشت، items را آرایه خالی بگذار.`;
-    const controller=new AbortController();
-    const timeoutId=setTimeout(()=>controller.abort(),30000);
-    let res;
-    try{
-      res=await fetch(smartNoteUrl(),{
-        method:"POST",
-        headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},
-        body:JSON.stringify({model:smartNoteModel(),max_tokens:1024,temperature:0,messages:[{role:"system",content:sys},{role:"user",content:text}]}),
-        signal:controller.signal
-      });
-    }catch(fetchErr){
-      if(fetchErr?.name==="AbortError")throw new Error("زمان درخواست به پایان رسید (۳۰ ثانیه). اتصال اینترنت را بررسی کن.");
-      throw fetchErr;
-    }finally{
-      clearTimeout(timeoutId);
-    }
-    if(!res.ok){const errBody=await res.text().catch(()=>"")
-      ;throw new Error("HTTP "+res.status+" "+errBody.slice(0,200))}
-    const data2=await res.json();
-    const raw=data2?.choices?.[0]?.message?.content||"{}";
-    const clean=raw.replace(/```json|```/g,"").trim();
-    let parsed;try{parsed=JSON.parse(clean)}catch(e){throw new Error("پاسخ هوش مصنوعی قابل خواندن نبود")}
-    const items=Array.isArray(parsed.items)?parsed.items:[];
-    smartNoteItems=items.map(it=>({
-      id:uid(),
-      kind:["debt","credit","reminder","expense","income"].includes(it.kind)?it.kind:"reminder",
-      person:String(it.person||"").trim(),
-      title:String(it.title||"").trim(),
-      amount:Math.max(0,Number(String(it.amount||0).replace(/[^\d.]/g,""))||0),
-      date:String(it.date||"").trim(),
-      note:String(it.note||"").trim(),
-      selected:true
-    }));
-    renderSmartNoteResults();
-  }catch(e){
-    console.warn("smart note analyze",e);
-    if(resultsBox)resultsBox.innerHTML=`<div class="card hint">⚠️ تحلیل انجام نشد. اتصال اینترنت یا اعتبار حساب دیپ‌سیک را بررسی کن.<br><small>${esc(e.message||"")}</small></div>`;
-  }finally{
-    if(btn){btn.disabled=false;btn.textContent="🔎 تحلیل با هوش مصنوعی"}
-  }
-}
-
-function renderSmartNoteResults(){
-  const box=$("smartNoteResults");if(!box)return;
-  if(!smartNoteItems.length){box.innerHTML=`<div class="card hint">هیچ مورد قابل تشخیصی در متن پیدا نشد.</div>`;return}
-  box.innerHTML=`<div class="section-head"><h3>موارد پیدا‌شده</h3></div>${smartNoteItems.map((it,i)=>smartNoteItemRow(it,i)).join("")}<button type="button" class="primary" onclick="addSmartNoteSelected()">✅ افزودن موارد انتخاب‌شده</button>`;
-  bindAmountInputs(box);
-}
-
-function smartNoteItemRow(it,i){
-  return `<div class="item smart-note-row" data-smart-idx="${i}">
-    <div class="form" style="flex:1">
-      <label class="feature-row"><input type="checkbox" ${it.selected?"checked":""} onchange="smartNoteItems[${i}].selected=this.checked"><span><b>${esc(it.title||it.person||"مورد بدون عنوان")}</b></span></label>
-      <select onchange="smartNoteItems[${i}].kind=this.value">${Object.entries(SMART_NOTE_KIND_LABEL).map(([k,l])=>`<option value="${k}" ${it.kind===k?"selected":""}>${l}</option>`).join("")}</select>
-      <input placeholder="نام شخص (اختیاری)" value="${esc(it.person)}" oninput="smartNoteItems[${i}].person=this.value">
-      <input placeholder="عنوان" value="${esc(it.title)}" oninput="smartNoteItems[${i}].title=this.value">
-      <input type="text" inputmode="numeric" class="amt-input" placeholder="مبلغ" value="${fmtAmtValue(it.amount)}" oninput="smartNoteItems[${i}].amount=parseMoney(this.value)">
-      <input placeholder="تاریخ شمسی مثل ۱۴۰۵/۰۶/۱۰ (اختیاری)" value="${esc(it.date)}" oninput="smartNoteItems[${i}].date=this.value">
-    </div>
-  </div>`;
-}
-
-function applySmartNoteItem(it){
-  const iso=it.date?jalaliToISO(it.date):"";
-  if(it.kind==="debt"||it.kind==="credit"){
-    const name=it.person||it.title||"شخص";
-    const np=touch({id:uid(),type:it.kind,name,amount:it.amount||0,paid:0,due:iso,note:it.note||""});
-    data.people.push(np);markDirty("people",np.id,false,np,np.updatedAt);
-    logEvent("افزودن از یادداشت هوشمند",`${name} • ${money(it.amount||0)}`,"create");
-    return;
-  }
-  if(it.kind==="expense"||it.kind==="income"){
-    if(!data.accounts.length)return;
-    const accountID=data.accounts.find(a=>a.default)?.id||data.accounts[0].id;
-    const nt=touch({id:uid(),title:it.title||it.person||(it.kind==="expense"?"هزینه":"دریافت"),amount:it.amount||0,type:it.kind,category:"سایر",accountID,date:iso?jalaliDateTimeToISO(it.date+" 00:00"):new Date().toISOString(),source:"smart-note"});
-    data.transactions.unshift(nt);markDirty("transactions",nt.id,false,nt,nt.updatedAt);
-    logEvent("افزودن از یادداشت هوشمند",`${nt.title} • ${money(it.amount||0)}`,"create");
-    return;
-  }
-  const maxOrder=data.reminders.length?Math.max(...data.reminders.map(x=>x.order??0)):-1;
-  const nr=touch({id:uid(),order:maxOrder+1,title:it.title||it.person||"یادآوری",amount:it.amount||0,date:iso?jalaliDateTimeToISO(it.date+" 09:00"):new Date().toISOString(),repeat:"once",type:"expense"});
-  data.reminders.push(nr);markDirty("reminders",nr.id,false,nr,nr.updatedAt);
-  scheduleNativeReminder(nr).catch(()=>{});
-  logEvent("افزودن از یادداشت هوشمند",nr.title,"create");
-}
-
-function addSmartNoteSelected(){
-  const chosen=smartNoteItems.filter(x=>x.selected);
-  if(!chosen.length)return alert("حداقل یک مورد را انتخاب کن");
-  for(const it of chosen)applySmartNoteItem(it);
-  localStorage.setItem(KEY,JSON.stringify(data));save();syncSave();
-  alert(`${fa(chosen.length)} مورد اضافه شد.`);
-  closeModal();
-}
+function openSmartNote(){alert("یادداشت هوشمند تا زمان آماده شدن Backend امن غیرفعال است.");}
 
 /* v3.4: قابلیت «بروزرسانی از GitHub» به‌طور کامل حذف شد (چک‌کردن مخزن،
  * ورودی نام مخزن و اعلان نسخه جدید). به‌روزرسانی سرویس‌ورکر (فایل‌های خود
  * همین گوشی) و پشتیبان خودکار هر ۶ ساعت هنوز کار می‌کنند. */
 async function updateServiceWorkerNow(){try{if(!('serviceWorker' in navigator))return; const reg=await navigator.serviceWorker.getRegistration(); if(reg){await reg.update();}}catch(e){console.warn("service worker update",e)}}
-function startUpdateChecker(){setTimeout(()=>{updateServiceWorkerNow()},2500);setInterval(()=>{updateServiceWorkerNow()},AUTO_BACKUP_MS);setInterval(()=>{maybeAutoBackup("هر ۶ ساعت")},AUTO_BACKUP_MS);setInterval(purgeOldTrash,AUTO_BACKUP_MS)}
+function startUpdateChecker(){setTimeout(()=>{updateServiceWorkerNow()},2500);setInterval(()=>{updateServiceWorkerNow()},AUTO_BACKUP_MS);setInterval(purgeOldTrash,AUTO_BACKUP_MS)}
 async function testNotifications(){
   const ok=await requestNativeNotifications();
   if(!ok)return alert("اجازه اعلان داده نشد. از تنظیمات گوشی/مرورگر اجازه اعلان را برای حساب‌یار فعال کن.");
@@ -3033,7 +2755,13 @@ function saveInvoice(id){
  /* کمبود موجودی مانع ثبت فاکتور نمی‌شود، ولی باید به کاربر هشدار داده شود. */
  const shortages=items.filter(it=>{if(!it.productId)return false;const pr=data.products.find(x=>x.id===it.productId);if(!pr)return false;const already=id?(data.invoices.find(v=>v.id===id)?.items||[]).filter(x=>x.productId===it.productId).reduce((s,x)=>s+(Number(x.qty)||0),0):0;return Number(it.qty||0)>Number(pr.stock||0)+already});
  if(shortages.length&&!confirm(`موجودی این کالاها کافی نیست: ${shortages.map(x=>x.desc).join("، ")}. با این حال فاکتور ثبت شود؟`))return;
- const discount=Math.max(0,parseMoney($("invDiscount").value)),discountPercent=Math.min(100,Math.max(0,Number($("invDiscountPercent").value)||0)),taxRate=Math.max(0,Number($("invTax").value)||0);let paid=Math.max(0,parseMoney($("invPaid").value));
+ let discount,discountPercent,taxRate,paid;
+ try{discount=nonNegativeMoney($("invDiscount").value||0,"تخفیف");discountPercent=validPercent($("invDiscountPercent").value||0,"درصد تخفیف");taxRate=validPercent($("invTax").value||0,"مالیات");paid=nonNegativeMoney($("invPaid").value||0,"مبلغ پرداختی");}catch(e){return alert(e.message)}
+ const subtotal=items.reduce((sum,it)=>sum+(Number(it.qty)*Number(it.price)),0);
+ if(discount>subtotal)return alert("تخفیف مبلغی بیشتر از جمع جزء نیست");
+ const provisional=Math.max(0,Math.round((subtotal-discount)-((subtotal-discount)*discountPercent/100)));
+ const provisionalTotal=Math.round(provisional+(provisional*taxRate/100));
+ if(paid>provisionalTotal)return alert("مبلغ پرداختی بیشتر از مبلغ فاکتور است");
  const customerName=$("invCustomerName")?.value.trim()||"";
  const phone=$("invPhone")?.value.trim()||"";
  const settleAccountId=$("invSettleAccount")?.value||"";
@@ -3644,7 +3372,7 @@ function renderProductProfit(){
  const rowHTML=r=>`<div class="report-row"><span>${esc(r.name)}<small>${fa(r.qty)} فروش • حاشیه سود ${fa(Math.round(r.margin))}٪</small></span><strong class="${r.profit>=0?"income":"expense"}">${money(r.profit)}</strong></div>`;
  box.innerHTML=`<div class="report-sub-title">🥇 پرسودترین کالاها</div>${top.map(rowHTML).join("")}<div class="report-sub-title">🥶 کم‌سودترین کالاها</div>${bottom.map(rowHTML).join("")}`;
 }
-function backupPayload(){return {format:"hesabdar-backup",version:2,appVersion:APP_VERSION,createdAt:new Date().toISOString(),data:JSON.parse(JSON.stringify(data))}}
+function backupPayload(){return {format:"hesabdar-backup-data",version:1,appVersion:APP_VERSION,createdAt:new Date().toISOString(),data:JSON.parse(JSON.stringify(data))}}
 /* v1.2.8: رمزنگاری بکاپ — بکاپ خروجی (که قرار است بین گوشی‌ها منتقل شود)
  * با AES-GCM رمزنگاری می‌شود؛ کلید با PBKDF2/SHA-256 از رمز عبور بکاپ
  * ساخته می‌شود و هرگز خودِ رمز یا کلید ذخیره نمی‌شود، فقط salt/iv/متن
@@ -3680,19 +3408,20 @@ async function decryptBackupPayload(container,password){
  * path so the button either genuinely saves a file, or clearly reports
  * failure instead of lying about success. */
 async function exportData(){
- const password=prompt("این بکاپ حاوی اطلاعات مالی شماست. یک رمز عبور برای رمزنگاری فایل تعیین کن (حداقل ۴ کاراکتر؛ این رمز فقط پیش خودت می‌ماند و بدون آن فایل قابل بازیابی نیست):");
+ const password=prompt("این بکاپ حاوی اطلاعات مالی شماست. یک رمز عبور برای رمزنگاری فایل تعیین کن (حداقل ۸ کاراکتر؛ این رمز فقط پیش خودت می‌ماند و بدون آن فایل قابل بازیابی نیست):");
  if(password===null)return;
- if(password.trim().length<4)return alert("رمز عبور بکاپ باید حداقل ۴ کاراکتر باشد.");
+ if(password.trim().length<8)return alert("رمز عبور بکاپ باید حداقل ۸ کاراکتر باشد.");
  let payload;
  try{payload=await encryptBackupPayload(backupPayload(),password.trim())}
  catch(e){console.warn("backup encrypt",e);return alert("رمزنگاری بکاپ انجام نشد. دوباره تلاش کن.")}
  const res=await writeAutoBackupFile(payload);
  if(res?.ok){
   logEvent("پشتیبان‌گیری","فایل پشتیبان رمزنگاری‌شده صادر شد • "+res.filename,"settings");
+  markBackupDone();
   const where=res.method==="filesystem"?`در پوشه ${res.where} با نام ${res.filename} `:"";
   alert(`فایل پشتیبان رمزنگاری‌شده ${where}ساخته شد. آن را به گوشی دیگر منتقل کن و هنگام بازیابی، همین رمز عبور را وارد کن. این رمز را حتماً جایی یادداشت کن؛ بدون آن بازیابی ممکن نیست.`);
  }else{
-  alert("پشتیبان‌گیری انجام نشد. دوباره تلاش کن؛ اگر باز هم نشد، از «بازیابی آخرین بکاپ خودکار» به‌عنوان جایگزین استفاده کن.");
+  alert("پشتیبان‌گیری انجام نشد. دوباره تلاش کن.");
  }
 }
 function stripBom(s){return s&&s.charCodeAt(0)===0xFEFF?s.slice(1):s}
@@ -3715,7 +3444,7 @@ async function replaceCloudAfterRestore(){
  for(const k of ks){for(const r of (data[k]||[])){r.updatedAt=restoreAt;r.updatedBy=sync.user.uid}}
  data._sync??={tombstones:{}};data._sync.tombstones??={};
  for(const k of ks){for(const id of Object.keys(data._sync.tombstones?.[k]||{}))data._sync.tombstones[k][id]=restoreAt}
- localStorage.setItem(KEY,JSON.stringify(data));
+ persistLocal();
  const col=recordsCollection(),snap=await col.get(),localMap=new Map(recordsFromLocal().map(x=>[x.id,x]));
  for(let i=0;i<snap.docs.length;i+=450){const batch=sync.db.batch();for(const d of snap.docs.slice(i,i+450)){if(!localMap.has(d.id))batch.delete(d.ref)}await batch.commit()}
  const all=recordsFromLocal();sync.dirty.clear();await commitChunks(all);
@@ -3745,20 +3474,17 @@ async function importData(e){
   try{
    data=JSON.parse(JSON.stringify(restored));data=migrateData(data);normalizeData();Object.assign(data,previousLock);data.audit??=[];data.notes??=[];
    // Mark the restore as a complete replacement locally before any async work.
-   localStorage.setItem(KEY,JSON.stringify(data));render();
+   persistLocal();render();
    if(sync.unsubscribe){sync.unsubscribe();sync.unsubscribe=null}
    sync.dirty.clear();
    if(sync.user&&sync.db)await replaceCloudAfterRestore();
    // Verify the exact restored collections, not just two arrays.
-   const checkBefore=JSON.parse(localStorage.getItem(KEY)||"null");
-   for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats"]){if(!Array.isArray(checkBefore?.[k]))throw new Error("storage-verification-failed:"+k)}
-   const check=JSON.parse(localStorage.getItem(KEY)||"null");
-   if(!check||!Array.isArray(check.accounts)||!Array.isArray(check.transactions))throw new Error("storage-verification-failed");
-   data=check;normalizeData();render();localStorage.setItem(KEY,JSON.stringify(data));
-   logEvent("بازیابی اطلاعات","پشتیبان وارد شد و اطلاعات روی این گوشی جایگزین شد","settings");localStorage.setItem(KEY,JSON.stringify(data));
+   for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats"]){if(!Array.isArray(data?.[k]))throw new Error("storage-verification-failed:"+k)}
+   normalizeData();render();persistLocal();
+   logEvent("بازیابی اطلاعات","پشتیبان وارد شد و اطلاعات روی این گوشی جایگزین شد","settings");persistLocal();
   }finally{
    sync.hydrating=wasHydrating;
-   if(sync.user&&sync.db&&!sync.unsubscribe){sync.unsubscribe=recordsCollection().onSnapshot(snap=>{if(sync.hydrating)return;const remote=snap.docs.map(d=>d.data());if(mergeCloud(remote)){localStorage.setItem(KEY,JSON.stringify(data));render();syncSave()}setSyncStatus("☁️ آنلاین • همگام‌سازی لحظه‌ای")},err=>setSyncStatus("⚠️ همگام‌سازی: "+(err.code||err.message)))}
+   if(sync.user&&sync.db&&!sync.unsubscribe){sync.unsubscribe=recordsCollection().onSnapshot(snap=>{if(sync.hydrating)return;const remote=snap.docs.map(d=>d.data());if(mergeCloud(remote)){persistLocal();render();syncSave()}setSyncStatus("☁️ آنلاین • همگام‌سازی لحظه‌ای")},err=>setSyncStatus("⚠️ همگام‌سازی: "+(err.code||err.message)))}
   }
   finish();alert("بازیابی با موفقیت انجام شد. اطلاعات فایل پشتیبان روی این گوشی جایگزین شد.");
  }catch(err){finish();console.error("backup restore",err);
@@ -3766,4 +3492,31 @@ async function importData(e){
   alert(msg)}
 }
 function clearData(){if(confirm("همه اطلاعات حذف شود؟")){const pin=data.pin,pinHash=data.pinHash,pinSalt=data.pinSalt,patternHash=data.patternHash,patternSalt=data.patternSalt,lockMethod=data.lockMethod,biometricEnabled=data.biometricEnabled,webauthnCredId=data.webauthnCredId,lang=data.lang;data=blankData();data.pin=pin;data.pinHash=pinHash;data.pinSalt=pinSalt;data.patternHash=patternHash;data.patternSalt=patternSalt;data.lockMethod=lockMethod;data.biometricEnabled=biometricEnabled;data.webauthnCredId=webauthnCredId;data.lang=lang;save();logEvent("پاک کردن اطلاعات","اطلاعات برنامه پاک شد","delete");}}
-(async function initApp(){normalizeData();purgeOldTrash();setupReminderNotificationActions();applyAccentThemeOnLoad();await migratePinSecurity();showLock();render();applyDashboardConfig();applyAppMode();renderBrandingInSettings();try{const rid=new URLSearchParams(location.search).get("reminder");if(rid)setTimeout(()=>{const rr=(data.reminders||[]).find(x=>x.id===rid);if(rr?.sourcePersonId)openPerson(rr.sourcePersonId);else if(rr)openReminder(rr.id)},500)}catch(e){}renderSettingsFeatures();applyLanguage();maybeAutoBackup("اجرای برنامه");processRecurringTransactions();logEvent("اجرای برنامه","برنامه حسابدار اجرا شد","system");await initSync();if(!sync.auth){[4000,12000,30000].forEach(ms=>setTimeout(()=>{if(!sync.auth)initSync()},ms))}syncAllNotesToReminders().catch(console.error);syncAllChecksToReminders().catch(console.error);syncAllPeopleToReminders().catch(console.error);rescheduleAllNativeReminders().catch(console.error);startUpdateChecker();startReminderChecker();if(!hasLockCode())setTimeout(showWhatsNewOnce,320);})();
+(async function initApp(){
+  if(globalThis.HesabYarStorage){
+    try{
+      const stored=await HesabYarStorage.hydrate(null);
+      if(stored){
+        /* IndexedDB همیشه مرجع است؛ نسخه‌ی قدیمی localStorage (اگر مانده) هرگز جایش را نمی‌گیرد. */
+        data=migrateData(stored)||stored;
+        normalizeData();
+      }else{
+        /* اولین اجرا روی IndexedDB: داده‌ی فعلی (از localStorage قدیمی یا خالی) نوشته می‌شود و فقط بعد از
+           تأیید خواندن‌مجدد، نسخه‌ی قدیمی پاک می‌شود. اگر داده‌ی قدیمی خراب بود، دست‌نخورده می‌ماند. */
+        normalizeData();
+        await HesabYarStorage.saveSnapshot(data);
+        if(legacyLoaded&&!legacyCorrupt&&await HesabYarStorage.verifySnapshot(data)){
+          try{localStorage.removeItem(KEY);for(const k of LEGACY_KEYS)localStorage.removeItem(k)}catch(e){}
+        }
+      }
+      HesabYarStorage.requestPersistence();
+    }catch(e){
+      console.warn("IndexedDB unavailable; falling back to localStorage",e);
+      storageMode="localStorage";
+      if(legacyCorrupt)alert("⚠️ اطلاعات قبلی روی این دستگاه خوانده نشد. تا زمانی که پشتیبان نگرفته‌ای برنامه را پاک یا حذف نکن.");
+    }
+  }
+  storageReady=true;
+  normalizeData();ensureCashAccount();
+  if(_persistDeferred){_persistDeferred=false;persistLocal()}
+  normalizeData();purgeOldTrash();setupReminderNotificationActions();applyAccentThemeOnLoad();await migratePinSecurity();showLock();render();applyDashboardConfig();applyAppMode();renderBrandingInSettings();try{const rid=new URLSearchParams(location.search).get("reminder");if(rid)setTimeout(()=>{const rr=(data.reminders||[]).find(x=>x.id===rid);if(rr?.sourcePersonId)openPerson(rr.sourcePersonId);else if(rr)openReminder(rr.id)},500)}catch(e){}renderSettingsFeatures();applyLanguage();maybeBackupReminder();processRecurringTransactions();logEvent("اجرای برنامه","برنامه حسابدار اجرا شد","system");await initSync();if(!sync.auth){[4000,12000,30000].forEach(ms=>setTimeout(()=>{if(!sync.auth)initSync()},ms))}syncAllNotesToReminders().catch(console.error);syncAllChecksToReminders().catch(console.error);syncAllPeopleToReminders().catch(console.error);rescheduleAllNativeReminders().catch(console.error);startUpdateChecker();startReminderChecker();if(!hasLockCode())setTimeout(showWhatsNewOnce,320);})();
