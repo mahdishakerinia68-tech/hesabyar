@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="t1";
+const APP_VERSION="pro2";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v2";
 const AUTO_BACKUP_MS=6*60*60*1000;
 const APP_MODE_KEY="hesabdar-app-mode-v1";
@@ -124,7 +124,7 @@ const DEFAULT_SYNC_CONFIG={
 let sync={app:null,auth:null,db:null,user:null,unsubscribe:null,ready:false,saving:false,queued:false,hydrating:false,authListener:false,dirty:new Map()};
 function syncConfig(){try{return JSON.parse(localStorage.getItem(SYNC_KEY)||"null")||DEFAULT_SYNC_CONFIG}catch{return DEFAULT_SYNC_CONFIG}}
 function autoBackupEnabled(){return localStorage.getItem(AUTO_BACKUP_ENABLED_KEY)!=="false"}
-/* t1: پشتیبان واقعیِ خودکار نمی‌تواند بدون رمز کاربر ساخته شود (بکاپ‌ها رمزنگاری‌شده‌اند)،
+/* pro2: پشتیبان واقعیِ خودکار نمی‌تواند بدون رمز کاربر ساخته شود (بکاپ‌ها رمزنگاری‌شده‌اند)،
  * پس این گزینه اکنون «یادآوری پشتیبان‌گیری» است و هیچ ادعای ساخت فایل خودکار ندارد. */
 const LAST_BACKUP_KEY="hesabdar-last-backup-at-v1";
 const BACKUP_REMIND_DAYS=7;
@@ -568,7 +568,7 @@ function renderAudit(){
   box.innerHTML=logs.map(e=>`<div class="audit-item"><div class="audit-icon">${auditIcon(e.kind)}</div><div class="audit-main"><b>${esc(e.action)}</b>${e.detail?`<div class="meta">${esc(e.detail)}</div>`:""}<small>${new Intl.DateTimeFormat("fa-IR-u-ca-persian",{dateStyle:"short",timeStyle:"short"}).format(new Date(e.at))}</small></div></div>`).join("")||empty("هنوز گزارشی ثبت نشده است");
 }
 function clearAudit(){if(!data.audit?.length)return alert("گزارشی برای پاک کردن وجود ندارد");if(confirm("همه گزارش‌های فعالیت پاک شوند؟")){const old=data.audit.slice();data.audit=[];for(const e of old)markDirty("audit",e.id,true,{id:e.id},new Date().toISOString());save();logEvent("گزارش‌ها پاک شدند","سابقه فعالیت قبلی حذف شد","system")}}
-/* ---- ذخیره‌سازی (t1) ---------------------------------------------------
+/* ---- ذخیره‌سازی (pro2) ---------------------------------------------------
  * ذخیره‌ها در صف serial انجام می‌شوند و چند درخواست پشت‌سرهم به یک نوشتن
  * ادغام می‌شوند (نوشتن همیشه آخرین وضعیت data را می‌خواند). خطا فقط یک بار
  * و بعد از شکست واقعی نوشتن گزارش می‌شود، نه به‌صورت الکی. */
@@ -1168,7 +1168,17 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeMenu()});
 
 const modal=$("modal"),modalBody=$("modalBody");
 function openModal(html){modalBody.innerHTML=html;modal.classList.remove("hidden");bindAmountInputs(modalBody)}
-function closeModal(){modal.classList.add("hidden")}
+function closeModal(){
+  try{document.activeElement?.blur?.()}catch(e){}
+  modal.classList.add("hidden");
+  try{
+    window.scrollTo(0,0);
+    if(window.visualViewport){
+      const reset=()=>window.scrollTo(0,0);
+      requestAnimationFrame(reset); setTimeout(reset,60);
+    }
+  }catch(e){}
+}
 /* ---- v3.12: جداکننده هزارگان در تمام فیلدهای عددی مبلغی ----
  * هر فیلدی که کلاس amt-input داشته باشد، هنگام تایپ خودکار هر ۳ رقم یک
  * ویرگول می‌گیرد (۱٬۲۵۰٬۰۰۰) تا میلیون از هزار به‌راحتی تشخیص داده شود؛

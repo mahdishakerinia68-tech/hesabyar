@@ -1,4 +1,4 @@
-/* t1: فونت وزیرمتن حالا از index.html و بدون مسدود کردن رندر بارگذاری می‌شود؛ اگر در دسترس نبود (آفلاین/فیلتر) فونت‌های سیستم جایگزین می‌شوند. */
+/* pro2: فونت وزیرمتن حالا از index.html و بدون مسدود کردن رندر بارگذاری می‌شود؛ اگر در دسترس نبود (آفلاین/فیلتر) فونت‌های سیستم جایگزین می‌شوند. */
 
 /* ===== "فیروزه و دوات" design tokens — Persian turquoise & ink theme ===== */
 :root{
@@ -30,7 +30,7 @@ body{
      swipe-back handler in app.js; vertical scrolling still works normally. */
   touch-action: pan-y;
 }
-button,input,select,textarea{font-family:inherit;max-width:100%}
+button,input,select,textarea{font-family:inherit;max-width:100%;-webkit-text-size-adjust:100%}
 h1,h2,h3{margin:0}
 img,svg,canvas{max-width:100%}
 
@@ -172,7 +172,7 @@ strong.income,strong.expense{font-size:15px;font-variant-numeric:tabular-nums}
 
 .search,.filters select,.filters input{
   width:100%;padding:12px 14px;border:none;border-radius:var(--radius-sm);background:var(--card);
-  outline:none;font:inherit;font-size:14.5px;color:var(--label);border:.5px solid var(--sep);
+  outline:none;font:inherit;font-size:16px;color:var(--label);border:.5px solid var(--sep);
 }
 .filters{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0 6px}
 .filters input{grid-column:span 1}
@@ -313,7 +313,7 @@ body:not(.dark) .sheet .close{background:#E5E5EA}
 .form,.form.invoice-form{display:flex;flex-direction:column;gap:10px}
 .form input,.form select,.form textarea{
   width:100%;padding:13px 14px;border-radius:var(--radius-sm);border:.5px solid var(--sep);
-  background:var(--card);color:var(--label);font:inherit;font-size:14.5px;outline:none;
+  background:var(--card);color:var(--label);font:inherit;font-size:16px;outline:none;
 }
 .form input:focus,.form select:focus,.form textarea:focus{border-color:var(--blue)}
 .amt-input{direction:ltr;text-align:right}
@@ -346,7 +346,7 @@ body:not(.dark) .sheet .close{background:#E5E5EA}
 /* invoice builder */
 .invoice-table-head{display:grid;grid-template-columns:2.2fr .7fr .9fr .3fr;gap:6px;font-size:10.5px;color:var(--label2);padding:0 4px;font-weight:700}
 .invoice-row{display:grid;grid-template-columns:2.2fr .7fr .9fr .3fr;gap:6px;align-items:start}
-.invoice-row select,.invoice-row input{padding:9px 8px;font-size:12.5px;border-radius:9px;border:.5px solid var(--sep);background:var(--card);color:var(--label);width:100%;min-width:0}
+.invoice-row select,.invoice-row input{padding:9px 8px;font-size:16px;border-radius:9px;border:.5px solid var(--sep);background:var(--card);color:var(--label);width:100%;min-width:0}
 .invoice-row button{border:none;background:color-mix(in srgb, var(--red) 12%, transparent);color:var(--red);border-radius:8px;height:32px}
 .inv-desc-wrap{position:relative;width:100%}
 .inv-suggest{position:absolute;z-index:60;top:100%;right:0;left:0;margin-top:3px;background:var(--card);border:.5px solid var(--sep);border-radius:10px;max-height:190px;overflow:auto;box-shadow:0 6px 18px rgba(0,0,0,.18)}
@@ -816,10 +816,15 @@ button,.nav,a,input,select,textarea{touch-action:manipulation}
 @media(max-width:430px){.inst-card{align-items:flex-start}.inst-card-side{min-width:94px}.inst-card-side button{font-size:9px;padding:5px 6px}.inst-stats b{font-size:10px}.inst-hero{padding:13px}.inst-total strong{font-size:21px}}
 
 
-/* ===== t1: دسترس‌پذیری ===== */
+/* ===== pro2: دسترس‌پذیری ===== */
 button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focus-visible,.nav:focus-visible{
   outline:3px solid var(--blue);outline-offset:2px;
 }
 @media (prefers-reduced-motion: reduce){
   *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;scroll-behavior:auto !important}
 }
+
+/* Mobile/WebView input zoom fix (pro2): iOS auto-zooms controls below 16px. */
+.form input,.form select,.form textarea,.search,.filters select,.filters input,.invoice-row select,.invoice-row input,.quick-fields input,.quick-fields select,.date-time-picker input[type=time],.menu-search{font-size:16px!important;}
+html{-webkit-text-size-adjust:100%;}
+body{touch-action:pan-y;}

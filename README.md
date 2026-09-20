@@ -1,55 +1,117 @@
-# حساب‌یار / HesabYar
+# 📒 حساب‌یار — pro2
 
-**نسخه فعلی: t1** (بیلد آزمایشی اول پس از 1.2.8؛ در `package.json` به‌صورت `1.2.9-t1` ثبت شده تا semver معتبر باشد.)
+حساب‌یار یک اپ حسابداری فارسی، RTL و قابل نصب به‌صورت PWA است و برای بسته‌بندی Android با Capacitor آماده شده است.
 
-حساب‌یار یک برنامه‌ی **Web / PWA** فارسی برای حسابداری شخصی و کسب‌وکار است و بدون هیچ dependency اجرا می‌شود. ساخت APK/iOS در محدوده‌ی این نسخه نیست (نگاه کنید به `CAPACITOR-SETUP.md`).
+## وضعیت انتشار
+
+- Release: `pro2`
+- Package version: `2.0.0-pro2`
+- Storage اصلی: IndexedDB با ذخیره اتمیک snapshot
+- Cloud sync: اختیاری، با Firebase Authentication + Firestore Rules
+- Android: Capacitor 7 + Java 17 در CI
+- Artifactهای build در repository نگهداری نمی‌شوند.
 
 ## اجرای محلی
 
-Service Worker فقط روی HTTPS یا localhost کار می‌کند:
+```bash
+npm ci
+npm run validate
+npm test
+npm run test:browser
+```
+
+برای تست PWA باید با HTTP سرو شود، نه `file://`:
 
 ```bash
-npx serve .
-# یا
 python3 -m http.server 8080
 ```
 
-## ساختار
+سپس `http://localhost:8080` را باز کنید.
 
-| مسیر | نقش |
-| --- | --- |
-| `index.html`, `style.css`, `app.js` | خودِ برنامه (کد اجرایی) |
-| `src/core/storage-runtime.js` | لایه‌ی ذخیره‌سازی IndexedDB؛ **تنها** ماژول `src/` که در مرورگر بارگذاری می‌شود |
-| `sw.js`, `manifest.json` | PWA و کار آفلاین |
-| `src/**` (بقیه) | پیاده‌سازی مرجع منطق مالی/مهاجرت/همگام‌سازی برای تست در Node. منطق فاکتور در `app.js` با `src/modules/invoices.js` روی ۵۰۰ فاکتور تصادفی مقایسه می‌شود |
-| `tests/` | تست‌ها (پایین را ببینید) |
+## تست مرورگر
 
-## ذخیره‌سازی
-
-- همه‌ی داده‌ها و تنظیمات (رمز ورود، زبان، مهر و امضا، تسویه‌ی سال) با یک transaction اتمیک در IndexedDB (`hesabdar-v4`) ذخیره می‌شوند.
-- تا پایان خواندن اطلاعات ذخیره‌شده هیچ نوشتنی انجام نمی‌شود، تا داده‌ی خالی اولیه هرگز داده‌ی واقعی را بازنویسی نکند.
-- داده‌ی قدیمیِ `localStorage` فقط پس از نوشتن و خواندن‌مجدد موفق پاک می‌شود؛ اگر خراب باشد دست‌نخورده می‌ماند.
-- اگر IndexedDB اصلاً در دسترس نباشد، برنامه به `localStorage` برمی‌گردد (آخرین راه‌حل).
-
-## پشتیبان‌گیری
-
-پشتیبان دستی با AES-GCM 256 و PBKDF2-SHA-256 رمزنگاری می‌شود (رمز حداقل ۸ کاراکتر و هیچ‌جا ذخیره نمی‌شود). چون ساخت فایل رمزنگاری‌شده بدون رمز کاربر ممکن نیست، **پشتیبان خودکار وجود ندارد**؛ برنامه فقط اگر بیش از ۷ روز پشتیبان نگرفته باشید یادآوری می‌کند.
-
-## هوش مصنوعی و API Key
-
-هیچ کلید APIـای در برنامه ذخیره نمی‌شود و «یادداشت هوشمند» تا وجود یک backend امن غیرفعال است. دکمه‌ی «واضح‌تر و تمیزتر کن» فقط پردازش پیکسلی روی خود دستگاه است و تصویر را به جایی نمی‌فرستد.
-
-## تست و اعتبارسنجی
+Playwright در `devDependencies` قرار دارد. در محیط CI، Chromium نیز نصب می‌شود.
 
 ```bash
-npm ci
-npm run validate      # syntax + اسکن امنیتی
-npm test              # تست‌های واحد + بررسی ایستای PWA (بدون مرورگر)
-npm run test:browser  # تست واقعی در Chromium (نیاز به: npm i -D playwright && npx playwright install chromium)
+npx playwright install --with-deps chromium
+npm run test:browser
 ```
 
-`test:browser` برنامه را واقعاً اجرا می‌کند: ثبت حساب/تراکنش/فاکتور با UI، ریلود، رمز ورود، بکاپ رمزنگاری‌شده، مهاجرت از localStorage، حالت آفلاین و اورفلو صفحه‌ها.
+## Firebase / همگام‌سازی
+
+تنظیمات Firebase در repository به‌صورت credential یا API secret نگهداری نمی‌شوند. کاربر تنظیمات Web App را از داخل برنامه وارد می‌کند و اطلاعات در storage محلی تنظیمات نگهداری می‌شود.
+
+قوانین Firestore فقط اجازه دسترسی کاربر به `users/{uid}` و زیرمجموعه‌های خودش را می‌دهند و payload رکوردها از نظر نام فیلد، نوع داده و اندازه محدود شده است.
+
+## Storage و Backup
+
+- IndexedDB مرجع اصلی داده است.
+- localStorage فقط برای تنظیمات کوچک و fallback زمانی استفاده می‌شود که IndexedDB در دسترس نباشد.
+- ذخیره snapshot در یک transaction واحد انجام می‌شود.
+- در خطای quota، snapshot قبلی حذف نمی‌شود.
+- backup رمزنگاری‌شده و restore با اعتبارسنجی انجام می‌شود.
+
+## حالت‌های برنامه
+
+- `personal`: امکانات شخصی
+- `business`: امکانات کامل کسب‌وکاری
+- `store`: حالت فروشگاه/کیوسک محدود با رمز مدیر جداگانه
+
+قفل حالت فروشگاه صرفاً محدودکننده UI/رفتار سمت کلاینت است و نباید به‌عنوان مرز امنیتی سرور یا کنترل دسترسی Firestore در نظر گرفته شود.
+
+## PWA و Offline
+
+Service Worker نسخه `pro2` را cache می‌کند، shell برنامه را برای حالت offline نگه می‌دارد و فایل‌های اصلی را network-first به‌روزرسانی می‌کند. درخواست‌های خارجی وارد cache محلی نمی‌شوند.
+
+## Android APK
+
+Workflow زیر را اجرا می‌کند:
+
+1. `npm ci`
+2. `npm run validate`
+3. `npm test`
+4. Java 17
+5. ایجاد Android project در صورت نبودن آن
+6. `npx cap sync android`
+7. `./gradlew assembleDebug`
+8. آپلود artifact با نام `HesabYar-pro2-APK`
+
+Workflow: `.github/workflows/android.yml`
+
+برای release امضاشده، keystore باید فقط از GitHub Secrets/secure CI storage تأمین شود و هرگز داخل repository قرار نگیرد.
+
+## امنیت release
+
+این فایل‌ها نباید commit شوند:
+
+```text
+*.bak
+*.zip
+*.apk
+*.aab
+*.keystore
+*.jks
+.env
+.env.*
+```
+
+اسکریپت `scripts/security-check.mjs` وجود artifactهای ممنوع و الگوهای secret/credential را بررسی می‌کند.
+
+## CSP و XSS
+
+CSP به حالت enforce تغییر داده شده است. به‌دلیل اینکه UI فعلی هنوز تعدادی inline event handler دارد، `script-src 'unsafe-inline'` فعلاً نگه داشته شده و باید در refactor بعدی به event delegation / addEventListener منتقل شود تا کاملاً حذف شود.
+
+ورودی‌های user-facing هنگام تولید HTML با `esc()` escape می‌شوند و تست XSS برای payloadهای `<img>`, `<script>` و کاراکترهای ویژه وجود دارد.
 
 ## انتشار
 
-فایل‌های zip در مخزن Git نگهداری نمی‌شوند؛ هر نسخه باید به‌صورت GitHub Release منتشر شود. قبل از انتشار `RELEASE-CHECKLIST.md` را اجرا کنید.
+قبل از release:
+
+```bash
+npm ci
+npm run validate
+npm test
+npm run test:browser
+```
+
+سپس tag نسخه را ایجاد کنید و GitHub Actions را اجرا کنید. APK/ZIP را داخل repository commit نکنید؛ artifactهای CI یا Release assets محل مناسب انتشار هستند.
