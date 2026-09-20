@@ -1,4 +1,4 @@
-/* HesabYar storage runtime (t1)
+/* HesabYar storage runtime (pro2)
  *
  * The one and only persistence layer used by app.js. Loaded as a classic
  * <script> before app.js and exposed as globalThis.HesabYarStorage.
@@ -18,7 +18,8 @@
 
   var DB_NAME = 'hesabdar-v4';
   var DB_VERSION = 1;
-  var APP_VERSION = 't1';
+  var APP_VERSION = 'pro2';
+  var MAX_SNAPSHOT_BYTES = 9 * 1024 * 1024;
   var RECORD_STORES = [
     'accounts', 'transactions', 'invoices', 'customers', 'products', 'people',
     'checks', 'notes', 'reminders', 'audit', 'attachments', 'trash',
@@ -96,6 +97,10 @@
   /* Replace the stored snapshot atomically. */
   function saveSnapshot(data) {
     if (!data || typeof data !== 'object') return Promise.reject(new Error('invalid-snapshot'));
+    try {
+      var serialized = JSON.stringify(data);
+      if (serialized.length > MAX_SNAPSHOT_BYTES) return Promise.reject(new DOMException('snapshot-too-large', 'QuotaExceededError'));
+    } catch (e) { return Promise.reject(new Error('invalid-snapshot')); }
     return openDatabase().then(function (db) {
       return new Promise(function (resolve, reject) {
         var tx;
@@ -154,6 +159,8 @@
         var s = RECORD_STORES[i];
         var expected = (Array.isArray(data[s]) ? data[s] : []).filter(function (r) { return r && typeof r === 'object'; }).length;
         if ((snap[s] || []).length !== expected) return false;
+        var expectedIds = new Set((Array.isArray(data[s]) ? data[s] : []).filter(function (r) { return r && typeof r === 'object' && r.id != null; }).map(function (r) { return String(r.id); }));
+        for (var j = 0; j < (snap[s] || []).length; j++) if (!expectedIds.has(String(snap[s][j].id))) return false;
       }
       return true;
     });
