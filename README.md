@@ -1,11 +1,11 @@
-# 📒 حساب‌یار — pro2
+# 📒 حساب‌یار — pro1.1
 
 حساب‌یار یک اپ حسابداری فارسی، RTL و قابل نصب به‌صورت PWA است و برای بسته‌بندی Android با Capacitor آماده شده است.
 
 ## وضعیت انتشار
 
-- Release: `pro2`
-- Package version: `2.0.0-pro2`
+- Release: `pro1.1`
+- Package version: `2.0.1-pro1.1`
 - Storage اصلی: IndexedDB با ذخیره اتمیک snapshot
 - Cloud sync: اختیاری، با Firebase Authentication + Firestore Rules
 - Android: Capacitor 7 + Java 17 در CI
@@ -61,7 +61,7 @@ npm run test:browser
 
 ## PWA و Offline
 
-Service Worker نسخه `pro2` را cache می‌کند، shell برنامه را برای حالت offline نگه می‌دارد و فایل‌های اصلی را network-first به‌روزرسانی می‌کند. درخواست‌های خارجی وارد cache محلی نمی‌شوند.
+Service Worker نسخه `pro1.1` را cache می‌کند، shell برنامه را برای حالت offline نگه می‌دارد و فایل‌های اصلی را network-first به‌روزرسانی می‌کند. درخواست‌های خارجی وارد cache محلی نمی‌شوند.
 
 ## Android APK
 
@@ -74,7 +74,7 @@ Workflow زیر را اجرا می‌کند:
 5. ایجاد Android project در صورت نبودن آن
 6. `npx cap sync android`
 7. `./gradlew assembleDebug`
-8. آپلود artifact با نام `HesabYar-pro2-APK`
+8. آپلود artifact با نام `HesabYar-pro1.1-APK`
 
 Workflow: `.github/workflows/android.yml`
 
