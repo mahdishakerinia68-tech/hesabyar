@@ -1,4 +1,4 @@
-const CACHE = "hesabdar-pro2-offline-v1";
+const CACHE = "hesabdar-pro1-offline-v1";
 const ASSETS = [
   "./",
   "./index.html",
