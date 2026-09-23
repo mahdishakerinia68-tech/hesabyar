@@ -7,10 +7,10 @@ const sw = readFileSync('sw.js', 'utf8');
 const app = readFileSync('app.js', 'utf8');
 const manifest = JSON.parse(readFileSync('manifest.json', 'utf8'));
 
-assert.match(index, /sw\.js\?v=pro2/);
+assert.match(index, /sw\.js\?v=pro1\.1/);
 assert.doesNotMatch(index, /maximum-scale=1/);
-assert.match(sw, /hesabdar-pro2-offline-v\d+/);
-assert.match(app, /APP_VERSION="pro2"/);
+assert.match(sw, /hesabdar-pro1\.1-offline-v\d+/);
+assert.match(app, /APP_VERSION="pro1.1"/);
 assert.doesNotMatch(app, /saveAnthropicKey|clearAnthropicKey/);
 
 // Every local script/style referenced by index.html must be pre-cached so the app starts offline.

@@ -52,7 +52,7 @@ async function openApp({ seedLocal = null, context, initScript = null } = {}) {
 async function gotoApp(state, { reload = false } = {}) {
   if (reload) await state.page.reload(); else await state.page.goto(server.url + '/index.html');
   await state.page.waitForFunction(() => typeof data === 'object' && document.querySelector('#balance') && globalThis.__hesabReady !== false);
-  await state.page.waitForFunction(() => document.querySelector('#versionPill')?.textContent.trim() === 'pro2');
+  await state.page.waitForFunction(() => document.querySelector('#versionPill')?.textContent.trim() === 'pro1.1');
   await state.page.waitForTimeout(400);
   await state.page.evaluate(() => { try { closeModal(); } catch { /* no modal */ } });
 }
@@ -128,7 +128,7 @@ await test('reload never overwrites saved data (init-order race), even with rapi
     await page.evaluate(i => { data.notes.push({ id: 'n' + i, title: 'یادداشت ' + i, items: [], order: i, updatedAt: new Date().toISOString() }); save(); }, i);
   }
   await idbFlush(page);
-  for (let i = 0; i < 4; i++) { await page.reload(); await page.waitForFunction(() => typeof data === 'object' && document.querySelector('#versionPill')?.textContent.trim() === 'pro2'); }
+  for (let i = 0; i < 4; i++) { await page.reload(); await page.waitForFunction(() => typeof data === 'object' && document.querySelector('#versionPill')?.textContent.trim() === 'pro1.1'); }
   await page.waitForTimeout(500);
   assert.equal(await page.evaluate(() => data.notes.length), 3);
   noErrors(app);
@@ -341,7 +341,7 @@ await test('offline: PWA shell and data load with the network cut', async () => 
   assert.equal(cached.includes('/src/core/storage-runtime.js'), true, 'storage runtime must be cached for offline start: ' + cached.join(','));
   await ctx.setOffline(true);
   await page.reload();
-  await page.waitForFunction(() => typeof data === 'object' && document.querySelector('#versionPill')?.textContent.trim() === 'pro2', null, { timeout: 15000 });
+  await page.waitForFunction(() => typeof data === 'object' && document.querySelector('#versionPill')?.textContent.trim() === 'pro1.1', null, { timeout: 15000 });
   await page.waitForTimeout(500);
   assert.equal(await page.evaluate(() => data.notes.some(n => n.title === 'آفلاین')), true);
   await ctx.setOffline(false);

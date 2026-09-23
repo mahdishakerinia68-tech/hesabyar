@@ -15,8 +15,13 @@ assert.equal(productProfit([{items:[{productId:'p',qty:2,price:100,costPriceAtSa
 assert.equal(compareRecords({revision:2,updatedAt:'2026-01-01',deviceId:'a'},{revision:1}),1);
 
 // One release label everywhere.
-const V = 'pro2';
+const V = 'pro1.1';
 const read = f => readFileSync(new URL('../' + f, import.meta.url), 'utf8');
+// Transaction display order must be date-descending, not insertion-order.
+const appSource = read('app.js');
+assert.match(appSource, /function transactionDateMs\(/);
+assert.match(appSource, /transactionsByDateDesc\(data\.transactions\)\.slice\(0,6\)/);
+assert.match(appSource, /transactionsByDateDesc\(data\.transactions\.filter/);
 assert.match(read('app.js'), new RegExp(`APP_VERSION="${V}"`));
 assert.match(read('index.html'), new RegExp(`id="versionPill">${V}<`));
 assert.match(read('index.html'), new RegExp(`id="appVersionText">${V}<`));
@@ -26,6 +31,6 @@ assert.match(read('src/core/state.js'), new RegExp(`APP_VERSION='${V}'`));
 assert.equal(JSON.parse(read('manifest.json')).version, V);
 assert.match(JSON.parse(read('package.json')).version, new RegExp(`-${V}$`));
 assert.equal(JSON.parse(read('package-lock.json')).version, JSON.parse(read('package.json')).version);
-assert.match(read('src/security/backup-crypto.js'), /appVersion='pro2'/);
+assert.match(read('src/security/backup-crypto.js'), /appVersion='pro1.1'/);
 assert.doesNotMatch(read('BUILD-STATUS.md'), /\bt1\b/);
 console.log('tests: PASS (core financial/security/migration/conflict suite + version consistency)');
