@@ -52,7 +52,7 @@ async function openApp({ seedLocal = null, context, initScript = null } = {}) {
 async function gotoApp(state, { reload = false } = {}) {
   if (reload) await state.page.reload(); else await state.page.goto(server.url + '/index.html');
   await state.page.waitForFunction(() => typeof data === 'object' && document.querySelector('#balance') && globalThis.__hesabReady !== false);
-  await state.page.waitForFunction(() => document.querySelector('#versionPill')?.textContent.trim() === 't1');
+  await state.page.waitForFunction(() => document.querySelector('#versionPill')?.textContent.trim() === 'pro2');
   await state.page.waitForTimeout(400);
   await state.page.evaluate(() => { try { closeModal(); } catch { /* no modal */ } });
 }
@@ -128,7 +128,7 @@ await test('reload never overwrites saved data (init-order race), even with rapi
     await page.evaluate(i => { data.notes.push({ id: 'n' + i, title: 'یادداشت ' + i, items: [], order: i, updatedAt: new Date().toISOString() }); save(); }, i);
   }
   await idbFlush(page);
-  for (let i = 0; i < 4; i++) { await page.reload(); await page.waitForFunction(() => typeof data === 'object' && document.querySelector('#versionPill')?.textContent.trim() === 't1'); }
+  for (let i = 0; i < 4; i++) { await page.reload(); await page.waitForFunction(() => typeof data === 'object' && document.querySelector('#versionPill')?.textContent.trim() === 'pro2'); }
   await page.waitForTimeout(500);
   assert.equal(await page.evaluate(() => data.notes.length), 3);
   noErrors(app);
@@ -209,6 +209,37 @@ await test('people, checks, notes, reminders can be created and persist', async 
   await gotoApp(app, { reload: true });
   const after = await page.evaluate(() => ({ people: data.people.length, checks: data.checks.length }));
   assert.deepEqual(after, { people: 1, checks: 1 });
+  noErrors(app);
+  await app.ctx.close();
+});
+
+await test('XSS payloads stay text and do not create executable DOM nodes', async () => {
+  const app = await openApp(); const { page } = app;
+  const payloads = ['<img src=x onerror=alert(1)>', '<script>alert(1)</script>', '&<>"\''];
+  for (const payload of payloads) {
+    await page.evaluate(() => openTx());
+    await page.fill('#title', payload);
+    await page.fill('#amount', '1000');
+    await page.click('#expenseCatButtons button >> nth=0');
+    await page.click('button[onclick^="saveTx"]');
+    await page.waitForTimeout(50);
+    assert.equal(await page.locator('img[onerror], script').count(), 0, `executable element created for ${payload}`);
+    assert.equal(await page.evaluate(p => document.body.innerHTML.includes(p), payload), false, 'raw payload unexpectedly present in DOM HTML');
+  }
+  noErrors(app);
+  await app.ctx.close();
+});
+
+await test('closing a transaction form leaves viewport at normal scale', async () => {
+  const app = await openApp(); const { page } = app;
+  await page.evaluate(() => openTx());
+  await page.fill('#title', 'zoom-test');
+  await page.fill('#amount', '1000');
+  await page.click('#expenseCatButtons button >> nth=0');
+  await page.click('button[onclick^="saveTx"]');
+  await page.waitForTimeout(100);
+  const scale = await page.evaluate(() => window.visualViewport?.scale ?? 1);
+  assert.ok(scale <= 1.01, `viewport remained zoomed: ${scale}`);
   noErrors(app);
   await app.ctx.close();
 });
@@ -310,7 +341,7 @@ await test('offline: PWA shell and data load with the network cut', async () => 
   assert.equal(cached.includes('/src/core/storage-runtime.js'), true, 'storage runtime must be cached for offline start: ' + cached.join(','));
   await ctx.setOffline(true);
   await page.reload();
-  await page.waitForFunction(() => typeof data === 'object' && document.querySelector('#versionPill')?.textContent.trim() === 't1', null, { timeout: 15000 });
+  await page.waitForFunction(() => typeof data === 'object' && document.querySelector('#versionPill')?.textContent.trim() === 'pro2', null, { timeout: 15000 });
   await page.waitForTimeout(500);
   assert.equal(await page.evaluate(() => data.notes.some(n => n.title === 'آفلاین')), true);
   await ctx.setOffline(false);
