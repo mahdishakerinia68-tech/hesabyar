@@ -1,4 +1,4 @@
-# Build verification — pro1.1
+# Build verification — pro1.2
 
 ## اجرا و پاس‌شده در محیط ساخت
 - `npm run validate` (syntax همه‌ی فایل‌ها + security-check)

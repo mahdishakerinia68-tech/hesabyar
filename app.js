@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="pro1.1";
+const APP_VERSION="pro1.2";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v2";
 const AUTO_BACKUP_MS=6*60*60*1000;
 const APP_MODE_KEY="hesabdar-app-mode-v1";
@@ -314,22 +314,6 @@ async function addToAndroidClock(r){const p=getNativeSystemAlarm();if(!p||!r?.da
 function getNativeLocalNotifications(){try{if(nativeNotifications)return nativeNotifications;const p=globalThis.Capacitor?.Plugins?.LocalNotifications;if(p&&typeof p.schedule==="function")nativeNotifications=p;return nativeNotifications}catch(e){return null}}
 function notificationIdForReminder(id){let h=0;for(const ch of String(id||""))h=((h<<5)-h+ch.charCodeAt(0))|0;return NATIVE_NOTIFICATION_ID_PREFIX+(Math.abs(h)%100000000)}
 function localDateFromInput(v){if(!v)return null;const raw=String(v);const m=raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);const d=m?new Date(+m[1],+m[2]-1,+m[3],12,0,0,0):new Date(v);return Number.isNaN(d.getTime())?null:d}
-function transactionDateMs(t){
- const v=t?.date ?? t?.createdAt ?? t?.updatedAt;
- if(!v)return Number.NEGATIVE_INFINITY;
- const d=localDateFromInput(v);
- if(d)return d.getTime();
- // Keep compatibility with older imports that stored a Jalali date string.
- const raw=toEnDigits(String(v)).trim().replace('T',' ');
- const m=raw.match(/^(\\d{4})[\\/\\-](\\d{1,2})[\\/\\-](\\d{1,2})(?:\\s+(\\d{1,2}):(\\d{2}))?/);
- if(m){
-  try{const g=jalaliToGregorian(+m[1],+m[2],+m[3]);return new Date(g[0],g[1]-1,g[2],+(m[4]||0),+(m[5]||0)).getTime()}catch(e){}
- }
- return Number.NEGATIVE_INFINITY;
-}
-function transactionsByDateDesc(list){
- return [...(list||[])].sort((a,b)=>transactionDateMs(b)-transactionDateMs(a));
-}
 function timeFa(v){const d=localDateFromInput(v);if(!d)return '';return `${toFaDigits(String(d.getHours()).padStart(2,'0'))}:${toFaDigits(String(d.getMinutes()).padStart(2,'0'))}`}
 function addMonthsSafe(d,n){const out=new Date(d.getTime()),day=out.getDate();out.setDate(1);out.setMonth(out.getMonth()+n);const last=new Date(out.getFullYear(),out.getMonth()+1,0).getDate();out.setDate(Math.min(day,last));return out}
 function nextReminderDate(r,now=new Date()){let d=localDateFromInput(r?.date);if(!d)return null;const rep=r.repeat||"once";if(rep==="once")return d>now?d:null;let guard=0;while(d<=now&&guard++<500){if(rep==="daily")d=new Date(d.getTime()+86400000);else if(rep==="weekly")d=new Date(d.getTime()+7*86400000);else if(rep==="monthly")d=addMonthsSafe(d,1);else return null}return d>now?d:null}
@@ -1263,7 +1247,7 @@ function renderGlobalSearch(){
  const q=($("gsInput")?.value||"").trim().toLowerCase();
  if(!q){box.innerHTML=`<p class="hint">برای جستجو در همه‌ی بخش‌ها تایپ کن.</p>`;return}
  const has=s=>String(s||"").toLowerCase().includes(q);
- const txRows=data.transactions.filter(t=>has(t.title)||has(t.category)).slice(0,8).map(t=>`<div class="item gs-row" onclick="closeModal();openTx('${t.id}')"><div><b>${esc(t.title||"تراکنش")}</b><div class="meta">${jalaliLabel(t.date)}${t.category?" • "+esc(t.category):""}</div></div><strong class="${t.type}">${money(t.amount)}</strong></div>`);
+ const txRows=data.transactions.filter(t=>has(t.title)||has(t.category)||has(t.otherName)||(t.type==="transfer"&&(has(data.accounts.find(a=>a.id===t.from)?.name)||has(data.accounts.find(a=>a.id===t.to)?.name)))).slice(0,8).map(t=>`<div class="item gs-row" onclick="closeModal();openTx('${t.id}')"><div><b>${esc(t.title||"تراکنش")}</b><div class="meta">${jalaliLabel(t.date)}${t.category?" • "+esc(t.category):""}</div></div><strong class="${t.type}">${money(t.amount)}</strong></div>`);
  const custRows=data.customers.filter(c=>has(c.name)||has(c.phone)).slice(0,8).map(c=>`<div class="item gs-row" onclick="closeModal();openCustomer('${c.id}')"><div><b>👤 ${esc(c.name)}</b><div class="meta">${esc(c.phone||"")}</div></div></div>`);
  const prodRows=data.products.filter(p=>has(p.name)||has(p.code)).slice(0,8).map(p=>`<div class="item gs-row" onclick="closeModal();openProduct('${p.id}')"><div><b>📦 ${esc(p.name)}</b><div class="meta">موجودی: ${fa(p.stock||0)} • فروش: ${money(p.price||0)}</div></div></div>`);
  const checkRows=data.checks.filter(c=>has(c.name)||has(c.bank)||has(c.number)).slice(0,8).map(c=>`<div class="item gs-row" onclick="closeModal();openCheck('${c.id}')"><div><b>✓ ${esc(c.name)}</b><div class="meta">${jalaliLabel(c.date)}${c.bank?" • "+esc(c.bank):""}</div></div><strong class="${c.type==="receive"?"income":"expense"}">${money(c.amount)}</strong></div>`);
@@ -3339,14 +3323,14 @@ function render(){
  const totalBalance = data.accounts
   .reduce((sum, account) => sum + accountBalance(account.id), 0);
  if($("balance"))$("balance").textContent=money(totalBalance);if($("income"))$("income").textContent=money(inc);if($("expense"))$("expense").textContent=money(exp);
- if($("recent"))$("recent").innerHTML=transactionsByDateDesc(data.transactions).slice(0,6).map(safeTxHTML).join("")||empty("هنوز تراکنشی ثبت نشده");
+ if($("recent"))$("recent").innerHTML=data.transactions.slice(0,6).map(safeTxHTML).join("")||empty("هنوز تراکنشی ثبت نشده");
  if($("accountList")&&pageActive("accounts"))$("accountList").innerHTML=data.accounts.map(a=>`<div class="item account-item"><div class="account-main"><b>${esc(a.name)}</b><div class="meta">${esc(a.bank||"حساب شخصی")}${a.sender?" • فرستنده: "+esc(a.sender):""}</div>${cardActions(a)}</div><div><strong>${money(accountBalance(a.id))}</strong>${actionButtons("openAccount","deleteAccount",a.id)}<button type="button" title="گزارش Excel" onclick="exportAccountExcel('${a.id}')">📊</button></div></div>`).join("")||empty("هنوز حسابی اضافه نشده");
  if($("transferList")&&pageActive("accounts"))$("transferList").innerHTML=data.transactions.filter(t=>t.type==="transfer").map(t=>{try{return transferItemHTML(t)}catch(e){console.warn("transferItemHTML: skipped a malformed transfer",t?.id,e);return ""}}).join("")||empty("هنوز انتقالی ثبت نشده");
  if($("productList")&&pageActive("products"))renderProducts();
  const q=$("search")?.value?.trim()||"",ft=$("filterType")?.value||"",fc=$("filterCat")?.value||"";
  if($("reportAccount")&&pageActive("reports")){const rv=$("reportAccount").value;$("reportAccount").innerHTML='<option value="">همه حساب‌ها</option>'+data.accounts.map(a=>`<option value="${esc(a.id)}">${esc(a.name)}</option>`).join("");$("reportAccount").value=rv;}
  if($("filterCat")&&pageActive("transactions")){let opts='<option value="">همه دسته‌ها</option>'+[...data.expenseCats,...data.incomeCats].map(c=>`<option value="${esc(c.name)}">${esc(c.name)}</option>`).join("");$("filterCat").innerHTML=opts;$("filterCat").value=fc}
- if($("txList")&&pageActive("transactions"))$("txList").innerHTML=transactionsByDateDesc(data.transactions.filter(t=>(!q||String(t.title).includes(q)||String(t.category||"").includes(q))&&(!ft||t.type===ft)&&(!fc||t.category===fc||String(t.category||"").startsWith(fc+" - ")))).map(safeTxHTML).join("")||empty("تراکنشی پیدا نشد");
+ if($("txList")&&pageActive("transactions"))$("txList").innerHTML=data.transactions.filter(t=>(!q||String(t.title).includes(q)||String(t.category||"").includes(q)||String(t.otherName||"").includes(q)||(t.type==="transfer"&&String(data.accounts.find(a=>a.id===t.from)?.name||"").includes(q))||(t.type==="transfer"&&String(data.accounts.find(a=>a.id===t.to)?.name||"").includes(q)))&&(!ft||t.type===ft)&&(!fc||t.category===fc||String(t.category||"").startsWith(fc+" - "))).map(safeTxHTML).join("")||empty("تراکنشی پیدا نشد");
  if($("customerList")&&pageActive("customers"))renderCustomers();
  if($("peopleList")&&pageActive("people"))$("peopleList").innerHTML=data.people.filter(p=>(p.type||"debt")===peopleMode).map(p=>{const total=Number(p.amount)||0,paid=Math.min(Number(p.paid)||0,total),remaining=Math.max(0,total-paid);const inst=p.installments;const instMeta=inst?`<div class="meta">🧾 اقساط: ${fa(inst.items.filter(x=>x.paid).length)} از ${fa(inst.count)} پرداخت‌شده</div>`:"";const instBtn=inst?`<button type="button" onclick="openInstallments('${p.id}')">اقساط</button>`:`<button type="button" onclick="payPerson('${p.id}')">تسویه</button>`;const invBadge=p.source==="invoice"?`<div class="meta">🧾 مانده فاکتور</div>`:"";const dueLabel=p.type==="credit"?"سررسید واریز":"سررسید پرداخت";return `<div class="item"><div><b>${esc(p.name)}</b>${invBadge}<div class="meta">${p.due?dueLabel+": "+p.due:""}${p.note?" • "+esc(p.note):""}</div><div class="meta">کل: ${money(total)} • تسویه: ${money(paid)}</div>${instMeta}</div><div><strong>${money(remaining)}</strong><div class="actions">${instBtn}${actionButtons("openPerson","deletePerson",p.id)}</div></div></div>`}).join("")||empty(peopleMode==="debt"?"هنوز بدهکاری ثبت نشده":"هنوز طلبی ثبت نشده");
  if($("reminderList")&&pageActive("reminders")){const normalReminders=data.reminders.filter(r=>!r.sourceNoteId&&!r.sourcePersonId).sort((a,b)=>(a.order??0)-(b.order??0)); const noteAlarms=data.reminders.filter(r=>r.sourceNoteId); const peopleAlarms=data.reminders.filter(r=>r.sourcePersonId); const normal=normalReminders.map((r,i)=>{const accId="rem-"+r.id;const isOpen=openAccordions.has(accId);return `<div class="item accordion-card${isOpen?' open':''}" data-acc-id="${accId}"><button class="accordion-head" type="button" aria-expanded="${isOpen}" onclick="toggleAccordion(this,event)"><span>🔔 <b>${esc(r.title)}</b></span><span>⌄</span></button><div class="accordion-body"><div class="meta">${jalaliLabel(r.date)} • ${r.repeat==="once"?"یک‌بار":r.repeat==="weekly"?"هفتگی":"ماهانه"}</div><div class="accordion-actions"><strong>${r.amount?money(r.amount):""}</strong><div class="reorder-btns"><button type="button" title="انتقال به بالا" ${i===0?"disabled":""} onclick="event.stopPropagation();moveReminder('${r.id}',-1)">▲</button><button type="button" title="انتقال به پایین" ${i===normalReminders.length-1?"disabled":""} onclick="event.stopPropagation();moveReminder('${r.id}',1)">▼</button></div>${actionButtons("openReminder","deleteReminder",r.id)}</div></div></div>`}).join(""); $("reminderList").innerHTML=`<div class="section-label">🔔 یادآوری‌های مستقل</div>${normal||empty("یادآوری مستقلی ندارید")}${noteAlarms.length?`<div class="section-label">📝⏰ آلارم یادداشت‌ها</div>`+noteAlarms.map(r=>{const accId="remnote-"+r.id;const isOpen=openAccordions.has(accId);return `<div class="item accordion-card${isOpen?' open':''}" data-acc-id="${accId}"><button class="accordion-head" type="button" aria-expanded="${isOpen}" onclick="toggleAccordion(this,event)"><span>📝 <b>${esc(r.title)}</b></span><span>⌄</span></button><div class="accordion-body"><div class="meta">${jalaliLabel(r.date)} • ${r.repeat==="once"?"یک‌بار":r.repeat==="weekly"?"هفتگی":"ماهانه"}</div></div></div>`}).join(""):``}${peopleAlarms.length?`<div class="section-label">👤 سررسید بدهکار/بستانکار</div>`+peopleAlarms.map(r=>{const accId="remperson-"+r.id;const isOpen=openAccordions.has(accId);return `<div class="item accordion-card${isOpen?' open':''}" data-acc-id="${accId}"><button class="accordion-head" type="button" aria-expanded="${isOpen}" onclick="event.stopPropagation();openPerson('${r.sourcePersonId}')"><span>${r.type==="income"?"💰":"⚠️"} <b>${esc(r.title)}</b></span><span>⌄</span></button><div class="accordion-body"><div class="meta">${jalaliLabel(r.date)}${r.amount?" • "+money(r.amount):""}</div></div></div>`}).join(""):``}`;}
