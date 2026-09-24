@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="pro1.2";
+const APP_VERSION="pro1.3";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v2";
 const AUTO_BACKUP_MS=6*60*60*1000;
 const APP_MODE_KEY="hesabdar-app-mode-v1";
@@ -1838,11 +1838,18 @@ function savePerson(id){
     const p=data.people.find(x=>x.id===id);if(!p)return alert("این شخص پیدا نشد");
     const prevCount=p.installments?.count||1;
     const prevFreq=p.installments?.frequency||"monthly";
+    const prevAmount=Number(p.amount)||0;
+    const prevDue=p.due||"";
     Object.assign(p,o);
     if(instCount>1){
       if(!p.installments){
         p.installments=generateInstallments(amount,instCount,due,instFreq);p.paid=0;
-      }else if(instCount!==prevCount||instFreq!==prevFreq){
+      /* v3.5 fix: قبلاً وقتی فقط «مبلغ کل» یا «تاریخ» تغییر می‌کرد ولی تعداد/فاصله
+       * اقساط همان‌ها می‌ماندند، برنامه‌ی اقساط دوباره ساخته نمی‌شد؛ در نتیجه
+       * ویرایش ذخیره می‌شد ولی مبلغ هر قسط با مبلغ کل جدید هم‌خوان نبود. حالا
+       * تغییر مبلغ یا تاریخ هم مثل تغییر تعداد/فاصله باعث بازسازی اقساطِ
+       * پرداخت‌نشده می‌شود (اقساط پرداخت‌شده دست‌نخورده می‌مانند). */
+      }else if(instCount!==prevCount||instFreq!==prevFreq||amount!==prevAmount||due!==prevDue){
         p.installments=rebuildInstallmentsForCountChange(p,amount,instCount,due,instFreq);
       }
     }else if(p.installments){
@@ -2196,7 +2203,7 @@ function notesWeekTableHTML(){
     /* اولویت‌بندی برنامه‌های هر روز بر اساس ساعت: هرچه زودتر، بالاتر؛ اگر ساعتی
        ثبت نشده باشد آخر لیست همان روز قرار می‌گیرد و ترتیب قبلی (order) حفظ می‌شود. */
     const dayItems=dayNotes.concat(dayReminders).concat(dayPeople).map(it=>{const d=it.date?localDateFromInput(it.date):null;return {...it,mins:d?d.getHours()*60+d.getMinutes():Infinity}}).sort((a,b)=>a.mins-b.mins||a.order-b.order);
-    const chips=dayItems.length?dayItems.map(it=>{const timeLbl=Number.isFinite(it.mins)?`<span class="week-chip-time">${timeFa(it.date)}</span> `:"";if(it.kind==="reminder")return `<button type="button" class="week-note-chip week-reminder-chip" onclick="openReminder('${it.id}')">🔔 ${timeLbl}${esc(it.title)}</button>`;if(it.kind==="person")return `<button type="button" class="week-note-chip week-person-chip${it.ptype==="credit"?" week-credit-chip":""}" onclick="openWeeklyPerson('${it.id}')">${it.ptype==="credit"?"💰":"⚠️"} ${esc(it.title)}</button>`;return `<button type="button" class="week-note-chip" onclick="openNote('${it.id}')">📝 ${timeLbl}${esc(it.title)}</button>`}).join(""):`<span class="meta">برنامه‌ای ثبت نشده</span>`;
+    const chips=dayItems.length?dayItems.map(it=>{const timeLbl=Number.isFinite(it.mins)?`<span class="week-chip-time">${timeFa(it.date)}</span> `:"";if(it.kind==="reminder")return `<span class="week-chip-group"><button type="button" class="week-note-chip week-reminder-chip" onclick="openReminder('${it.id}')">🔔 ${timeLbl}${esc(it.title)}</button><button type="button" class="week-chip-done" title="حذف از لیست هفتگی" aria-label="حذف از لیست هفتگی" onclick="event.stopPropagation();dismissWeeklyReminder('${it.id}')">✓</button></span>`;if(it.kind==="person")return `<button type="button" class="week-note-chip week-person-chip${it.ptype==="credit"?" week-credit-chip":""}" onclick="openWeeklyPerson('${it.id}')">${it.ptype==="credit"?"💰":"⚠️"} ${esc(it.title)}</button>`;return `<button type="button" class="week-note-chip" onclick="openNote('${it.id}')">📝 ${timeLbl}${esc(it.title)}</button>`}).join(""):`<span class="meta">برنامه‌ای ثبت نشده</span>`;
     rows.push(`<tr class="${isToday?"week-today":""}"><td class="week-day-cell"><b>${PERSIAN_WEEKDAY_NAMES[i]}</b><div class="meta">${toFaDigits(jd[2])} ${PERSIAN_MONTHS[jd[1]-1]}</div></td><td class="week-notes-cell">${chips}</td></tr>`);
   }
   return `<div class="week-table-wrap"><div class="week-table-head"><button type="button" class="cal-nav" onclick="changeNotesWeek(-1)" aria-label="هفته قبل">❮</button><div><b>جدول هفتگی</b><div class="meta">${rangeLabel}</div></div><button type="button" class="cal-nav" onclick="changeNotesWeek(1)" aria-label="هفته بعد">❯</button></div><table class="week-table"><tbody>${rows.join("")}</tbody></table><button type="button" class="cal-today-btn" onclick="changeNotesWeek(0)">هفته جاری</button></div>`;
@@ -2279,6 +2286,16 @@ function moveReminder(id,dir){
 }
 async function saveReminder(id){if(!$("rt").value||!$("rdPicker").value)return alert("عنوان و تاریخ لازم است");const o={title:$("rt").value.trim(),amount:parseMoney($("ra").value),date:pickerToISO("rdPicker","rtPicker"),repeat:$("rr").value,type:$("rb").value};if(id){const r=data.reminders.find(x=>x.id===id);Object.assign(r,o);touch(r);markDirty("reminders",r.id,false,r,r.updatedAt);save();await cancelNativeReminder(r.id);await scheduleNativeReminder(r);if((r.type||"")==="note" && (r.repeat||"once")==="once") await addToAndroidClock(r)}else{const maxOrder=data.reminders.length?Math.max(...data.reminders.map(x=>x.order??0)):-1;const nr=touch({id:uid(),order:maxOrder+1,...o});data.reminders.push(nr);markDirty("reminders",nr.id,false,nr,nr.updatedAt);save();await scheduleNativeReminder(nr);if((nr.type||"")==="note" && (nr.repeat||"once")==="once") await addToAndroidClock(nr)}logEvent(id?"ویرایش یادآوری":"ایجاد یادآوری",o.title,id?"edit":"create");closeModal()}
 async function deleteReminder(id){if(confirm("این یادآوری حذف شود؟")){const r=data.reminders.find(x=>x.id===id);await cancelNativeReminder(id);removeRecord("reminders",id);logEvent("حذف یادآوری",r?.title||id,"delete");closeModal()}}
+/* v3.5: دکمهٔ تاییدِ کنار هر یادآوری در «جدول هفتگی»؛ با تایید، همان‌طور که در
+ * صفحه یادآوری‌ها با 🗑 حذف می‌شود، از لیست هفتگی هم حذف می‌شود (بدون باز شدن
+ * مودال ویرایش). */
+async function dismissWeeklyReminder(id){
+  if(!confirm("این یادآوری از لیست هفتگی حذف شود؟"))return;
+  const r=data.reminders.find(x=>x.id===id);
+  await cancelNativeReminder(id);
+  removeRecord("reminders",id);
+  logEvent("حذف یادآوری",r?.title||id,"delete");
+}
 
 /* v3.10: چک‌ها حالا به یک حساب وصل می‌شوند. تا وقتی چک «نشسته» (وصول/نقد)
    علامت نخورده، هیچ اثری روی موجودی حساب یا لیست تراکنش‌ها ندارد — چون تا

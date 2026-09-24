@@ -455,6 +455,10 @@ body.dark .week-reminder-chip{color:#FFB84D}
 .week-credit-chip{background:color-mix(in srgb, var(--green) 16%, var(--bg3));color:var(--green)}
 .week-credit-chip:active{background:color-mix(in srgb, var(--green) 30%, var(--bg3))}
 .week-chip-time{display:inline-block;direction:ltr;font-weight:800;opacity:.75;margin-inline-end:2px}
+.week-chip-group{display:inline-flex;align-items:center;gap:4px;margin:0 0 6px 6px}
+.week-chip-group .week-note-chip{margin:0}
+.week-chip-done{border:none;border-radius:999px;width:22px;height:22px;min-width:22px;flex:none;display:inline-flex;align-items:center;justify-content:center;padding:0;font-size:12px;font-weight:800;background:color-mix(in srgb, var(--green) 20%, var(--bg3));color:var(--green)}
+.week-chip-done:active{background:color-mix(in srgb, var(--green) 38%, var(--bg3))}
 
 /* side menu drawer */
 .menu-modal{align-items:stretch;justify-content:flex-start}

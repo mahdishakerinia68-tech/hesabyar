@@ -1,4 +1,4 @@
-const CACHE = "hesabdar-pro1.2-offline-v1";
+const CACHE = "hesabdar-pro1.3-offline-v1";
 const ASSETS = [
   "./",
   "./index.html",
@@ -45,8 +45,17 @@ self.addEventListener("fetch", event => {
           if (response && response.ok) {
             const copy = response.clone();
             caches.open(CACHE).then(cache => cache.put("./index.html", copy)).catch(() => {});
+            return response;
           }
-          return response;
+          // v3.5 fix: the network WAS reachable but answered with an error
+          // status (e.g. a transient 404 from the host, such as GitHub Pages
+          // briefly 404ing while a new deploy propagates). Previously this
+          // branch only checked response.ok before deciding whether to
+          // cache, then returned that error response to the page anyway —
+          // so users occasionally saw a raw "404" screen even though a
+          // working cached copy of the app existed. Now an error status
+          // falls back to the cached shell just like a network failure does.
+          return caches.match("./index.html").then(cached => cached || caches.match("./") || response);
         })
         .catch(() => caches.match("./index.html").then(response => response || caches.match("./")))
     );
@@ -64,8 +73,11 @@ self.addEventListener("fetch", event => {
           if (response && response.ok) {
             const copy = response.clone();
             caches.open(CACHE).then(cache => cache.put(event.request, copy)).catch(() => {});
+            return response;
           }
-          return response;
+          // Same fallback as above: a reachable-but-error response (e.g. a
+          // transient 404) should not override a working cached asset.
+          return caches.match(event.request).then(cached => cached || response);
         })
         .catch(() => caches.match(event.request))
     );
