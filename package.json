@@ -1,8 +1,8 @@
 {
   "name": "hesabyar",
-  "version": "2.0.1-pro1.4.1",
+  "version": "2.0.1-pro1.4",
   "private": true,
-  "description": "حساب‌یار - Web/PWA personal and business accounting application (pro1.4.1)",
+  "description": "حساب‌یار - Web/PWA personal and business accounting application (pro1.4)",
   "type": "module",
   "scripts": {
     "check": "node --check app.js && node --check sw.js && node --check src/core/storage-runtime.js && node --check capacitor-biometric-bridge.js && node --check capacitor-filesystem-bridge.js && node --check capacitor-local-notifications-bridge.js",

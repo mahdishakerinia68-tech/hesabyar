@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="pro1.4.1";
+const APP_VERSION="pro1.4";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v2";
 const AUTO_BACKUP_MS=6*60*60*1000;
 const APP_MODE_KEY="hesabdar-app-mode-v1";
@@ -2127,7 +2127,7 @@ function noteChecklistHTML(n){
  }
  return html;
 }
-async function toggleNoteItem(noteId,itemId){const n=data.notes.find(x=>x.id===noteId);const it=n?.items?.find(x=>x.id===itemId);if(!it)return;it.done=!it.done;touch(n);markDirty("notes",n.id,false,n,n.updatedAt);persistLocal();syncSave();await upsertReminderForNote(n,false);logEvent(it.done?"تکمیل آیتم یادداشت":"بازگردانی آیتم یادداشت",`${n.title} • ${it.text}`,"edit");const card=document.querySelector(`[data-note-card="${CSS.escape(noteId)}"]`);if(card){const list=card.querySelector(".note-checklist");if(list)list.innerHTML=noteChecklistHTML(n);const total=(n.items||[]).length,doneCount=(n.items||[]).filter(x=>x.done).length;const count=card.querySelector(".note-count");if(count)count.textContent=total?`${fa(doneCount)} / ${fa(total)}`:""}if($("notesTableView")&&$("notesTableView").style.display!=="none")$("notesTableView").innerHTML=notesWeekTableHTML();}
+async function toggleNoteItem(noteId,itemId){const n=data.notes.find(x=>x.id===noteId);const it=n?.items?.find(x=>x.id===itemId);if(!it)return;it.done=!it.done;touch(n);markDirty("notes",n.id,false,n,n.updatedAt);persistLocal();syncSave();await upsertReminderForNote(n,false);logEvent(it.done?"تکمیل آیتم یادداشت":"بازگردانی آیتم یادداشت",`${n.title} • ${it.text}`,"edit");const card=document.querySelector(`[data-note-card="${CSS.escape(noteId)}"]`);if(card){const list=card.querySelector(".note-checklist");if(list)list.innerHTML=noteChecklistHTML(n);const total=(n.items||[]).length,doneCount=(n.items||[]).filter(x=>x.done).length;const count=card.querySelector(".note-count");if(count)count.textContent=total?`${fa(doneCount)} / ${fa(total)}`:""}}
 async function deleteNote(id){if(confirm("این یادداشت و همه آیتم‌های آن حذف شود؟")){const n=data.notes.find(x=>x.id===id);await removeReminderForNote(id);removeRecord("notes",id);logEvent("حذف یادداشت",n?.title||id,"delete");closeModal()}}
 async function deleteNoteItem(noteId,itemId){const n=data.notes.find(x=>x.id===noteId);if(!n)return;if(confirm("این آیتم حذف شود؟")){n.items=(n.items||[]).filter(x=>x.id!==itemId);touch(n);markDirty("notes",n.id,false,n,n.updatedAt);persistLocal();syncSave();await upsertReminderForNote(n,false);logEvent("حذف آیتم یادداشت",n.title,"delete");const card=document.querySelector(`[data-note-card="${CSS.escape(noteId)}"]`);if(card){const total=(n.items||[]).length,doneCount=(n.items||[]).filter(x=>x.done).length;const count=card.querySelector(".note-count");if(count)count.textContent=total?`${fa(doneCount)} / ${fa(total)}`:"";const list=card.querySelector(".note-checklist");if(list)list.innerHTML=noteChecklistHTML(n)}}}
 function noteRepeatLabel(r){return r==="daily"?"روزانه":r==="weekly"?"هفتگی":r==="monthly"?"ماهانه":"بدون تکرار"}
@@ -2208,20 +2208,7 @@ function notesWeekTableHTML(){
      * انجام‌شده باشند، از جدول هفتگی همان روز مخفی می‌شود (دقیقاً مثل یادآوری‌
      * که با ✓ از لیست هفتگی حذف می‌شود). یادداشت‌های بدون آیتم (فقط متنی) طبق
      * قبل همیشه نمایش داده می‌شوند. */
-    /* v1.4.1 fix: نسخهٔ قبلی فقط وقتی «همهٔ» آیتم‌های یک یادداشت تیک می‌خوردند
-     * کل یادداشت را از جدول هفتگی پنهان می‌کرد؛ اگر یادداشت چند آیتم داشت و
-     * فقط یکی از آن‌ها تیک می‌خورد، یادداشت (با همان عنوان کلی) همچنان نمایش
-     * داده می‌شد و انگار آن یک آیتمِ تیک‌خورده اصلاً پنهان نشده بود. حالا برای
-     * یادداشت‌هایی که آیتم (چک‌لیست) دارند، به‌جای یک ردیفِ کلی برای کل
-     * یادداشت، هر آیتمِ هنوز انجام‌نشده جداگانه در جدول هفتگی نمایش داده
-     * می‌شود؛ به‌محض تیک‌خوردنِ همان آیتم، دقیقاً همان ردیف از جدول پنهان
-     * می‌شود (و وقتی همهٔ آیتم‌ها تیک بخورند، یادداشت به‌طور کامل از آن روز
-     * حذف می‌شود). یادداشت‌های بدون آیتم (فقط متنی) طبق قبل یک ردیف کلی دارند. */
-    const dayNotes=data.notes.filter(n=>noteOccursOnDay(n,day)).flatMap(n=>{
-      const items=n.items||[];
-      if(!items.length)return [{kind:"note",id:n.id,title:n.title,date:n.date,order:n.order??0}];
-      return items.filter(it=>!it.done).map(it=>({kind:"note",id:n.id,title:items.length>1?`${n.title}: ${it.text}`:n.title,date:n.date,order:n.order??0}));
-    });
+    const dayNotes=data.notes.filter(n=>{if(!noteOccursOnDay(n,day))return false;const items=n.items||[];if(items.length&&items.every(x=>x.done))return false;return true}).map(n=>({kind:"note",id:n.id,title:n.title,date:n.date,order:n.order??0}));
     const dayReminders=(data.reminders||[]).filter(r=>!r.sourceNoteId&&!r.sourcePersonId&&r.date&&reminderOccursOnDay(r,day)).map(r=>({kind:"reminder",id:r.id,title:r.title,date:r.date,order:r.order??0}));
     const dayPeople=personDueItemsOnDay(day).map(pp=>({kind:"person",id:pp.id,title:pp.title,date:null,order:0,ptype:pp.type}));
     /* اولویت‌بندی برنامه‌های هر روز بر اساس ساعت: هرچه زودتر، بالاتر؛ اگر ساعتی
