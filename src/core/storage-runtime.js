@@ -1,4 +1,4 @@
-/* HesabYar storage runtime (pro1.3)
+/* HesabYar storage runtime (pro1.4)
  *
  * The one and only persistence layer used by app.js. Loaded as a classic
  * <script> before app.js and exposed as globalThis.HesabYarStorage.
@@ -18,7 +18,7 @@
 
   var DB_NAME = 'hesabdar-v4';
   var DB_VERSION = 1;
-  var APP_VERSION = 'pro1.3';
+  var APP_VERSION = 'pro1.4';
   var MAX_SNAPSHOT_BYTES = 9 * 1024 * 1024;
   var RECORD_STORES = [
     'accounts', 'transactions', 'invoices', 'customers', 'products', 'people',
