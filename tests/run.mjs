@@ -15,7 +15,7 @@ assert.equal(productProfit([{items:[{productId:'p',qty:2,price:100,costPriceAtSa
 assert.equal(compareRecords({revision:2,updatedAt:'2026-01-01',deviceId:'a'},{revision:1}),1);
 
 // One release label everywhere.
-const V = 'pro1.4';
+const V = 'pro1.4.1';
 const read = f => readFileSync(new URL('../' + f, import.meta.url), 'utf8');
 assert.match(read('app.js'), new RegExp(`APP_VERSION="${V}"`));
 assert.match(read('index.html'), new RegExp(`id="versionPill">${V}<`));
