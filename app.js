@@ -1,7 +1,7 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
 const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="pro1.3";
+const APP_VERSION="pro1.4";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v2";
 const AUTO_BACKUP_MS=6*60*60*1000;
 const APP_MODE_KEY="hesabdar-app-mode-v1";
@@ -1247,7 +1247,7 @@ function renderGlobalSearch(){
  const q=($("gsInput")?.value||"").trim().toLowerCase();
  if(!q){box.innerHTML=`<p class="hint">برای جستجو در همه‌ی بخش‌ها تایپ کن.</p>`;return}
  const has=s=>String(s||"").toLowerCase().includes(q);
- const txRows=data.transactions.filter(t=>has(t.title)||has(t.category)||has(t.otherName)||(t.type==="transfer"&&(has(data.accounts.find(a=>a.id===t.from)?.name)||has(data.accounts.find(a=>a.id===t.to)?.name)))).slice(0,8).map(t=>`<div class="item gs-row" onclick="closeModal();openTx('${t.id}')"><div><b>${esc(t.title||"تراکنش")}</b><div class="meta">${jalaliLabel(t.date)}${t.category?" • "+esc(t.category):""}</div></div><strong class="${t.type}">${money(t.amount)}</strong></div>`);
+ const txRows=sortedTransactions().filter(t=>has(t.title)||has(t.category)||has(t.otherName)||(t.type==="transfer"&&(has(data.accounts.find(a=>a.id===t.from)?.name)||has(data.accounts.find(a=>a.id===t.to)?.name)))).slice(0,8).map(t=>`<div class="item gs-row" onclick="closeModal();openTx('${t.id}')"><div><b>${esc(t.title||"تراکنش")}</b><div class="meta">${jalaliLabel(t.date)}${t.category?" • "+esc(t.category):""}</div></div><strong class="${t.type}">${money(t.amount)}</strong></div>`);
  const custRows=data.customers.filter(c=>has(c.name)||has(c.phone)).slice(0,8).map(c=>`<div class="item gs-row" onclick="closeModal();openCustomer('${c.id}')"><div><b>👤 ${esc(c.name)}</b><div class="meta">${esc(c.phone||"")}</div></div></div>`);
  const prodRows=data.products.filter(p=>has(p.name)||has(p.code)).slice(0,8).map(p=>`<div class="item gs-row" onclick="closeModal();openProduct('${p.id}')"><div><b>📦 ${esc(p.name)}</b><div class="meta">موجودی: ${fa(p.stock||0)} • فروش: ${money(p.price||0)}</div></div></div>`);
  const checkRows=data.checks.filter(c=>has(c.name)||has(c.bank)||has(c.number)).slice(0,8).map(c=>`<div class="item gs-row" onclick="closeModal();openCheck('${c.id}')"><div><b>✓ ${esc(c.name)}</b><div class="meta">${jalaliLabel(c.date)}${c.bank?" • "+esc(c.bank):""}</div></div><strong class="${c.type==="receive"?"income":"expense"}">${money(c.amount)}</strong></div>`);
@@ -1700,7 +1700,7 @@ function exportCustomerExcel(id){const c=data.customers.find(x=>x.id===id);if(!c
  * همان زیرساخت فعلی فاکتور. */
 async function drawCustomerStatementCanvas(customer,scale=1){
  const b=data.branding||{};
- const inv=data.invoices.filter(x=>x.customerId===customer.id).sort((a,b2)=>new Date(a.date)-new Date(b2.date));
+ const inv=data.invoices.filter(x=>x.customerId===customer.id).sort((a,b2)=>(localDateFromInput(a.date)?.getTime()||0)-(localDateFromInput(b2.date)?.getTime()||0));
  const W=794, rowH=42, headH=250, H=Math.max(1000,headH+inv.length*rowH+140);
  const [logoImg]=await Promise.all([loadImg(b.logo)]);
  const c=document.createElement("canvas");c.width=W*scale;c.height=H*scale;const x=c.getContext("2d");
@@ -1813,7 +1813,12 @@ function rebuildInstallmentsForCountChange(p,amount,instCount,dueISO,frequency="
       const baseDate=lastPaidDue?localDateFromInput(lastPaidDue):new Date();
       startDate=frequency==="weekly"?new Date(baseDate.getTime()+7*86400000):addMonthsSafe(baseDate,1);
     }else{
-      startDate=dueISO?new Date(dueISO):new Date();
+      /* v1.4 fix: اینجا برخلاف generateInstallments از new Date(dueISO) به‌جای
+       * localDateFromInput استفاده می‌شد؛ چون dueISO فقط یک تاریخ («۱۴۰۵/۰۷/۰۴»
+       * تبدیل‌شده به «۲۰۲۶-۰۹-۲۶») است و new Date() رشته‌ی تاریخِ بدون ساعت را
+       * UTC می‌خواند نه محلی، این ناهماهنگی می‌توانست باعث جابه‌جایی یک‌روزه در
+       * تاریخ سررسید اقساط بازسازی‌شده شود. */
+      startDate=dueISO?localDateFromInput(dueISO):new Date();
     }
     if(Number.isNaN(startDate.getTime()))startDate=new Date();
     const base=Math.floor(remainingAmount/remainingCount);
@@ -2197,7 +2202,13 @@ function notesWeekTableHTML(){
     const day=new Date(start.getTime()+i*86400000);
     const jd=gregorianToJalali(day.getFullYear(),day.getMonth()+1,day.getDate());
     const isToday=day.getTime()===t.getTime();
-    const dayNotes=data.notes.filter(n=>noteOccursOnDay(n,day)).map(n=>({kind:"note",id:n.id,title:n.title,date:n.date,order:n.order??0}));
+    /* v1.4 fix: وقتی همه‌ی آیتم‌های زیرمجموعه‌ی یک یادداشت تیک می‌خوردند (انجام
+     * می‌شدند)، یادداشت همچنان در جدول هفتگی نمایش داده می‌شد، انگار هنوز کاری
+     * باقی مانده. حالا اگر یادداشت حداقل یک آیتم داشته باشد و همه‌ی آیتم‌هایش
+     * انجام‌شده باشند، از جدول هفتگی همان روز مخفی می‌شود (دقیقاً مثل یادآوری‌
+     * که با ✓ از لیست هفتگی حذف می‌شود). یادداشت‌های بدون آیتم (فقط متنی) طبق
+     * قبل همیشه نمایش داده می‌شوند. */
+    const dayNotes=data.notes.filter(n=>{if(!noteOccursOnDay(n,day))return false;const items=n.items||[];if(items.length&&items.every(x=>x.done))return false;return true}).map(n=>({kind:"note",id:n.id,title:n.title,date:n.date,order:n.order??0}));
     const dayReminders=(data.reminders||[]).filter(r=>!r.sourceNoteId&&!r.sourcePersonId&&r.date&&reminderOccursOnDay(r,day)).map(r=>({kind:"reminder",id:r.id,title:r.title,date:r.date,order:r.order??0}));
     const dayPeople=personDueItemsOnDay(day).map(pp=>({kind:"person",id:pp.id,title:pp.title,date:null,order:0,ptype:pp.type}));
     /* اولویت‌بندی برنامه‌های هر روز بر اساس ساعت: هرچه زودتر، بالاتر؛ اگر ساعتی
@@ -2361,7 +2372,7 @@ function deleteCheck(id){
  * یادآوری هم به‌روزرسانی یا حذف می‌شود تا اعلان‌های قدیمی و بی‌ربط نماند. */
 const CHECK_ALERT_DAYS=5; // چند روز مانده به سررسید، چک را «نزدیک به سررسید» حساب کن
 const CHECK_REMINDER_DAYS_BEFORE=3; // چند روز قبل از سررسید یادآوری بزن
-function checkDueDays(c){const d=new Date(c?.date);if(Number.isNaN(d.getTime()))return null;return Math.ceil((d.setHours(0,0,0,0)-new Date().setHours(0,0,0,0))/86400000)}
+function checkDueDays(c){const d=localDateFromInput(c?.date);if(!d)return null;return Math.ceil((d.setHours(0,0,0,0)-new Date().setHours(0,0,0,0))/86400000)}
 function isCheckDueSoon(c){if(!c||c.settled)return false;const dd=checkDueDays(c);return dd!==null&&dd<=CHECK_ALERT_DAYS}
 function checkDueBadge(c){if(c.settled)return"";const dd=checkDueDays(c);if(dd===null)return"";if(dd<0)return`⚠️ ${fa(Math.abs(dd))} روز از سررسید گذشته`;if(dd===0)return"⚠️ امروز سررسید است";if(dd<=CHECK_ALERT_DAYS)return`⏰ ${fa(dd)} روز تا سررسید`;return""}
 async function upsertReminderForCheck(check,renderAfter=true){
@@ -2370,8 +2381,8 @@ async function upsertReminderForCheck(check,renderAfter=true){
  let r=linked[0];
  for(const dup of linked.slice(1)){await cancelNativeReminder(dup.id);removeRecordSilent("reminders",dup.id)}
  if(check.settled||!check.date){if(r){await cancelNativeReminder(r.id);removeRecordSilent("reminders",r.id);if(renderAfter)save();else{persistLocal();syncSave()}}return}
- const due=new Date(check.date);
- if(Number.isNaN(due.getTime()))return;
+ const due=localDateFromInput(check.date);
+ if(!due)return;
  const alertAt=new Date(due.getTime()-CHECK_REMINDER_DAYS_BEFORE*86400000);
  const useDate=(alertAt>new Date()?alertAt:due).toISOString();
  const o={title:`⚠️ سررسید چک ${check.type==="receive"?"دریافتی":"پرداختی"}: ${check.name}`,amount:check.amount||0,date:useDate,repeat:"once",type:"check",sourceCheckId:check.id,body:`مبلغ: ${money(check.amount||0)} • سررسید: ${jalaliLabel(check.date)}`};
@@ -2539,6 +2550,14 @@ function txImagesOf(t){return (t?.images&&t.images.length)?t.images:(t?.image?[t
    isolates each row so one bad record just gets skipped (with a console
    warning) instead of hiding every transaction after it. */
 function safeTxHTML(t){try{return txHTML(t)}catch(e){console.warn("txHTML: skipped a malformed transaction",t?.id,e);return ""}}
+/* v1.4 fix: لیست تراکنش‌ها (هم «اخیر» در داشبورد و هم صفحه‌ی «تراکنش‌ها») قبلاً
+ * فقط به ترتیب افزوده‌شدن به آرایه نمایش داده می‌شد، نه به ترتیب تاریخ. وقتی یک
+ * تراکنش تکرارشونده برای تاریخی در گذشته ساخته می‌شد یا هنگام همگام‌سازی بین دو
+ * گوشی ترتیب افزودن با ترتیب تاریخ یکی نبود، تراکنش‌ها در لیست نامرتب و
+ * تاریخ‌هایشان به‌نظر جابه‌جا/درهم می‌آمدند. حالا هر دو لیست همیشه بر اساس
+ * تاریخ (نزولی، جدیدترین بالا) مرتب می‌شوند. */
+function txSortKey(t){const d=new Date(t?.date);return Number.isNaN(d.getTime())?0:d.getTime()}
+function sortedTransactions(){return [...data.transactions].sort((a,b)=>txSortKey(b)-txSortKey(a))}
 function txHTML(t){if(t.type==="transfer")return transferItemHTML(t);let a=data.accounts.find(x=>x.id===t.accountID),sign=t.type==="income"?"+":"−";const recurBadge=t.recurring&&t.recurring!=="none"?` • 🔁 ${t.recurring==="monthly"?"ماهانه":"هفتگی"}`:t.source==="recurring"?" • 🔁 خودکار":"";const imgs=txImagesOf(t);const thumb=imgs.length?`<div class="tx-thumb-wrap" onclick="viewImage('${t.id}')"><img class="tx-thumb" src="${imgs[0]}" alt="پیوست">${imgs.length>1?`<span class="tx-thumb-count">${fa(imgs.length)}</span>`:""}</div>`:"";return `<div class="item"><div><b>${esc(t.title)}</b><div class="meta">${esc(t.category||"")} • ${a?esc(a.name):""} • ${t.source==="bank"?"بانکی":t.source==="recurring"?"تکرارشونده":"دستی"}${recurBadge}</div><div class="meta">${jalaliDateTimeInput(t.date)}</div>${thumb}</div><div><strong class="${t.type}">${sign}${money(t.amount)}</strong>${actionButtons("openTx","deleteTx",t.id)}</div></div>`}
 let imageViewerState={imgs:[],index:0,scale:1,x:0,y:0,startDist:0,startScale:1,startX:0,startY:0,dragX:0,dragY:0};
 function imageViewerRender(){
@@ -3340,14 +3359,14 @@ function render(){
  const totalBalance = data.accounts
   .reduce((sum, account) => sum + accountBalance(account.id), 0);
  if($("balance"))$("balance").textContent=money(totalBalance);if($("income"))$("income").textContent=money(inc);if($("expense"))$("expense").textContent=money(exp);
- if($("recent"))$("recent").innerHTML=data.transactions.slice(0,6).map(safeTxHTML).join("")||empty("هنوز تراکنشی ثبت نشده");
+ if($("recent"))$("recent").innerHTML=sortedTransactions().slice(0,6).map(safeTxHTML).join("")||empty("هنوز تراکنشی ثبت نشده");
  if($("accountList")&&pageActive("accounts"))$("accountList").innerHTML=data.accounts.map(a=>`<div class="item account-item"><div class="account-main"><b>${esc(a.name)}</b><div class="meta">${esc(a.bank||"حساب شخصی")}${a.sender?" • فرستنده: "+esc(a.sender):""}</div>${cardActions(a)}</div><div><strong>${money(accountBalance(a.id))}</strong>${actionButtons("openAccount","deleteAccount",a.id)}<button type="button" title="گزارش Excel" onclick="exportAccountExcel('${a.id}')">📊</button></div></div>`).join("")||empty("هنوز حسابی اضافه نشده");
- if($("transferList")&&pageActive("accounts"))$("transferList").innerHTML=data.transactions.filter(t=>t.type==="transfer").map(t=>{try{return transferItemHTML(t)}catch(e){console.warn("transferItemHTML: skipped a malformed transfer",t?.id,e);return ""}}).join("")||empty("هنوز انتقالی ثبت نشده");
+ if($("transferList")&&pageActive("accounts"))$("transferList").innerHTML=sortedTransactions().filter(t=>t.type==="transfer").map(t=>{try{return transferItemHTML(t)}catch(e){console.warn("transferItemHTML: skipped a malformed transfer",t?.id,e);return ""}}).join("")||empty("هنوز انتقالی ثبت نشده");
  if($("productList")&&pageActive("products"))renderProducts();
  const q=$("search")?.value?.trim()||"",ft=$("filterType")?.value||"",fc=$("filterCat")?.value||"";
  if($("reportAccount")&&pageActive("reports")){const rv=$("reportAccount").value;$("reportAccount").innerHTML='<option value="">همه حساب‌ها</option>'+data.accounts.map(a=>`<option value="${esc(a.id)}">${esc(a.name)}</option>`).join("");$("reportAccount").value=rv;}
  if($("filterCat")&&pageActive("transactions")){let opts='<option value="">همه دسته‌ها</option>'+[...data.expenseCats,...data.incomeCats].map(c=>`<option value="${esc(c.name)}">${esc(c.name)}</option>`).join("");$("filterCat").innerHTML=opts;$("filterCat").value=fc}
- if($("txList")&&pageActive("transactions"))$("txList").innerHTML=data.transactions.filter(t=>(!q||String(t.title).includes(q)||String(t.category||"").includes(q)||String(t.otherName||"").includes(q)||(t.type==="transfer"&&String(data.accounts.find(a=>a.id===t.from)?.name||"").includes(q))||(t.type==="transfer"&&String(data.accounts.find(a=>a.id===t.to)?.name||"").includes(q)))&&(!ft||t.type===ft)&&(!fc||t.category===fc||String(t.category||"").startsWith(fc+" - "))).map(safeTxHTML).join("")||empty("تراکنشی پیدا نشد");
+ if($("txList")&&pageActive("transactions"))$("txList").innerHTML=sortedTransactions().filter(t=>(!q||String(t.title).includes(q)||String(t.category||"").includes(q)||String(t.otherName||"").includes(q)||(t.type==="transfer"&&String(data.accounts.find(a=>a.id===t.from)?.name||"").includes(q))||(t.type==="transfer"&&String(data.accounts.find(a=>a.id===t.to)?.name||"").includes(q)))&&(!ft||t.type===ft)&&(!fc||t.category===fc||String(t.category||"").startsWith(fc+" - "))).map(safeTxHTML).join("")||empty("تراکنشی پیدا نشد");
  if($("customerList")&&pageActive("customers"))renderCustomers();
  if($("peopleList")&&pageActive("people"))$("peopleList").innerHTML=data.people.filter(p=>(p.type||"debt")===peopleMode).map(p=>{const total=Number(p.amount)||0,paid=Math.min(Number(p.paid)||0,total),remaining=Math.max(0,total-paid);const inst=p.installments;const instMeta=inst?`<div class="meta">🧾 اقساط: ${fa(inst.items.filter(x=>x.paid).length)} از ${fa(inst.count)} پرداخت‌شده</div>`:"";const instBtn=inst?`<button type="button" onclick="openInstallments('${p.id}')">اقساط</button>`:`<button type="button" onclick="payPerson('${p.id}')">تسویه</button>`;const invBadge=p.source==="invoice"?`<div class="meta">🧾 مانده فاکتور</div>`:"";const dueLabel=p.type==="credit"?"سررسید واریز":"سررسید پرداخت";return `<div class="item"><div><b>${esc(p.name)}</b>${invBadge}<div class="meta">${p.due?dueLabel+": "+p.due:""}${p.note?" • "+esc(p.note):""}</div><div class="meta">کل: ${money(total)} • تسویه: ${money(paid)}</div>${instMeta}</div><div><strong>${money(remaining)}</strong><div class="actions">${instBtn}${actionButtons("openPerson","deletePerson",p.id)}</div></div></div>`}).join("")||empty(peopleMode==="debt"?"هنوز بدهکاری ثبت نشده":"هنوز طلبی ثبت نشده");
  if($("reminderList")&&pageActive("reminders")){const normalReminders=data.reminders.filter(r=>!r.sourceNoteId&&!r.sourcePersonId).sort((a,b)=>(a.order??0)-(b.order??0)); const noteAlarms=data.reminders.filter(r=>r.sourceNoteId); const peopleAlarms=data.reminders.filter(r=>r.sourcePersonId); const normal=normalReminders.map((r,i)=>{const accId="rem-"+r.id;const isOpen=openAccordions.has(accId);return `<div class="item accordion-card${isOpen?' open':''}" data-acc-id="${accId}"><button class="accordion-head" type="button" aria-expanded="${isOpen}" onclick="toggleAccordion(this,event)"><span>🔔 <b>${esc(r.title)}</b></span><span>⌄</span></button><div class="accordion-body"><div class="meta">${jalaliLabel(r.date)} • ${r.repeat==="once"?"یک‌بار":r.repeat==="weekly"?"هفتگی":"ماهانه"}</div><div class="accordion-actions"><strong>${r.amount?money(r.amount):""}</strong><div class="reorder-btns"><button type="button" title="انتقال به بالا" ${i===0?"disabled":""} onclick="event.stopPropagation();moveReminder('${r.id}',-1)">▲</button><button type="button" title="انتقال به پایین" ${i===normalReminders.length-1?"disabled":""} onclick="event.stopPropagation();moveReminder('${r.id}',1)">▼</button></div>${actionButtons("openReminder","deleteReminder",r.id)}</div></div></div>`}).join(""); $("reminderList").innerHTML=`<div class="section-label">🔔 یادآوری‌های مستقل</div>${normal||empty("یادآوری مستقلی ندارید")}${noteAlarms.length?`<div class="section-label">📝⏰ آلارم یادداشت‌ها</div>`+noteAlarms.map(r=>{const accId="remnote-"+r.id;const isOpen=openAccordions.has(accId);return `<div class="item accordion-card${isOpen?' open':''}" data-acc-id="${accId}"><button class="accordion-head" type="button" aria-expanded="${isOpen}" onclick="toggleAccordion(this,event)"><span>📝 <b>${esc(r.title)}</b></span><span>⌄</span></button><div class="accordion-body"><div class="meta">${jalaliLabel(r.date)} • ${r.repeat==="once"?"یک‌بار":r.repeat==="weekly"?"هفتگی":"ماهانه"}</div></div></div>`}).join(""):``}${peopleAlarms.length?`<div class="section-label">👤 سررسید بدهکار/بستانکار</div>`+peopleAlarms.map(r=>{const accId="remperson-"+r.id;const isOpen=openAccordions.has(accId);return `<div class="item accordion-card${isOpen?' open':''}" data-acc-id="${accId}"><button class="accordion-head" type="button" aria-expanded="${isOpen}" onclick="event.stopPropagation();openPerson('${r.sourcePersonId}')"><span>${r.type==="income"?"💰":"⚠️"} <b>${esc(r.title)}</b></span><span>⌄</span></button><div class="accordion-body"><div class="meta">${jalaliLabel(r.date)}${r.amount?" • "+money(r.amount):""}</div></div></div>`}).join(""):``}`;}
@@ -3364,7 +3383,7 @@ function render(){
  }
  if($("invoiceList")&&pageActive("invoices"))$("invoiceList").innerHTML=data.invoices.map(invoiceHTML).join("")||empty("هنوز فاکتوری ساخته نشده است");
  if($("checkList")&&pageActive("checks")){
-   const sortedChecks=[...data.checks].sort((a,b)=>{const da=isCheckDueSoon(a)?0:1,db=isCheckDueSoon(b)?0:1;if(da!==db)return da-db;const ta=new Date(a.date).getTime()||0,tb=new Date(b.date).getTime()||0;return ta-tb});
+   const sortedChecks=[...data.checks].sort((a,b)=>{const da=isCheckDueSoon(a)?0:1,db=isCheckDueSoon(b)?0:1;if(da!==db)return da-db;const ta=localDateFromInput(a.date)?.getTime()||0,tb=localDateFromInput(b.date)?.getTime()||0;return ta-tb});
    $("checkList").innerHTML=sortedChecks.map(c=>{const accName=data.accounts.find(a=>a.id===c.accountID)?.name;const dueSoon=isCheckDueSoon(c);const badge=checkDueBadge(c);const cDueLabel=c.type==="receive"?"سررسید واریز":"سررسید پرداخت";return `<div class="item check-row${c.settled?" check-settled":""}${dueSoon?" item-low check-duesoon":""}"><div><b>${c.type==="receive"?"دریافتی":"پرداختی"} • ${esc(c.name)}</b><div class="meta">${cDueLabel}: ${jalaliLabel(c.date)}${c.bank?" • "+esc(c.bank):""}${c.nationalCode?" • کد ملی "+esc(c.nationalCode):""}</div><div class="meta">${accName?"🏦 "+esc(accName):"⚠️ بدون حساب متصل"} • ${c.settled?"✅ نشسته":"⏳ در انتظار"}${badge?" • "+badge:""}</div></div><div class="check-row-side"><strong class="${c.type==="receive"?"income":"expense"}">${money(c.amount)}</strong><button type="button" class="check-settle-btn${c.settled?" is-settled":""}" onclick="toggleCheckSettled('${c.id}')">${c.settled?"↩️ لغو نشستن":"✅ ثبت نشستن"}</button>${actionButtons("openCheck","deleteCheck",c.id)}</div></div>`}).join("")||empty("چکی ثبت نشده");
  }
  if(pageActive("reports")){
