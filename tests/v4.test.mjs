@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+globalThis.data = undefined;
+await import('../src/v4/v4-core.js');
+const V = globalThis.V4;
+assert.equal(V.amount('۱,۲۵۰,۰۰۰', 'x'), 1250000);
+for (const bad of ['-1', 'abc', '', '0', '1e99']) assert.throws(() => V.amount(bad, 'x'), bad);
+assert.equal(V.amount('', 'x', { optional: true }), 0);
+assert.throws(() => V.cleanText('', 'نام', 10, true)); assert.throws(() => V.cleanText('x'.repeat(11), 'نام', 10));
+assert.deepEqual(V.goalInfo({ target: 100, deposits: [{ amount: 100 }] }).status, 'done');
+assert.equal(V.savingBalance({ movements: [{ type: 'deposit', amount: 10 }, { type: 'withdraw', amount: 3 }] }), 7);
+const sh = V.sharedInfo({ total: 900, payer: 'من', participants: [{ name: 'من' }, { name: 'a' }, { name: 'b' }], settlements: [{ from: 'a', amount: 300 }] });
+assert.equal(sh.owedTotal, 300);
+const rows = [{ n: 'الف', d: '2026-01-05', a: 10 }, { n: 'ب', d: '2026-02-05', a: 50 }, { n: 'ج', d: '2026-03-05', a: 30 }];
+const cfg = { text: r => r.n, date: r => r.d, amount: r => r.a };
+assert.deepEqual(V.applyFilters(rows, { min: 20, sort: 'amount-asc' }, cfg).map(r => r.n), ['ج', 'ب']);
+assert.deepEqual(V.applyFilters(rows, { from: '2026-02-01', to: '2026-02-28' }, cfg).map(r => r.n), ['ب']);
+assert.deepEqual(V.applyFilters(rows, { q: 'الف' }, cfg).map(r => r.n), ['الف']);
+const m = V.migrate({ schemaVersion: 4, accounts: [1] }); assert.equal(m.schemaVersion, 5); assert.deepEqual(m.accounts, [1]); assert.ok(Array.isArray(m.v4.budgets));
+const bytes = V.buildXlsx([{ name: 'ت', headers: ['الف', 'ب'], rows: [['سلام', 5]] }]); require_zip(bytes);
+function require_zip(b) { import('node:fs').then(fs => { fs.writeFileSync('/tmp/t.xlsx', b); assert.match(execFileSync('unzip', ['-tq', '/tmp/t.xlsx']).toString(), /No errors/); }); }
+const src = f => readFileSync(new URL('../' + f, import.meta.url), 'utf8');
+assert.match(src('app.js'), /APP_VERSION="pro1.9"/); assert.match(src('app.js'), /CURRENT_SCHEMA_VERSION=5/);
+console.log('v4 unit tests: PASS');
