@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+const r=f=>readFileSync(new URL('../'+f, import.meta.url),'utf8');
+const index=r('index.html'), ui=r('src/v4/v4-ui.js'), backup=r('src/v4/v4-backup.js');
+assert.match(index,/id="stgGroup-v4Backup"/);
+assert.match(index,/id="stgGroup-v4Excel"/);
+assert.match(index,/id="stgGroup-v4Security"/);
+assert.match(index,/id="v4SettingsBackup"/);
+assert.match(index,/جایگزین کامل پشتیبان‌گیری دستی قبلی/);
+assert.doesNotMatch(ui,/V4Backup\.open\(\)/);
+assert.doesNotMatch(ui,/V4Security\.open\(\)/);
+assert.doesNotMatch(ui,/V4UI\.exportAll\(\)/);
+assert.match(backup,/B\.mountSettings\s*=\s*function/);
+assert.match(backup,/V4Backup\.makeBackup/);
+assert.match(backup,/V4Backup\.restoreFromInput/);
+console.log('m1.2-settings: PASS');
