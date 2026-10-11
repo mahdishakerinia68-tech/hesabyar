@@ -4,8 +4,8 @@
 
 ## وضعیت انتشار
 
-- Release: `pro1.10` (schema 5)
-- Package version: `1.0.0-pro1.10`
+- Release: `pro1.11` (schema 5)
+- Package version: `1.0.0-pro1.11`
 - Storage اصلی: IndexedDB با ذخیره اتمیک snapshot
 - Cloud sync: اختیاری، با Firebase Authentication + Firestore Rules
 - Android: Capacitor 7 + Java 17 در CI
