@@ -43,7 +43,7 @@
 
   /* ---------- رویدادهای تقویم (از همه‌ی بخش‌ها) ---------- */
   V.collectEvents = function (d) {
-    d = d || D(); var ev = [], today = ymd(new Date().toISOString());
+    d = d || D(); var ev = [], today = V.localToday();
     (d.checks || []).forEach(function (c) {
       if (!c.date) return;
       var day = ymd(c.date), st = c.settled ? 'settled' : (day < today ? 'overdue' : 'pending');
@@ -52,7 +52,19 @@
     (d.reminders || []).forEach(function (r) {
       if (!r.date) return;
       var linkedType = r.sourcePersonId ? 'person' : (r.sourceNoteId ? 'note' : 'reminder');
-      ev.push({ day: ymd(r.date), title: r.title || 'یادآوری', kind: 'reminder', sourceType: linkedType, sourceId: r.sourcePersonId || r.sourceNoteId || r.id, reminderId: r.id, at: r.date, sourcePersonId: r.sourcePersonId || '', sourceInstallmentId: r.sourceInstallmentId || '', sourceNoteId: r.sourceNoteId || '', amount: Number(r.amount) || 0, status: r.done ? 'settled' : (ymd(r.date) < today ? 'overdue' : 'pending'), icon: '🔔', person: '', account: '' });
+      var rep = r.repeat || 'once', recurring = rep === 'daily' || rep === 'weekly' || rep === 'monthly' || rep === 'yearly';
+      function push(at, isPast) {
+        ev.push({ day: ymd(at), title: r.title || 'یادآوری', kind: 'reminder', sourceType: linkedType, sourceId: r.sourcePersonId || r.sourceNoteId || r.id, reminderId: r.id, at: at, sourcePersonId: r.sourcePersonId || '', sourceInstallmentId: r.sourceInstallmentId || '', sourceNoteId: r.sourceNoteId || '', amount: Number(r.amount) || 0, status: r.done ? 'settled' : (ymd(at) < today ? (recurring ? 'settled' : 'overdue') : 'pending'), icon: '🔔', person: '', account: '' });
+      }
+      if (!recurring) { push(r.date); return; }
+      /* pro1.11: یادآوری‌های تکرارشونده (روزانه/هفتگی/ماهانه/سالانه) در همه‌ی رخدادها دیده شوند، نه فقط تاریخ اول. بازه: ۶۲ روز قبل تا ۴۰۰ روز بعد. */
+      var base = V.parseLocal(r.date); if (!base) return;
+      var t0 = V.parseLocal(today + 'T00:00'), from = new Date(t0.getTime()); from.setDate(from.getDate() - 62);
+      var to = new Date(t0.getTime()); to.setDate(to.getDate() + 400);
+      for (var n = 0, guard = 0; guard++ < 6000; n++) {
+        var occ = V.repeatStep(base, rep, n); if (!occ || occ > to) break;
+        if (occ >= from || n === 0) push(V.fmtLocalISO(occ));
+      }
     });
     V.list('goals').forEach(function (g) { if (g.deadline) { var gi = V.goalInfo(g); ev.push({ day: ymd(g.deadline), title: 'مهلت هدف: ' + g.name, kind: 'goal', sourceType: 'goal', sourceId: g.id, at: g.deadline, amount: gi.remaining, status: gi.status === 'done' ? 'settled' : (ymd(g.deadline) < today ? 'overdue' : 'pending'), icon: '🎯', person: '', account: '' }); } });
     V.list('budgets').forEach(function (b) {

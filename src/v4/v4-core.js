@@ -3,7 +3,7 @@
 (function (root) {
   'use strict';
   var V4 = root.V4 = root.V4 || {};
-  V4.VERSION = 'pro1.10.0';
+  V4.VERSION = 'pro1.11.0';
   V4.SCHEMA = 5;
   V4.SECTIONS = ['budgets', 'goals', 'savings', 'assets', 'shared', 'events'];
 
@@ -32,9 +32,31 @@
   /* تاریخ محلی به شکل YYYY-MM-DD (برای مقایسه‌ی امن بدون اثر منطقه‌ی زمانی) */
   V4.ymd = function (iso) {
     var s = String(iso || '');
-    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+    /* تاریخ ساده یا تاریخ‌وساعت محلی (بدون Z/offset) → همان ده نویسه؛ ISO با Z/offset باید به روز «محلی» تبدیل شود (قبلاً روز UTC برمی‌گشت و بین ۰۰:۰۰ تا ۰۳:۳۰ امروز اشتباه بود). */
+    if (/^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?)?$/.test(s)) return s.slice(0, 10);
     var d = new Date(s); if (isNaN(d.getTime())) return '';
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  };
+
+  /* تکرار یادآوری/یادداشت: گام n‌ام همیشه از تاریخ پایه حساب می‌شود (بدون لغزش ۳۱ ام/۲۹ فوریه). */
+  V4.repeatStep = function (base, rep, n) {
+    var o = new Date(base.getTime());
+    if (rep === 'daily') { o.setDate(o.getDate() + n); return o; }
+    if (rep === 'weekly') { o.setDate(o.getDate() + 7 * n); return o; }
+    var months = rep === 'monthly' ? n : rep === 'yearly' ? 12 * n : null;
+    if (months === null) return null;
+    var day = o.getDate(); o.setDate(1); o.setMonth(o.getMonth() + months);
+    o.setDate(Math.min(day, new Date(o.getFullYear(), o.getMonth() + 1, 0).getDate())); return o;
+  };
+  V4.localToday = function () { var n = new Date(); return n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + '-' + String(n.getDate()).padStart(2, '0'); };
+  V4.parseLocal = function (v) {
+    var s = String(v || ''), m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/);
+    if (m && !/(Z|[+-]\d{2}:?\d{2})$/.test(s)) return new Date(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0), 0, 0);
+    var d = new Date(s); return isNaN(d.getTime()) ? null : d;
+  };
+  V4.fmtLocalISO = function (d) {
+    var p = function (x) { return String(x).padStart(2, '0'); };
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes());
   };
 
   /* ---------- اعتبارسنجی ورودی ---------- */
