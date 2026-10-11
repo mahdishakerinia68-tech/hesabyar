@@ -20,6 +20,15 @@ assert.deepEqual(V.applyFilters(rows, { q: 'الف' }, cfg).map(r => r.n), ['ا�
 const m = V.migrate({ schemaVersion: 4, accounts: [1] }); assert.equal(m.schemaVersion, 5); assert.deepEqual(m.accounts, [1]); assert.ok(Array.isArray(m.v4.budgets));
 const bytes = V.buildXlsx([{ name: 'ت', headers: ['الف', 'ب'], rows: [['سلام', 5]] }]); require_zip(bytes);
 function require_zip(b) { import('node:fs').then(fs => { fs.writeFileSync('/tmp/t.xlsx', b); assert.match(execFileSync('unzip', ['-tq', '/tmp/t.xlsx']).toString(), /No errors/); }); }
+// pro1.11: تکرار سالانه/ماهانه در تقویم مالی و روز محلیِ ymd
+const L = d => V.ymd(V.fmtLocalISO(d));
+assert.equal(L(V.repeatStep(new Date(2028, 1, 29, 8, 0), 'yearly', 1)), '2029-02-28');
+assert.equal(L(V.repeatStep(new Date(2028, 1, 29, 8, 0), 'yearly', 4)), '2032-02-29');
+assert.equal(L(V.repeatStep(new Date(2026, 0, 31, 8, 0), 'monthly', 2)), '2026-03-31');
+assert.equal(L(V.repeatStep(new Date(2026, 0, 31, 8, 0), 'weekly', 1)), '2026-02-07');
+assert.equal(V.repeatStep(new Date(2026, 0, 31), 'once', 1), null);
+assert.equal(V.ymd('2026-03-10T09:00'), '2026-03-10'); assert.equal(V.ymd('2026-03-10'), '2026-03-10');
+const localOfZ = new Date('2026-03-10T23:30:00.000Z'); assert.equal(V.ymd('2026-03-10T23:30:00.000Z'), localOfZ.getFullYear() + '-' + String(localOfZ.getMonth() + 1).padStart(2, '0') + '-' + String(localOfZ.getDate()).padStart(2, '0'));
 const src = f => readFileSync(new URL('../' + f, import.meta.url), 'utf8');
-assert.match(src('app.js'), /APP_VERSION="pro1.10"/); assert.match(src('app.js'), /CURRENT_SCHEMA_VERSION=5/);
+assert.match(src('app.js'), /APP_VERSION="pro1.11"/); assert.match(src('app.js'), /CURRENT_SCHEMA_VERSION=5/);
 console.log('v4 unit tests: PASS');
