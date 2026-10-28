@@ -30,5 +30,5 @@ assert.equal(V.repeatStep(new Date(2026, 0, 31), 'once', 1), null);
 assert.equal(V.ymd('2026-03-10T09:00'), '2026-03-10'); assert.equal(V.ymd('2026-03-10'), '2026-03-10');
 const localOfZ = new Date('2026-03-10T23:30:00.000Z'); assert.equal(V.ymd('2026-03-10T23:30:00.000Z'), localOfZ.getFullYear() + '-' + String(localOfZ.getMonth() + 1).padStart(2, '0') + '-' + String(localOfZ.getDate()).padStart(2, '0'));
 const src = f => readFileSync(new URL('../' + f, import.meta.url), 'utf8');
-assert.match(src('app.js'), /APP_VERSION="pro1.11"/); assert.match(src('app.js'), /CURRENT_SCHEMA_VERSION=5/);
+assert.match(src('app.js'), /APP_VERSION="pro1.12"/); assert.match(src('app.js'), /CURRENT_SCHEMA_VERSION=5/);
 console.log('v4 unit tests: PASS');

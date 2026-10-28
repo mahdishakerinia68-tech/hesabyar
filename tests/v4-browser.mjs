@@ -266,7 +266,7 @@ await test(22, 'داده‌ی V4 بعد از بستن و بازکردن برنا
 
 await ctx.close(); await browser.close(); await server.close();
 const failed = results.filter(r => !r[2]);
-const ownErrors = jsErrors.filter(e => !/firebase|gstatic/i.test(e));
+const ownErrors = jsErrors.filter(e => !/gstatic/i.test(e));
 if (ownErrors.length) { console.log('JS errors:', ownErrors.slice(0, 5)); }
 console.log(`\nv4-browser: ${results.length - failed.length}/${results.length} passed${ownErrors.length ? `, ${ownErrors.length} JS error(s)` : ', no JS errors'}`);
 process.exit(failed.length || ownErrors.length ? 1 : 0);
