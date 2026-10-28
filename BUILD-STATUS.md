@@ -1,12 +1,11 @@
-# Build verification — pro1.11
+# Build verification — pro1.12
 
 ## اجرا و پاس‌شده در محیط ساخت
 - `npm run validate` (syntax + security-check) ✔
-- `npm test` (واحد + ایستا + `tests/repeat.test.mjs` + `tests/v4.test.mjs`) ✔
-- بررسی دستی در Chromium headless: گزینه‌ی «سالانه» در فرم یادآوری و یادداشت، ذخیره، تاریخ بعدی (سال بعد)، برچسب‌ها در صفحه‌ی یادآوری‌ها، جدول هفتگی و رخدادهای تقویم مالی — بدون خطای JavaScript ✔
+- `npm test` (واحد + ایستا + repeat + v4 + `tests/sync.test.mjs` + smoke) ✔
+- `tests/sync.test.mjs`: دو «گوشی» (vm جدا) با Worker واقعی و KV شبیه‌سازی‌شده — اتصال با کد، کد اشتباه، رمز همگام‌سازی اشتباه، دوطرفه، تداخل هم‌زمان (409)، حذف، آفلاین، بازیابی از فایل (epoch)، قطع دسترسی گوشی، رمزنگاری بودن داده روی سرور ✔
 
 ## اجرا نشده
-- `npm run test:browser` و `npm run test:v4` (Playwright برای Node در این محیط نصب نبود)
-- تست روی گوشی واقعی (Android/iOS) و Safari
-- همگام‌سازی Firebase (داده‌ی V4 هنوز sync نمی‌شود)
-- Capacitor/APK (اعلان بومی سالانه فقط در کد اضافه شده، روی دستگاه تست نشده)
+- `npm run test:browser` و `npm run test:v4` (Playwright نصب نبود)
+- تست روی گوشی واقعی و اتصال به ربات/Cloudflare واقعی (نیاز به نصب سرور توسط مالک)
+- همگام‌سازی داده‌ی V4 (هنوز sync نمی‌شود)

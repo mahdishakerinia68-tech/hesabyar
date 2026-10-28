@@ -1,7 +1,6 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
-const SYNC_KEY="hesabdar-firebase-config-v1";
-const APP_VERSION="pro1.11";
+const APP_VERSION="pro1.12";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v2";
 const AUTO_BACKUP_MS=6*60*60*1000;
 const APP_MODE_KEY="hesabdar-app-mode-v1";
@@ -105,24 +104,11 @@ function openAppModeSheet(){
   applyAppMode();
 }
 const DEVICE_ID_KEY="hesabdar-device-id-v1";
-const DEVICE_PRESENCE_MS=45*1000;
-const DEVICE_PRESENCE_INTERVAL=20*1000;
-const SYNC_INTERVAL=5000;
-// Firebase project configuration supplied for this app.
-// This is safe to ship in a web app; access is protected by Firebase Authentication + Firestore Rules.
-const DEFAULT_SYNC_CONFIG={
-  // Firebase API keys are intentionally not committed to the repository.
-  // Existing users keep their locally stored sync configuration.
-  apiKey:"",
-  authDomain:"hesabdari-fd3a3.firebaseapp.com",
-  projectId:"hesabdari-fd3a3",
-  storageBucket:"hesabdari-fd3a3.firebasestorage.app",
-  messagingSenderId:"1048332879407",
-  appId:"1:1048332879407:web:d1168138d754d28c8d68da",
-  measurementId:"G-562NVEJKZT"
-};
-let sync={app:null,auth:null,db:null,user:null,unsubscribe:null,ready:false,saving:false,queued:false,hydrating:false,authListener:false,dirty:new Map()};
-function syncConfig(){try{return JSON.parse(localStorage.getItem(SYNC_KEY)||"null")||DEFAULT_SYNC_CONFIG}catch{return DEFAULT_SYNC_CONFIG}}
+const SYNC_STATE_KEY="hesabdar-tgsync-v1";
+const SYNC_PASS_KEY="hesabdar-tgsync-pass-v1";
+const SYNC_POLL_MS=20000;
+const SYNC_PUSH_DELAY_MS=15000;
+let sync={user:null,ready:false,busy:false,rerun:false,hydrating:false,saving:false,timer:null,pushTimer:null,listeners:false,version:0,lastErrorCode:"",dirty:new Map()};
 function autoBackupEnabled(){return localStorage.getItem(AUTO_BACKUP_ENABLED_KEY)!=="false"}
 /* pro2: پشتیبان واقعیِ خودکار نمی‌تواند بدون رمز کاربر ساخته شود (بکاپ‌ها رمزنگاری‌شده‌اند)،
  * پس این گزینه اکنون «یادآوری پشتیبان‌گیری» است و هیچ ادعای ساخت فایل خودکار ندارد. */
@@ -279,7 +265,7 @@ function renderSettingsFeatures(){const e=$("autoBackupToggle");if(e)e.checked=a
  const lt=$("langToggle");if(lt){lt.textContent=data.lang==="en"?"فا":"EN";lt.setAttribute("aria-label",data.lang==="en"?"تغییر زبان به فارسی":"Switch language to English")}
  applyAppMode();
 }
-function setSyncStatus(t){const e=$("syncStatus");if(e)e.textContent=t||"";const b=$("syncBadge");if(!b)return;const s=String(t||"");let cls="offline",label="☁️ آفلاین";if(s.includes("آنلاین")||s.includes("انجام شد")||s.includes("متصل است")){cls="online";label="☁️ متصل"}else if(s.includes("⚠️")||s.includes("ناموفق")){cls="error";label="⚠️ خطای اتصال"}else if(s.includes("در حال")||s.includes("بررسی")){cls="pending";label="☁️ در حال اتصال..."}else if(s.includes("وارد شوید")||s.includes("ابتدا")){cls="offline";label="☁️ واردنشده"}b.textContent=label;b.className="sync-badge "+cls}
+function setSyncStatus(t){const e=$("syncStatus");if(e)e.textContent=t||"";const b=$("syncBadge");if(!b)return;const s=String(t||"");let cls="offline",label="☁️ آفلاین";if(s.includes("آنلاین")||s.includes("انجام شد")||s.includes("متصل است")){cls="online";label="☁️ متصل"}else if(s.includes("در انتظار ارسال")){cls="pending";label="☁️ در انتظار ارسال"}else if(s.includes("⚠️")||s.includes("ناموفق")){cls="error";label="⚠️ خطای اتصال"}else if(s.includes("در حال")||s.includes("بررسی")){cls="pending";label="☁️ در حال اتصال..."}else if(s.includes("وصل شوید")||s.includes("وارد شوید")||s.includes("ابتدا")){cls="offline";label="☁️ وصل‌نشده"}b.textContent=label;b.className="sync-badge "+cls}
 
 const defaultsExpense=["بنزین","غذا و رستوران","خرید خانه","خرید روزانه","قبض","اینترنت و شارژ","حمل‌ونقل","پوشاک","درمان","تفریح","هدیه","سایر"];
 const defaultsIncome=["حقوق","پاداش","واریز","فروش","دریافت از شخص","سایر"];
@@ -331,7 +317,7 @@ function setupReminderNotificationActions(){const p=getNativeLocalNotifications(
 async function rescheduleAllNativeReminders(){if(!getNativeLocalNotifications())return;for(const r of data.reminders||[]){await cancelNativeReminder(r.id);await scheduleNativeReminder(r)}}
 async function requestNativeNotifications(){const p=getNativeLocalNotifications();if(p){try{const perm=await p.requestPermissions();if(perm.display!=="granted")return false;if(typeof p.checkExactNotificationSetting==="function"){const exact=await p.checkExactNotificationSetting();if(exact.value!=="granted"&&typeof p.changeExactNotificationSetting==="function")try{await p.changeExactNotificationSetting()}catch(e){console.warn("exact notification setting",e)}}await rescheduleAllNativeReminders();return true}catch(e){console.warn("native notification permission",e);return false}}if("Notification"in window){try{return (await Notification.requestPermission())==="granted"}catch(e){}}return false}
 function reminderBodyFromNote(note){const parts=[];if(note?.text)parts.push(note.text);const pending=(note?.items||[]).filter(x=>!x.done).map(x=>x.text).filter(Boolean);if(pending.length)parts.push(pending.join(" • "));return parts.join(" — ")||"یادآوری یادداشت"}
-function removeRecordSilent(type,id){const i=data[type].findIndex(x=>x.id===id);if(i<0)return;data[type].splice(i,1);markDeleted(type,id)}
+function removeRecordSilent(type,id){const i=data[type].findIndex(x=>x.id===id);if(i<0)return;const rv=data[type][i].revision;data[type].splice(i,1);markDeleted(type,id,rv)}
 /* ---- v3.11: زباله‌دان ۳۰ روزه برای تراکنش/فاکتور/چک ----
  * حذف در این سه بخش برگشت‌ناپذیر بود؛ حالا رکورد حذف‌شده یک کپی کامل از
  * خودش را در data.trash می‌گذارد و به مدت TRASH_DAYS روز قابل بازگردانی
@@ -404,7 +390,7 @@ function renderTrash(){
  box.innerHTML=(data.trash||[]).map(t=>`<div class="item trash-row"><div><b>${trashTypeIcon(t.type)} ${esc(t.label)}</b><div class="meta">حذف‌شده: ${jalaliLabel(t.deletedAt)} • ${fa(trashDaysLeft(t))} روز تا حذف همیشگی</div></div><div class="actions"><button class="primary" onclick="restoreFromTrash('${t.trashId}')">↩️ بازگردانی</button><button onclick="deleteFromTrashForever('${t.trashId}')" class="danger-icon">🗑</button></div></div>`).join("")||empty("زباله‌دان خالی است");
 }
 async function upsertReminderForNote(note,renderAfter=true){if(!note?.id)return;const linked=(data.reminders||[]).filter(x=>x.sourceNoteId===note.id);let r=linked[0];for(const duplicate of linked.slice(1)){await cancelNativeReminder(duplicate.id);removeRecordSilent("reminders",duplicate.id)}if(!note.date){if(r){await cancelNativeReminder(r.id);removeRecordSilent("reminders",r.id);if(renderAfter)save();else{persistLocal();syncSave()}}return}const o={title:note.title||"یادداشت",amount:0,date:note.date,repeat:note.repeat&&note.repeat!=="none"?note.repeat:"once",type:"note",sourceNoteId:note.id,body:reminderBodyFromNote(note)};if(r){Object.assign(r,o);touch(r);markDirty("reminders",r.id,false,r,r.updatedAt)}else{r=touch({id:uid(),...o});data.reminders.push(r);markDirty("reminders",r.id,false,r,r.updatedAt)}if(renderAfter)save();else{persistLocal();syncSave()}await cancelNativeReminder(r.id);await scheduleNativeReminder(r);if((r.type||"")==="note" && (r.repeat||"once")==="once") await addToAndroidClock(r)}
-async function syncAllNotesToReminders(){let changed=false;const noteIds=new Set((data.notes||[]).map(n=>n.id));for(const n of data.notes||[]){const before=(data.reminders||[]).length;await upsertReminderForNote(n);if((data.reminders||[]).length!==before)changed=true}for(const r of [...(data.reminders||[])]){if(r.sourceNoteId&&!noteIds.has(r.sourceNoteId)){await cancelNativeReminder(r.id);removeRecordSilent("reminders",r.id);changed=true}}if(changed)save();else render();if(sync.db)syncSave()}
+async function syncAllNotesToReminders(){let changed=false;const noteIds=new Set((data.notes||[]).map(n=>n.id));for(const n of data.notes||[]){const before=(data.reminders||[]).length;await upsertReminderForNote(n);if((data.reminders||[]).length!==before)changed=true}for(const r of [...(data.reminders||[])]){if(r.sourceNoteId&&!noteIds.has(r.sourceNoteId)){await cancelNativeReminder(r.id);removeRecordSilent("reminders",r.id);changed=true}}if(changed)save();else render();if(sync.user)syncSave()}
 async function removeReminderForNote(noteId){const matches=(data.reminders||[]).filter(r=>r.sourceNoteId===noteId);for(const r of matches){await cancelNativeReminder(r.id);removeRecordSilent("reminders",r.id)}if(matches.length)save()}
 
 /* ---- Web/PWA notification fallback engine ----
@@ -489,7 +475,7 @@ function renderDueSoon(){
 const blankData=()=>({accounts:[],transactions:[],people:[],reminders:[],notes:[],checks:[],invoices:[],customers:[],products:[],audit:[],trash:[],expenseCats:defaultsExpense.map((name,i)=>({id:"e"+i,name,children:[]})),incomeCats:defaultsIncome.map((name,i)=>({id:"i"+i,name,children:[]})),pin:"",patternHash:"",patternSalt:"",lockMethod:"pin",biometricEnabled:false,webauthnCredId:"",lang:"fa",branding:{storeName:"",logo:"",stamp:"",signature:""},yearSettlements:{}});
 window.addEventListener("error",e=>{console.error(e.error||e.message)});
 window.addEventListener("unhandledrejection",e=>{console.error(e.reason)});
-window.addEventListener("online",async()=>{if(sync.db)sync.db.enableNetwork().catch(console.error);setSyncStatus("🌐 اینترنت برقرار شد؛ در حال بررسی اتصال دو گوشی..."); if(!sync.auth)await initSync(); if(sync.dirty&&sync.dirty.size)syncSave(); await verifyTwoPhoneConnection(true);});
+window.addEventListener("online",()=>{if(sync.ready){setSyncStatus("🌐 اینترنت برقرار شد؛ در حال همگام‌سازی...");syncTick()}});
 window.addEventListener("offline",()=>setSyncStatus("⚠️ اینترنت دستگاه قطع است"));
 
 /* v1.2.8: زیرساخت migration نسخه‌به‌نسخه‌ی داده — غیرمخرب: قبل از هر
@@ -643,14 +629,12 @@ function mergeData(remote){
   }
   return base;
 }
-function cloudDoc(){return sync.db.collection("users").doc(sync.user.uid)}
-function recordsCollection(){return cloudDoc().collection("records")}
 function recordDocId(type,id){return `${type}__${id}`}
 function allSyncRecords(){
   const ks=["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats","audit"];
   const out=[];
   for(const k of ks) for(const r of (data[k]||[])) out.push({id:recordDocId(k,r.id),type:k,record:r,revision:Number(r.revision)||0,updatedAt:r.updatedAt||new Date().toISOString(),updatedBy:r.updatedBy||deviceId(),deviceId:r.deviceId||deviceId(),deleted:false});
-  for(const k of ks) for(const [id,dt] of Object.entries(data._sync?.tombstones?.[k]||{})) out.push({id:recordDocId(k,id),type:k,record:{id},updatedAt:dt,deleted:true});
+  for(const k of ks) for(const [id,dt] of Object.entries(data._sync?.tombstones?.[k]||{})) out.push({id:recordDocId(k,id),type:k,record:{id},revision:Number(data._sync?.tombstoneRevisions?.[k]?.[id])||0,updatedAt:dt,deleted:true});
   return out;
 }
 function clearOldTombstones(){
@@ -666,35 +650,107 @@ function markAllLocalDirty(){
   for(const k of ks) for(const r of (data[k]||[])) markDirty(k,r.id,false,r,r.updatedAt);
   for(const k of ks) for(const [id,dt] of Object.entries(data._sync?.tombstones?.[k]||{})) markDirty(k,id,true,{id},dt);
 }
-function cloudPayload(x){return {id:x.id,type:x.type,record:x.record,revision:Number(x.record?.revision||0),updatedAt:x.updatedAt,updatedBy:x.record?.updatedBy||sync.user.uid,deviceId:x.record?.deviceId||deviceId(),deleted:x.deleted};}
-async function commitChunks(items){
-  const col=recordsCollection();
-  for(let i=0;i<items.length;i+=450){
-    const batch=sync.db.batch();
-    for(const x of items.slice(i,i+450)) batch.set(col.doc(x.id),cloudPayload(x),{merge:false});
-    await batch.commit();
-  }
+const SYNC_KEYS=["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats","audit"];
+/* ===== pro1.12: همگام‌سازی دو گوشی با ربات تلگرام + سرور Cloudflare Worker =====
+ * جایگزین Firebase. هر گوشی با «کد یک‌بارمصرف» ربات به حساب تلگرامِ خودش وصل می‌شود.
+ * رکوردها روی خود گوشی با «رمز همگام‌سازی» رمزنگاری می‌شوند و سرور فقط متن رمزشده می‌بیند.
+ * ادغام همچنان رکورد‌به‌رکورد است (شناسه، revision، زمان، تومب‌استون). */
+function syncErr(code,message){const e=new Error(message);e.code=code;return e}
+function syncState(){try{return JSON.parse(localStorage.getItem(SYNC_STATE_KEY)||"null")||{}}catch{return {}}}
+function saveSyncState(p){const s={...syncState(),...p};try{localStorage.setItem(SYNC_STATE_KEY,JSON.stringify(s))}catch(e){console.warn("sync state",e)}return s}
+function syncServer(){return String(syncState().server||"").trim().replace(/\/+$/,"")}
+function syncPassword(){try{return localStorage.getItem(SYNC_PASS_KEY)||""}catch{return ""}}
+function stopSyncTimers(){if(sync.timer){clearInterval(sync.timer);sync.timer=null}if(sync.pushTimer){clearTimeout(sync.pushTimer);sync.pushTimer=null}}
+function syncDropLocal(msg){
+  stopSyncTimers();
+  saveSyncState({token:"",tgId:"",name:"",version:0});
+  try{localStorage.removeItem(SYNC_PASS_KEY)}catch(e){}
+  _syncKeyCache=null;sync.user=null;sync.ready=false;sync.version=0;sync.dirty.clear();
+  fillSettingsSync();setSyncStatus(msg||"☁️ برای همگام‌سازی به ربات وصل شوید");
 }
-async function pushRest(items=null){
-  if(!sync.user||!sync.db)throw new Error("همگام‌سازی آماده نیست");
-  const outgoing=items||[...sync.dirty.values()];
-  if(outgoing.length) await commitChunks(outgoing);
-  await sync.db.collection("users").doc(sync.user.uid).set({appVersion:APP_VERSION,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
-  if(!items){for(const x of outgoing){const current=sync.dirty.get(x.id);if(current&&current.updatedAt===x.updatedAt)sync.dirty.delete(x.id)}}
+async function syncApi(path,method="GET",body=null,auth=true){
+  const base=syncServer();
+  if(!base)throw syncErr("no-server","آدرس سرور تنظیم نشده است");
+  const headers={"Content-Type":"application/json"};
+  if(auth){const st=syncState();if(!st.token)throw syncErr("no-token","این گوشی هنوز وصل نشده است");headers.Authorization="Bearer "+st.token}
+  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),20000);
+  let res,j={};
+  try{
+    res=await fetch(base+path,{method,headers,body:body?JSON.stringify(body):undefined,signal:ctl.signal,cache:"no-store"});
+    try{j=await res.json()}catch(e){}
+  }catch(e){
+    throw syncErr(e&&e.name==="AbortError"?"timeout":"network",e&&e.name==="AbortError"?"سرور در زمان مناسب پاسخ نداد":"اتصال به سرور برقرار نشد")
+  }finally{clearTimeout(timer)}
+  if(res.status===401&&auth){syncDropLocal("⚠️ دسترسی این گوشی از طرف سرور قطع شده است؛ دوباره با کد ربات وصل شوید");throw syncErr("revoked","دسترسی این گوشی قطع شده است")}
+  return {status:res.status,body:j};
+}
+let _syncKeyCache=null;
+async function syncCryptoKey(){
+  const st=syncState(),pass=syncPassword();
+  if(!st.tgId||!pass)throw syncErr("no-pass","رمز همگام‌سازی تنظیم نشده است");
+  const id=st.tgId+"|"+pass;
+  if(_syncKeyCache&&_syncKeyCache.id===id)return _syncKeyCache.key;
+  const base=await crypto.subtle.importKey("raw",new TextEncoder().encode(pass),"PBKDF2",false,["deriveKey"]);
+  const key=await crypto.subtle.deriveKey({name:"PBKDF2",salt:new TextEncoder().encode("hesabyar-sync-v1:"+st.tgId),iterations:120000,hash:"SHA-256"},base,{name:"AES-GCM",length:256},false,["encrypt","decrypt"]);
+  _syncKeyCache={id,key};return key;
+}
+async function encryptSnapshot(){
+  const key=await syncCryptoKey(),iv=crypto.getRandomValues(new Uint8Array(12));
+  const payload={v:1,epoch:String(data._sync?.epoch||""),at:new Date().toISOString(),device:deviceId(),records:recordsFromLocal()};
+  const ct=await crypto.subtle.encrypt({name:"AES-GCM",iv},key,new TextEncoder().encode(JSON.stringify(payload)));
+  return JSON.stringify({format:"hesabdar-sync",v:1,iv:bytesToB64(iv),ct:bytesToB64(ct)});
+}
+async function decryptSnapshot(text){
+  let box;try{box=JSON.parse(text)}catch(e){throw syncErr("bad-blob","داده‌ی روی سرور خراب است")}
+  if(!box||box.format!=="hesabdar-sync"||!box.iv||!box.ct)throw syncErr("bad-blob","داده‌ی روی سرور خراب است");
+  const key=await syncCryptoKey();
+  try{const plain=await crypto.subtle.decrypt({name:"AES-GCM",iv:b64ToBytes(box.iv)},key,b64ToBytes(box.ct));return JSON.parse(new TextDecoder().decode(plain))}
+  catch(e){throw syncErr("wrong-pass","رمز همگام‌سازی این گوشی با رمز گوشی اول یکی نیست")}
 }
 async function pullRest(){
-  if(!sync.user||!sync.db)throw new Error("همگام‌سازی آماده نیست");
-  // Always read the true latest data from the Firestore server when possible,
-  // instead of a device's own local cache. Two phones (iPhone/Android/...)
-  // signed into the same account share one "users/{uid}/records" collection
-  // already — but without this, a device could still show its own last-seen
-  // snapshot for a moment instead of the actual latest merged state written
-  // by another device/platform. Falls back to the normal (cache-allowed) read
-  // when offline, so nothing breaks without a connection.
-  let snap;
-  try{snap=await recordsCollection().get({source:"server"})}
-  catch(e){snap=await recordsCollection().get()}
-  return snap.docs.map(d=>d.data());
+  if(!sync.user)throw syncErr("no-token","همگام‌سازی آماده نیست");
+  const r=await syncApi("/api/sync");
+  if(r.status!==200)throw syncErr("pull","دریافت از سرور ناموفق بود ("+r.status+")");
+  const payload=r.body.blob?await decryptSnapshot(r.body.blob):null;
+  return {version:Number(r.body.version)||0,payload};
+}
+/* آیا این گوشی رکوردی دارد که سرور ندارد یا نسخه‌ی جدیدتری از آن دارد؟ (فقط روی زمان واقعیِ رکورد، نه «الان») */
+function localAhead(records){
+  const map=new Map((records||[]).map(x=>[recordDocId(x.type,x.record?.id),x]));
+  for(const l of recordsFromLocal()){
+    const r=map.get(l.id);
+    if(!r)return true;
+    const lt=l.deleted?l.updatedAt:(l.record?.updatedAt||"");
+    if(lt&&compareUpdatedAt(lt,r.updatedAt||r.record?.updatedAt||"")>0)return true;
+  }
+  return false;
+}
+function afterRemoteMerge(){
+  persistLocal();render();
+  syncAllNotesToReminders().catch(console.error);syncAllPeopleToReminders().catch(console.error);rescheduleAllNativeReminders().catch(console.error);
+}
+async function pushRest(){
+  if(!sync.user)throw syncErr("no-token","همگام‌سازی آماده نیست");
+  const sent=new Map(sync.dirty);
+  for(let attempt=0;attempt<4;attempt++){
+    const blob=await encryptSnapshot();
+    const r=await syncApi("/api/sync","PUT",{baseVersion:sync.version,blob});
+    if(r.status===200){
+      sync.version=Number(r.body.version)||sync.version;saveSyncState({version:sync.version,lastSync:Date.now()});
+      for(const [k,x] of sent){const cur=sync.dirty.get(k);if(cur&&cur.updatedAt===x.updatedAt)sync.dirty.delete(k)}
+      return;
+    }
+    if(r.status===409){
+      // گوشی دیگر زودتر نوشته: نسخه‌ی او را ادغام کن و دوباره بفرست
+      const payload=r.body.blob?await decryptSnapshot(r.body.blob):null;
+      if(payload&&mergeCloud(payload.records,payload.epoch))afterRemoteMerge();
+      sync.version=Number(r.body.version)||sync.version;
+      continue;
+    }
+    if(r.status===413)throw syncErr("too-large","حجم اطلاعات از حد مجاز سرور بیشتر است");
+    throw syncErr("push","ارسال به سرور ناموفق بود ("+r.status+")");
+  }
+  throw syncErr("conflict","تداخل پشت‌سرهم با گوشی دیگر؛ کمی بعد دوباره تلاش می‌شود");
 }
 /* v1.2.8: مقایسه زمانی رکوردها بر اساس Date.parse به‌جای مقایسه رشته‌ای
  * (localeCompare)، تا فرمت‌های زمانی متفاوت هم درست مقایسه شوند. */
@@ -702,32 +758,39 @@ function compareUpdatedAt(a,b){const ar=Number(a?.revision)||0,br=Number(b?.revi
 function recordsFromLocal(){
   const ks=["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats","audit"],out=[];
   for(const k of ks) for(const r of (data[k]||[])) out.push({id:recordDocId(k,r.id),type:k,record:r,revision:Number(r.revision)||0,updatedAt:r.updatedAt||new Date().toISOString(),updatedBy:r.updatedBy||deviceId(),deviceId:r.deviceId||deviceId(),deleted:false});
-  for(const k of ks) for(const [id,dt] of Object.entries(data._sync?.tombstones?.[k]||{})) out.push({id:recordDocId(k,id),type:k,record:{id},updatedAt:dt,deleted:true});
+  for(const k of ks) for(const [id,dt] of Object.entries(data._sync?.tombstones?.[k]||{})) out.push({id:recordDocId(k,id),type:k,record:{id},revision:Number(data._sync?.tombstoneRevisions?.[k]?.[id])||0,updatedAt:dt,deleted:true});
   return out;
 }
-async function reconcileInitial(remote){
-  const remoteMap=new Map((remote||[]).map(x=>[recordDocId(x.type,x.record?.id),x]));
-  const outgoing=[];
-  for(const local of recordsFromLocal()){
-    const r=remoteMap.get(local.id);
-    if(!r || compareUpdatedAt(local.updatedAt,r.updatedAt||r.record?.updatedAt||"")>0) outgoing.push(local);
-  }
-  if(outgoing.length) await pushRest(outgoing);
-}
-function mergeCloud(remote){
+function mergeCloud(remote,remoteEpoch=""){
   const ks=["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats","audit"];
   let changed=false;
   const remoteMap=new Map();
   for(const x of (remote||[])){if(!x?.type||!x?.record?.id)continue;remoteMap.set(recordDocId(x.type,x.record.id),x)}
   data._sync??={tombstones:{}};data._sync.tombstones??={};
+  /* پشتیبان‌گیری/بازیابی از فایل «epoch» می‌سازد: اگر گوشی دیگر بعد از بازیابی فایل، اطلاعات را جایگزین کرده،
+   * رکوردهای قدیمیِ این گوشی که در نسخه‌ی جدید نیستند حذف می‌شوند (مگر بعد از آن تاریخ ساخته شده باشند). */
+  const re=String(remoteEpoch||""),le=String(data._sync.epoch||"");
+  if(re&&re>le){
+    const cut=Date.parse(re)||0;
+    for(const k of SYNC_KEYS){
+      if(!Array.isArray(data[k]))continue;
+      const before=data[k].length;
+      data[k]=data[k].filter(r=>remoteMap.has(recordDocId(k,r.id))||(Date.parse(r.updatedAt||"")||0)>cut);
+      if(data[k].length!==before)changed=true;
+      for(const id of Object.keys(data._sync.tombstones?.[k]||{})){if(!remoteMap.has(recordDocId(k,id))&&(Date.parse(data._sync.tombstones[k][id])||0)<cut)delete data._sync.tombstones[k][id]}
+    }
+    data._sync.epoch=re;changed=true;
+  }
+  const myCut=Date.parse(data._sync.epoch||"")||0;
   for(const x of remoteMap.values()){
     const type=x.type,id=x.record.id,arr=data[type]; if(!Array.isArray(arr))continue;
-    const local=arr.find(r=>r.id===id); const localTs=local?.updatedAt||data._sync.tombstones?.[type]?.[id]||""; const remoteTs=x.updatedAt||x.record.updatedAt||""; const localBy=String(local?.updatedBy||""); const remoteBy=String(x.updatedBy||x.record?.updatedBy||"");
-    const timeCmp=compareUpdatedAt({revision:x.revision||x.record?.revision,updatedAt:remoteTs,deviceId:x.deviceId||x.record?.deviceId},{revision:local?.revision||0,updatedAt:localTs,deviceId:localBy});
+    const local=arr.find(r=>r.id===id); if(!local&&myCut&&(Date.parse(x.updatedAt||x.record?.updatedAt||"")||0)<myCut)continue; const localTs=local?.updatedAt||data._sync.tombstones?.[type]?.[id]||""; const remoteTs=x.updatedAt||x.record.updatedAt||""; const localBy=String(local?.updatedBy||""); const remoteBy=String(x.updatedBy||x.record?.updatedBy||"");
+    const timeCmp=compareUpdatedAt({revision:x.revision||x.record?.revision,updatedAt:remoteTs,deviceId:x.deviceId||x.record?.deviceId},{revision:local?(local.revision||0):(Number(data._sync.tombstoneRevisions?.[type]?.[id])||0),updatedAt:localTs,deviceId:localBy});
     if(timeCmp<0 || (timeCmp===0 && remoteBy<=localBy))continue;
     if(x.deleted){
       if(local){arr.splice(arr.indexOf(local),1);changed=true}
       data._sync.tombstones[type]??={};data._sync.tombstones[type][id]=remoteTs;
+      data._sync.tombstoneRevisions??={};data._sync.tombstoneRevisions[type]??={};data._sync.tombstoneRevisions[type][id]=Number(x.revision||x.record?.revision)||0;
       sync.dirty.delete(recordDocId(type,id));
     }else{
       const rec={...x.record,updatedAt:remoteTs};
@@ -740,139 +803,139 @@ function mergeCloud(remote){
   for(const p of data.people||[]){if(p.type==="debtor"||p.type==="debtors"||p.type==="بدهکار")p.type="debt";if(p.type==="creditor"||p.type==="creditors"||p.type==="طلبکار"||p.type==="بستانکار")p.type="credit";if(p.type!=="debt"&&p.type!=="credit")p.type="debt";p.amount=Number(p.amount)||0;p.paid=Number(p.paid)||0}
   return changed;
 }
+function handleSyncError(e){
+  console.error(e);sync.lastErrorCode=e&&e.code||"";
+  if(e&&e.code==="revoked")return;
+  const off=!navigator.onLine||(e&&(e.code==="network"||e.code==="timeout"));
+  if(e&&e.code==="wrong-pass")setSyncStatus("⚠️ "+e.message);
+  else if(off)setSyncStatus("☁️ در انتظار ارسال • آفلاین"+(sync.dirty.size?" • "+fa(sync.dirty.size)+" تغییر":""));
+  else setSyncStatus("⚠️ خطا در همگام‌سازی: "+((e&&e.message)||(e&&e.code)||""));
+}
 async function hydrateSync(){
-  if(!sync.user||!sync.db)return;
-  sync.hydrating=true;
-  try{const remote=await pullRest();mergeCloud(remote);persistLocal();await reconcileInitial(remote);render();setSyncStatus("☁️ آنلاین • همگام‌سازی لحظه‌ای")}
-  catch(e){console.error(e);setSyncStatus("⚠️ دریافت اولیه ناموفق: "+(e.code||e.message))}
+  if(!sync.user)return false;
+  sync.hydrating=true;sync.lastErrorCode="";
+  try{
+    const r=await pullRest();
+    if(r.payload&&mergeCloud(r.payload.records,r.payload.epoch))afterRemoteMerge();
+    sync.version=r.version;saveSyncState({version:r.version});
+    if(!r.payload||localAhead(r.payload.records)){markAllLocalDirty();await pushRest()}
+    setSyncStatus("☁️ آنلاین • همگام‌سازی شد");
+    return true;
+  }catch(e){handleSyncError(e);return false}
   finally{sync.hydrating=false}
 }
 async function syncTick(){
-  if(!sync.user||!sync.db||sync.hydrating)return;
-  try{if(sync.dirty.size)await pushRest();setSyncStatus("☁️ آنلاین • همگام‌سازی لحظه‌ای")}catch(e){console.error(e)}
+  if(!sync.ready||!sync.user||sync.hydrating)return;
+  if(sync.busy){sync.rerun=true;return}
+  sync.busy=true;sync.lastErrorCode="";
+  try{
+    if(!navigator.onLine)throw syncErr("network","اینترنت دستگاه قطع است");
+    const m=await syncApi("/api/meta");
+    if(m.status!==200)throw syncErr("meta","بررسی سرور ناموفق بود ("+m.status+")");
+    if(Number(m.body.version)>sync.version){
+      const r=await pullRest();
+      if(r.payload&&mergeCloud(r.payload.records,r.payload.epoch))afterRemoteMerge();
+      sync.version=r.version;saveSyncState({version:r.version});
+      if(r.payload&&localAhead(r.payload.records))markAllLocalDirty();
+    }
+    if(sync.dirty.size)await pushRest();
+    setSyncStatus("☁️ آنلاین • همگام‌سازی شد");
+  }catch(e){handleSyncError(e)}
+  finally{sync.busy=false;if(sync.rerun){sync.rerun=false;syncSave()}}
+}
+/* هر تغییر محلی: ارسال با تاخیر کوتاه (چند تغییر پشت‌سرهم یک‌جا می‌روند؛ پلن رایگان Cloudflare سقف نوشتن روزانه دارد) */
+function syncSave(){
+  if(!sync.ready||!sync.user||sync.hydrating)return;
+  setSyncStatus("☁️ در انتظار ارسال"+(sync.dirty.size?" • "+fa(sync.dirty.size)+" تغییر":""));
+  if(sync.pushTimer)clearTimeout(sync.pushTimer);
+  sync.pushTimer=setTimeout(()=>{sync.pushTimer=null;syncTick()},SYNC_PUSH_DELAY_MS);
+}
+async function pushToCloud(){
+  if(!sync.user)return alert("اول با کد ربات تلگرام وصل شو");
+  try{
+    setSyncStatus("در حال همگام‌سازی...");
+    const r=await pullRest();
+    if(r.payload&&mergeCloud(r.payload.records,r.payload.epoch))afterRemoteMerge();
+    sync.version=r.version;saveSyncState({version:r.version});
+    markAllLocalDirty();await pushRest();
+    setSyncStatus("☁️ آنلاین • اطلاعات دو گوشی ادغام و ذخیره شد — "+dataSummary(data));
+    alert("ارسال و ادغام با موفقیت انجام شد\n"+dataSummary(data));
+  }catch(e){handleSyncError(e);alert("ارسال ناموفق: "+(e.message||e.code||""))}
+}
+async function pullFromCloud(){
+  if(!sync.user)return alert("اول با کد ربات تلگرام وصل شو");
+  try{
+    const r=await pullRest();
+    if(!r.payload||!(r.payload.records||[]).length)return alert("هنوز اطلاعاتی روی سرور وجود ندارد");
+    if(mergeCloud(r.payload.records,r.payload.epoch))afterRemoteMerge();
+    sync.version=r.version;saveSyncState({version:r.version});
+    setSyncStatus("☁️ آنلاین • اطلاعات از سرور دریافت شد — "+dataSummary(data));
+    alert("اطلاعات دریافت شد\n"+dataSummary(data));
+  }catch(e){handleSyncError(e);alert("دریافت ناموفق: "+(e.message||e.code||""))}
+}
+function syncDeviceName(){
+  const ua=navigator.userAgent||"";
+  const kind=/android/i.test(ua)?"اندروید":/iphone|ipad|ios/i.test(ua)?"آیفون":"مرورگر";
+  return "گوشی "+kind+" "+deviceId().slice(0,4);
+}
+function fillSettingsSync(){
+  const st=syncState();
+  const s=$("settingsSyncServer");if(s&&document.activeElement!==s)s.value=st.server||"";
+  const w=$("syncWho");
+  if(w)w.textContent=st.token&&st.tgId?("✅ وصل به حساب تلگرام: "+(st.name||"")+" ("+st.tgId+")"):"این گوشی هنوز وصل نیست.";
+  const pass=$("settingsSyncPass");if(pass&&st.token)pass.value="";
+  const code=$("settingsSyncCode");if(code&&st.token)code.value="";
+}
+const SYNC_PAIR_ERRORS={bad_code:"کد اشتباه است یا منقضی شده. در ربات /start بزن و کد تازه بگیر.",too_many_attempts:"تلاش‌های ناموفق زیاد بود؛ چند دقیقه بعد دوباره امتحان کن.",not_allowed:"دسترسی این حساب هنوز توسط مدیر تایید نشده است.",device_limit:"تعداد گوشی‌های متصل به سقف رسیده. در ربات /devices و /revoke را بزن."};
+async function connectFromSettings(){
+  const server=($("settingsSyncServer")?.value||"").trim().replace(/\/+$/,"");
+  const code=toEnDigits($("settingsSyncCode")?.value||"").replace(/\D/g,"");
+  const pass=$("settingsSyncPass")?.value||"";
+  if(!/^https:\/\/[^\s/]+$/i.test(server))return alert("آدرس سرور باید با https:// شروع شود و مسیر نداشته باشد.\nمثل: https://hesabyar-sync.xxxx.workers.dev");
+  if(code.length!==6)return alert("کد ۶ رقمی را که ربات تلگرام داد وارد کن.");
+  if(pass.length<8)return alert("رمز همگام‌سازی باید حداقل ۸ کاراکتر باشد و روی هر دو گوشی یکی باشد.");
+  try{
+    setSyncStatus("در حال اتصال...");
+    if(sync.user)await logoutSync(true);
+    saveSyncState({server});
+    const r=await syncApi("/api/pair","POST",{code,deviceName:syncDeviceName()},false);
+    if(r.status!==200||!r.body.token){setSyncStatus("☁️ برای همگام‌سازی به ربات وصل شوید");return alert(SYNC_PAIR_ERRORS[r.body?.error]||("اتصال ناموفق بود ("+r.status+")"))}
+    saveSyncState({token:r.body.token,tgId:String(r.body.id),name:r.body.name||"",version:0});
+    try{localStorage.setItem(SYNC_PASS_KEY,pass)}catch(e){}
+    _syncKeyCache=null;
+    await initSync();
+    if(sync.lastErrorCode==="wrong-pass"){
+      await logoutSync(true);
+      return alert("رمز همگام‌سازی با رمزی که روی گوشی اول گذاشتی یکی نیست. دوباره کد بگیر و همان رمز را وارد کن.");
+    }
+    logEvent("اتصال به ربات تلگرام","همگام‌سازی دو گوشی فعال شد","auth");
+    alert("اتصال انجام شد و همگام‌سازی فعال است.");
+  }catch(e){handleSyncError(e);alert("اتصال ناموفق: "+(e.message||e.code||""))}
+}
+async function logoutSync(silent=false){
+  try{if(sync.user&&syncState().token)await syncApi("/api/logout","POST",null,true).catch(()=>{})}catch(e){}
+  const name=syncState().name||"";
+  syncDropLocal();
+  if(!silent){alert("این گوشی از همگام‌سازی جدا شد. اطلاعات روی گوشی می‌ماند.");logEvent("قطع همگام‌سازی",name,"auth")}
+}
+async function initSync(){
+  try{localStorage.removeItem("hesabdar-firebase-config-v1")}catch(e){}
+  const st=syncState();
+  sync.user=st.token&&st.tgId?{uid:String(st.tgId),email:st.name||String(st.tgId)}:null;
+  sync.version=Number(st.version)||0;
+  fillSettingsSync();
+  if(!sync.user){sync.ready=false;stopSyncTimers();setSyncStatus("☁️ برای همگام‌سازی به ربات وصل شوید");return}
+  if(sync.timer)return;
+  sync.ready=true;
+  setSyncStatus("در حال اتصال به سرور...");
+  await hydrateSync();
+  rescheduleAllNativeReminders().catch(console.error);
+  if(!sync.ready)return;
+  sync.timer=setInterval(syncTick,SYNC_POLL_MS);
+  if(!sync.listeners){sync.listeners=true;document.addEventListener("visibilitychange",()=>{if(!document.hidden&&sync.ready)syncTick()})}
 }
 function dataSummary(d){return `حساب ${fa(d.accounts?.length||0)} • تراکنش ${fa(d.transactions?.length||0)} • افراد ${fa(d.people?.length||0)} • یادداشت ${fa(d.notes?.length||0)}`}
 function deviceId(){let id=localStorage.getItem(DEVICE_ID_KEY);if(!id){id=uid();localStorage.setItem(DEVICE_ID_KEY,id)}return id}
-async function updateDevicePresence(){if(!sync.user||!sync.db)return false; try{await cloudDoc().collection("devices").doc(deviceId()).set({deviceId:deviceId(),lastSeen:new Date().toISOString(),userAgent:navigator.userAgent.slice(0,120)}, {merge:true}); return true}catch(e){console.warn("presence",e);return false}}
-async function verifyTwoPhoneConnection(manual=false){if(!sync.user||!sync.db){if(manual)setSyncStatus("⚠️ ابتدا با حساب همگام‌سازی وارد شوید");return false} try{await updateDevicePresence(); const snap=await cloudDoc().collection("devices").get(); const now=Date.now(); const others=snap.docs.map(d=>d.data()).filter(x=>x.deviceId!==deviceId()&&x.lastSeen&&(now-new Date(x.lastSeen).getTime())<=DEVICE_PRESENCE_MS); setSyncStatus(others.length?`📱 ${fa(others.length)} گوشی دیگر متصل است • همگام‌سازی فعال`:"📱 گوشی دوم در ۴۵ ثانیه اخیر دیده نشد • در حال بررسی مجدد"); if(others.length)logEvent("بررسی اتصال دو گوشی",`گوشی دیگر فعال است (${others.length})`,"sync",false); return !!others.length}catch(e){setSyncStatus("⚠️ بررسی اتصال دو گوشی ناموفق بود: "+(e.code||e.message));return false}}
-function startDevicePresence(){if(sync.presenceTimer)clearInterval(sync.presenceTimer); updateDevicePresence(); sync.presenceTimer=setInterval(()=>{if(sync.user)verifyTwoPhoneConnection(false)},DEVICE_PRESENCE_INTERVAL)}
-const FIREBASE_SDK_URLS=["https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js","https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js","https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"];
-const FIREBASE_LOAD_TIMEOUT_MS=9000;
-function withTimeout(promise,ms,msg){return Promise.race([promise,new Promise((_,rej)=>setTimeout(()=>rej(new Error(msg)),ms))])}
-function loadScriptOnce(src){return new Promise((resolve,reject)=>{if([...document.scripts].some(s=>s.src===src)){resolve();return}const s=document.createElement("script");s.src=src;s.onload=()=>resolve();s.onerror=()=>reject(new Error("script load failed: "+src));document.head.appendChild(s)})}
-let firebaseLoadPromise=null;
-async function ensureFirebaseLoaded(){
-  if(window.firebase)return true;
-  if(!navigator.onLine)return false;
-  if(!firebaseLoadPromise){
-    firebaseLoadPromise=(async()=>{for(const url of FIREBASE_SDK_URLS){await withTimeout(loadScriptOnce(url),FIREBASE_LOAD_TIMEOUT_MS,"سرور Firebase در زمان مناسب پاسخ نداد (احتمال فیلترشدن gstatic.com)")}})()
-      .catch(e=>{console.warn("firebase sdk load failed",e);firebaseLoadPromise=null;throw e});
-  }
-  try{await firebaseLoadPromise;return !!window.firebase}catch(e){sync.lastLoadError=e.message||String(e);return false}
-}
-async function initSync(){
-  const cfg=syncConfig();if(!cfg)return;
-  if(!window.firebase){const ok=await ensureFirebaseLoaded().catch(()=>false);if(!ok)return}
-  try{
-    if(!sync.app)sync.app=firebase.apps.length?firebase.app():firebase.initializeApp(cfg);
-    sync.auth=firebase.auth();sync.db=firebase.firestore();
-    try{sync.db.settings({ignoreUndefinedProperties:true})}catch(e){}
-    if(sync.authListener)return;
-    sync.authListener=true;
-    sync.auth.onAuthStateChanged(async user=>{
-      sync.user=user;fillSettingsSyncEmail();
-      if(sync.timer)clearInterval(sync.timer);if(sync.unsubscribe){sync.unsubscribe();sync.unsubscribe=null}
-      if(!user){sync.ready=false;if(sync.presenceTimer)clearInterval(sync.presenceTimer);setSyncStatus("☁️ برای همگام‌سازی وارد شوید");return}
-      sync.ready=true;await hydrateSync();await rescheduleAllNativeReminders();startDevicePresence();await verifyTwoPhoneConnection(false);
-      sync.unsubscribe=recordsCollection().onSnapshot(snap=>{
-        if(sync.hydrating)return;
-        const remote=snap.docs.map(d=>d.data());
-        if(mergeCloud(remote)){persistLocal();render();syncSave();syncAllNotesToReminders().catch(console.error);syncAllPeopleToReminders().catch(console.error);rescheduleAllNativeReminders().catch(console.error)}
-        setSyncStatus("☁️ آنلاین • همگام‌سازی لحظه‌ای")
-      },e=>setSyncStatus("⚠️ همگام‌سازی: "+(e.code||e.message)));
-      sync.timer=setInterval(syncTick,SYNC_INTERVAL);
-    });
-  }catch(e){console.error(e);setSyncStatus("⚠️ تنظیمات Firebase نامعتبر است")}
-}
-async function syncSave(){
-  if(!sync.ready||!sync.user||sync.hydrating)return;
-  sync.queued=true;if(sync.saving)return;sync.saving=true;
-  while(sync.queued){sync.queued=false;try{await pushRest();setSyncStatus("☁️ ذخیره ابری انجام شد — "+dataSummary(data)); logEvent("همگام‌سازی ابری","ذخیره تغییرات در ابر","sync",false)}catch(e){console.error(e);setSyncStatus("⚠️ ذخیره ابری انجام نشد: "+(e.code||"")+" "+e.message)}}
-  sync.saving=false;
-}
-async function pushToCloud(){
-  if(!sync.user){if(!await ensureSyncReady())return;if(!sync.user)return alert("اول با حساب همگام‌سازی وارد شو");}
-  try{
-   // Manual send is a MERGE, not a replace: first fetch the latest shared
-   // records, merge them with this phone, then upload the unified dataset.
-   const remote=await pullRest();
-   mergeCloud(remote||[]);
-   persistLocal();
-   markAllLocalDirty();
-   await pushRest();
-   setSyncStatus("☁️ اطلاعات دو گوشی با هم ادغام و ذخیره شد — "+dataSummary(data));
-   alert("ارسال و ادغام با موفقیت انجام شد\n"+dataSummary(data));
-  }catch(e){alert("ارسال ناموفق: "+(e.code||'')+"\n"+e.message)}
-}
-async function pullFromCloud(){
-  if(!sync.user){if(!await ensureSyncReady())return;if(!sync.user)return alert("اول با حساب همگام‌سازی وارد شو");}
-  try{
-    const remote=await pullRest();
-    if(!remote||!remote.length)return alert("هنوز اطلاعاتی در ابر وجود ندارد");
-    mergeCloud(remote);persistLocal();render();setSyncStatus("☁️ اطلاعات از ابر دریافت شد — "+dataSummary(data));alert("اطلاعات ابری دریافت شد\n"+dataSummary(data));
-  }catch(e){alert("دریافت ناموفق: "+(e.code||'')+"\n"+e.message)}
-}
-function openSyncSettings(){
- const c=syncConfig()||{};
- openModal(`<h2>☁️ اتصال دو گوشی</h2><div class="form">
- <p class="hint">ایمیل و رمز یکسان را روی هر دو گوشی استفاده کن. بعد از ورود، اطلاعات موجود در ابر خودکار دریافت می‌شود.</p>
- <input id="fbApiKey" placeholder="apiKey" value="${esc(c.apiKey||"")}">
- <input id="fbAuthDomain" placeholder="authDomain" value="${esc(c.authDomain||"")}">
- <input id="fbProjectId" placeholder="projectId" value="${esc(c.projectId||"")}">
- <input id="fbStorageBucket" placeholder="storageBucket (اختیاری)" value="${esc(c.storageBucket||"")}">
- <input id="fbAppId" placeholder="appId" value="${esc(c.appId||"")}">
- <hr><input id="syncEmail" type="email" placeholder="ایمیل حساب مشترک" autocomplete="username">
- <input id="syncPass" type="password" placeholder="رمز حساب مشترک" autocomplete="current-password">
- <button class="primary" onclick="saveSyncSettings()">ذخیره و اتصال</button>
- <button onclick="createSyncAccount()">ساخت حساب همگام‌سازی</button>
- <button onclick="logoutSync()">خروج از حساب</button>
- </div>`);
-}
-async function saveSyncSettings(){
- const cfg={apiKey:$('fbApiKey').value.trim(),authDomain:$('fbAuthDomain').value.trim(),projectId:$('fbProjectId').value.trim(),storageBucket:$('fbStorageBucket').value.trim(),appId:$('fbAppId').value.trim()};
- if(!cfg.apiKey||!cfg.authDomain||!cfg.projectId||!cfg.appId)return alert("apiKey، authDomain، projectId و appId لازم است");
- localStorage.setItem(SYNC_KEY,JSON.stringify(cfg));
- try{await initSync();const email=$('syncEmail').value.trim(),pass=$('syncPass').value;if(email&&pass){await sync.auth.signInWithEmailAndPassword(email,pass);alert("اتصال و ورود انجام شد")}else alert("تنظیمات ذخیره شد؛ ایمیل و رمز را هم وارد کن تا وارد شوی");closeModal()}catch(e){alert("اتصال ناموفق: "+e.message)}}
-async function createSyncAccount(){
- const email=$('syncEmail')?.value.trim(),pass=$('syncPass')?.value;if(!email||!pass)return alert("ایمیل و رمز را وارد کن");
- const cfg={apiKey:$('fbApiKey').value.trim(),authDomain:$('fbAuthDomain').value.trim(),projectId:$('fbProjectId').value.trim(),storageBucket:$('fbStorageBucket').value.trim(),appId:$('fbAppId').value.trim()};
- if(!cfg.apiKey||!cfg.authDomain||!cfg.projectId||!cfg.appId)return alert("اول اطلاعات Firebase را کامل کن");
- localStorage.setItem(SYNC_KEY,JSON.stringify(cfg));
- try{await initSync();await sync.auth.createUserWithEmailAndPassword(email,pass);alert("حساب ساخته شد. همین ایمیل و رمز را روی گوشی دوم هم استفاده کن.")}catch(e){alert("ساخت حساب ناموفق: "+e.message)}}
-async function ensureSyncReady(){
- const cfg=syncConfig();
- if(!cfg||!cfg.apiKey||!cfg.authDomain||!cfg.projectId||!cfg.appId){alert("اول یک‌بار «تنظیم اتصال Firebase» را باز کن و اطلاعات Firebase را وارد کن.");return false}
- await initSync();
- if(!sync.auth){alert("اتصال به سرویس همگام‌سازی برقرار نشد.\nاحتمال زیاد سرورهای گوگل (gstatic.com / firebaseapp.com) روی این اینترنت در دسترس نیستند.\nیک VPN را روشن کن و دوباره امتحان کن."+(sync.lastLoadError?"\n\nجزئیات: "+sync.lastLoadError:""));return false}
- return true;
-}
-function fillSettingsSyncEmail(){const e=$("settingsSyncEmail");if(e&&sync.user)e.value=sync.user.email||""}
-async function loginFromSettings(){
- const email=$("settingsSyncEmail")?.value.trim(), pass=$("settingsSyncPass")?.value;
- if(!email||!pass)return alert("ایمیل و رمز را وارد کن");
- if(!await ensureSyncReady())return;
- try{await sync.auth.signInWithEmailAndPassword(email,pass);alert("ورود با موفقیت انجام شد؛ همگام‌سازی فعال شد");logEvent("ورود به حساب همگام‌سازی",email,"auth");$("settingsSyncPass").value="";setSyncStatus("☁️ همگام‌سازی فعال است")}
- catch(e){alert("ورود ناموفق: "+(e.message||e))}
-}
-async function createFromSettings(){
- const email=$("settingsSyncEmail")?.value.trim(), pass=$("settingsSyncPass")?.value;
- if(!email||!pass)return alert("ایمیل و رمز را وارد کن");
- if(pass.length<6)return alert("رمز باید حداقل ۶ کاراکتر باشد");
- if(!await ensureSyncReady())return;
- try{await sync.auth.createUserWithEmailAndPassword(email,pass);alert("حساب ساخته شد و همگام‌سازی فعال است. همین ایمیل و رمز را روی گوشی دوم وارد کن.");logEvent("ساخت حساب همگام‌سازی",email,"auth");$("settingsSyncPass").value="";setSyncStatus("☁️ همگام‌سازی فعال است")}
- catch(e){alert("ساخت حساب ناموفق: "+(e.message||e))}
-}
-async function logoutSync(){try{const email=sync.user?.email||"";await sync.auth?.signOut();alert("از حساب همگام‌سازی خارج شد");logEvent("خروج از حساب همگام‌سازی",email,"auth")}catch(e){alert(e.message)}}
 
 function normalize(s){return String(s||"").replace(/[۰-۹]/g,d=>"۰۱۲۳۴۵۶۷۸۹".indexOf(d)).replace(/[٬،]/g,",").replace(/\s+/g," ").trim()}
 function parseMoney(v){return Number(toEnDigits(String(v)).replace(/[^\d]/g,""))||0}
@@ -1009,10 +1072,10 @@ function showWhatsNewOnce(){
   <div class="whats-new-section">
    <h3>🛠 تغییرات این نسخه</h3>
    <ul>
-    <li>💾 ذخیره‌سازی اطلاعات کاملاً بازنویسی و آزمایش شد: تراکنش‌ها، فاکتورها و همه‌ی تنظیمات (رمز ورود، زبان، مهر و امضا) اکنون با هم و به‌صورت اتمیک در IndexedDB ذخیره می‌شوند.</li>
-    <li>🔁 انتقال از نسخه‌های قبلی امن است: نسخه‌ی قدیمی فقط بعد از تأیید خواندن‌مجدد پاک می‌شود.</li>
-    <li>🔔 «پشتیبان خودکار» به «یادآوری پشتیبان‌گیری» تبدیل شد؛ چون بکاپ رمزنگاری‌شده بدون رمز شما ساخته نمی‌شود، اگر بیش از ۷ روز پشتیبان نگرفته باشی یادآوری می‌شوی.</li>
-    <li>🧾 رفع خطاهایی که با هر ذخیره پیام «حافظه پر است» می‌دادند یا صفحه تنظیمات را از کار می‌انداختند.</li>
+    <li>🤖 همگام‌سازی دو گوشی حالا با ربات تلگرام انجام می‌شود (Firebase حذف شد): در تنظیمات ← همگام‌سازی، کد ۶ رقمی ربات را وارد کن.</li>
+     <li>🔐 اطلاعات قبل از ارسال روی خود گوشی با «رمز همگام‌سازی» رمزنگاری می‌شود؛ روی هر دو گوشی باید همان رمز را وارد کنی.</li>
+     <li>📴 در حالت آفلاین تغییرات می‌مانند و بعد از وصل شدن اینترنت خودکار ارسال می‌شوند؛ وضعیت بالای صفحه نمایش داده می‌شود.</li>
+     <li>🗑 رفع ایراد: حذف یک رکورد حالا همیشه به گوشی دیگر می‌رسد و رکورد دوباره برنمی‌گردد.</li>
    </ul>
   </div>
   <div class="whats-new-section">
@@ -1319,8 +1382,8 @@ window.addEventListener("popstate",()=>{performBack();armBackTrap()});
 })();
 
 function touch(r){r.revision=Math.max(0,Number(r.revision)||0)+1;r.updatedAt=new Date().toISOString();r.updatedBy=sync.user?.uid||deviceId();r.deviceId=deviceId();return r}
-function markDeleted(type,id){data._sync??={tombstones:{}};data._sync.tombstones??={};data._sync.tombstones[type]??={};const dt=new Date().toISOString();const revision=Number(data._sync.tombstoneRevisions?.[type]?.[id]||0)+1;data._sync.tombstoneRevisions??={};data._sync.tombstoneRevisions[type]??={};data._sync.tombstoneRevisions[type][id]=revision;data._sync.tombstones[type][id]=dt;markDirty(type,id,true,{id,revision,updatedAt:dt,updatedBy:sync.user?.uid||deviceId(),deviceId:deviceId()},dt)}
-function removeRecord(type,id){const i=data[type].findIndex(x=>x.id===id);if(i<0)return;data[type].splice(i,1);markDeleted(type,id);save()}
+function markDeleted(type,id,prevRevision=0){data._sync??={tombstones:{}};data._sync.tombstones??={};data._sync.tombstones[type]??={};const dt=new Date().toISOString();const revision=Math.max(Number(data._sync.tombstoneRevisions?.[type]?.[id]||0),Number(prevRevision)||0)+1;data._sync.tombstoneRevisions??={};data._sync.tombstoneRevisions[type]??={};data._sync.tombstoneRevisions[type][id]=revision;data._sync.tombstones[type][id]=dt;markDirty(type,id,true,{id,revision,updatedAt:dt,updatedBy:sync.user?.uid||deviceId(),deviceId:deviceId()},dt)}
+function removeRecord(type,id){const i=data[type].findIndex(x=>x.id===id);if(i<0)return;const rv=data[type][i].revision;data[type].splice(i,1);markDeleted(type,id,rv);save()}
 function accountSelect(id="acc",selected=""){return `<select id="${id}">${data.accounts.map(a=>`<option value="${a.id}" ${a.id===selected?"selected":""}>${esc(a.name)}${a.bank?" • "+esc(a.bank):""}</option>`).join("")}</select>`}
 function openAccount(id=null){const a=id&&data.accounts.find(x=>x.id===id);openModal(`<h2>${a?"ویرایش حساب":"افزودن حساب"}</h2><div class="form"><input id="an" placeholder="نام حساب" value="${esc(a?.name||"")}"><input id="bank" placeholder="نام بانک" value="${esc(a?.bank||"")}"><input id="sender" placeholder="شماره فرستنده پیامک بانک" value="${esc(a?.sender||"")}"><input id="card" placeholder="شماره کارت (اختیاری)" value="${esc(a?.card||"")}"><input id="ab" type="text" inputmode="numeric" class="amt-input" placeholder="موجودی اولیه" value="${fmtAmtValue(a?.balance)}"><button class="primary" onclick="saveAccount('${a?.id||""}')">${a?"ذخیره تغییرات":"ذخیره"}</button></div>`)}
 function saveAccount(id){if(!$("an").value.trim())return alert("نام حساب را وارد کنید");const o={name:$("an").value.trim(),bank:$("bank").value.trim(),sender:$("sender").value.trim(),card:$("card").value.trim(),balance:parseMoney($("ab").value)||0};if(id){const a=data.accounts.find(x=>x.id===id);Object.assign(a,o);touch(a);markDirty("accounts",a.id,false,a,a.updatedAt)}else{const a=touch({id:uid(),...o});data.accounts.push(a);markDirty("accounts",a.id,false,a,a.updatedAt)}save();logEvent(id?"ویرایش حساب":"ایجاد حساب",o.name,id?"edit":"create");closeModal()}
@@ -3008,7 +3071,7 @@ async function drawInvoiceCanvas(inv,scale=1){
  * embedding the already-rendered invoice canvas as a JPEG image inside
  * a minimal hand-written PDF structure. No external library or network
  * request is needed (kept fully offline, and avoids depending on a CDN
- * that may be filtered — see the gstatic/Firebase note above), and all
+ * that may be filtered), and all
  * the Persian text is already rasterized into the image so there is no
  * font-embedding problem. */
 function uint8ToBase64(bytes){
@@ -3564,19 +3627,26 @@ async function readBackupFile(file){
  throw new Error("empty-backup");
 }
 async function replaceCloudAfterRestore(){
- if(!sync.user||!sync.db)return;
- const restoreAt=new Date().toISOString();
- const ks=["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats","audit"];
- // A file restore is authoritative. Give every restored record a fresh timestamp so
- // an older pending change on the other phone cannot win the timestamp merge later.
- for(const k of ks){for(const r of (data[k]||[])){r.updatedAt=restoreAt;r.updatedBy=sync.user.uid}}
- data._sync??={tombstones:{}};data._sync.tombstones??={};
- for(const k of ks){for(const id of Object.keys(data._sync.tombstones?.[k]||{}))data._sync.tombstones[k][id]=restoreAt}
- persistLocal();
- const col=recordsCollection(),snap=await col.get(),localMap=new Map(recordsFromLocal().map(x=>[x.id,x]));
- for(let i=0;i<snap.docs.length;i+=450){const batch=sync.db.batch();for(const d of snap.docs.slice(i,i+450)){if(!localMap.has(d.id))batch.delete(d.ref)}await batch.commit()}
- const all=recordsFromLocal();sync.dirty.clear();await commitChunks(all);
- await sync.db.collection("users").doc(sync.user.uid).set({appVersion:APP_VERSION,lastRestoreAt:restoreAt,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+  if(!sync.user)return;
+  const restoreAt=new Date().toISOString();
+  // بازیابی از فایل، مرجع نهایی است: به همه‌ی رکوردها زمان تازه بده تا تغییر قدیمیِ گوشی دیگر برنده نشود.
+  for(const k of SYNC_KEYS){for(const r of (data[k]||[])){r.updatedAt=restoreAt;r.updatedBy=sync.user.uid}}
+  data._sync??={tombstones:{}};data._sync.tombstones??={};
+  for(const k of SYNC_KEYS){for(const id of Object.keys(data._sync.tombstones?.[k]||{}))data._sync.tombstones[k][id]=restoreAt}
+  data._sync.epoch=restoreAt;
+  persistLocal();
+  sync.dirty.clear();
+  try{
+    // جایگزینی کامل (بدون ادغام) روی سرور؛ گوشی دیگر با «epoch» رکوردهای قدیمی خودش را کنار می‌گذارد.
+    const m=await syncApi("/api/meta");if(m.status===200)sync.version=Number(m.body.version)||0;
+    for(let i=0;i<3;i++){
+      const r=await syncApi("/api/sync","PUT",{baseVersion:sync.version,blob:await encryptSnapshot()});
+      if(r.status===200){sync.version=Number(r.body.version)||sync.version;saveSyncState({version:sync.version,lastSync:Date.now()});return}
+      if(r.status===409){sync.version=Number(r.body.version)||sync.version;continue}
+      break;
+    }
+    markAllLocalDirty();
+  }catch(e){markAllLocalDirty();handleSyncError(e)}
 }
 async function importData(e){
  const input=e?.target,file=input?.files?.[0];if(!file)return;const finish=()=>{if(input)input.value=""};
@@ -3606,16 +3676,14 @@ async function importData(e){
    data=JSON.parse(JSON.stringify(restored));data=migrateData(data);normalizeData();Object.assign(data,previousLock);data.audit??=[];data.notes??=[];
    // Mark the restore as a complete replacement locally before any async work.
    persistLocal();render();
-   if(sync.unsubscribe){sync.unsubscribe();sync.unsubscribe=null}
    sync.dirty.clear();
-   if(sync.user&&sync.db)await replaceCloudAfterRestore();
+   if(sync.user)await replaceCloudAfterRestore();
    // Verify the exact restored collections, not just two arrays.
    for(const k of ["accounts","transactions","people","customers","products","reminders","notes","checks","invoices","expenseCats","incomeCats"]){if(!Array.isArray(data?.[k]))throw new Error("storage-verification-failed:"+k)}
    normalizeData();render();persistLocal();
    logEvent("بازیابی اطلاعات","پشتیبان وارد شد و اطلاعات روی این گوشی جایگزین شد","settings");persistLocal();
   }finally{
    sync.hydrating=wasHydrating;
-   if(sync.user&&sync.db&&!sync.unsubscribe){sync.unsubscribe=recordsCollection().onSnapshot(snap=>{if(sync.hydrating)return;const remote=snap.docs.map(d=>d.data());if(mergeCloud(remote)){persistLocal();render();syncSave()}setSyncStatus("☁️ آنلاین • همگام‌سازی لحظه‌ای")},err=>setSyncStatus("⚠️ همگام‌سازی: "+(err.code||err.message)))}
   }
   finish();alert("بازیابی با موفقیت انجام شد. اطلاعات فایل پشتیبان روی این گوشی جایگزین شد.");
  }catch(err){finish();console.error("backup restore",err);
@@ -3651,4 +3719,4 @@ function clearData(){if(confirm("همه اطلاعات حذف شود؟")){const 
   storageReady=true;
   normalizeData();ensureCashAccount();
   if(_persistDeferred){_persistDeferred=false;persistLocal()}
-  normalizeData();purgeOldTrash();setupReminderNotificationActions();applyAccentThemeOnLoad();await migratePinSecurity();showLock();render();applyDashboardConfig();applyAppMode();renderBrandingInSettings();try{const rid=new URLSearchParams(location.search).get("reminder");if(rid)setTimeout(()=>{const rr=(data.reminders||[]).find(x=>x.id===rid);if(rr?.sourcePersonId)openPerson(rr.sourcePersonId);else if(rr)openReminder(rr.id)},500)}catch(e){}renderSettingsFeatures();applyLanguage();maybeBackupReminder();processRecurringTransactions();logEvent("اجرای برنامه","برنامه حسابدار اجرا شد","system");await initSync();if(!sync.auth){[4000,12000,30000].forEach(ms=>setTimeout(()=>{if(!sync.auth)initSync()},ms))}syncAllNotesToReminders().catch(console.error);syncAllChecksToReminders().catch(console.error);syncAllPeopleToReminders().catch(console.error);rescheduleAllNativeReminders().catch(console.error);startUpdateChecker();startReminderChecker();if(!hasLockCode())setTimeout(showWhatsNewOnce,320);})();
+  normalizeData();purgeOldTrash();setupReminderNotificationActions();applyAccentThemeOnLoad();await migratePinSecurity();showLock();render();applyDashboardConfig();applyAppMode();renderBrandingInSettings();try{const rid=new URLSearchParams(location.search).get("reminder");if(rid)setTimeout(()=>{const rr=(data.reminders||[]).find(x=>x.id===rid);if(rr?.sourcePersonId)openPerson(rr.sourcePersonId);else if(rr)openReminder(rr.id)},500)}catch(e){}renderSettingsFeatures();applyLanguage();maybeBackupReminder();processRecurringTransactions();logEvent("اجرای برنامه","برنامه حسابدار اجرا شد","system");await initSync();syncAllNotesToReminders().catch(console.error);syncAllChecksToReminders().catch(console.error);syncAllPeopleToReminders().catch(console.error);rescheduleAllNativeReminders().catch(console.error);startUpdateChecker();startReminderChecker();if(!hasLockCode())setTimeout(showWhatsNewOnce,320);})();

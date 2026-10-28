@@ -4,10 +4,10 @@
 
 ## وضعیت انتشار
 
-- Release: `pro1.11` (schema 5)
-- Package version: `1.0.0-pro1.11`
+- Release: `pro1.12` (schema 5)
+- Package version: `1.0.0-pro1.12`
 - Storage اصلی: IndexedDB با ذخیره اتمیک snapshot
-- Cloud sync: اختیاری، با Firebase Authentication + Firestore Rules
+- Cloud sync: اختیاری، با ربات تلگرام + Cloudflare Worker (پوشه‌ی `server/`)
 - Android: Capacitor 7 + Java 17 در CI
 - Artifactهای build در repository نگهداری نمی‌شوند.
 
@@ -37,11 +37,11 @@ npx playwright install --with-deps chromium
 npm run test:browser
 ```
 
-## Firebase / همگام‌سازی
+## همگام‌سازی (ربات تلگرام + Cloudflare Worker)
 
-تنظیمات Firebase در repository به‌صورت credential یا API secret نگهداری نمی‌شوند. کاربر تنظیمات Web App را از داخل برنامه وارد می‌کند و اطلاعات در storage محلی تنظیمات نگهداری می‌شود.
+سرور در `server/worker.js` است و راهنمای نصب در `server/README-fa.md`. هیچ توکن یا کلیدی داخل repository نیست؛ توکن ربات فقط در Secretهای Cloudflare می‌ماند و آدرس سرور و رمز همگام‌سازی از داخل برنامه وارد می‌شود.
 
-قوانین Firestore فقط اجازه دسترسی کاربر به `users/{uid}` و زیرمجموعه‌های خودش را می‌دهند و payload رکوردها از نظر نام فیلد، نوع داده و اندازه محدود شده است.
+هر گوشی با کد ۶ رقمی یک‌بارمصرفِ ربات وصل می‌شود، رکوردها روی گوشی رمزنگاری می‌شوند و سرور فقط متن رمزشده نگه می‌دارد. پنل مدیریت (تایید/مسدود کردن کاربر، قطع گوشی) روی `/admin` همان Worker است.
 
 ## Storage و Backup
 
@@ -57,7 +57,7 @@ npm run test:browser
 - `business`: امکانات کامل کسب‌وکاری
 - `store`: حالت فروشگاه/کیوسک محدود با رمز مدیر جداگانه
 
-قفل حالت فروشگاه صرفاً محدودکننده UI/رفتار سمت کلاینت است و نباید به‌عنوان مرز امنیتی سرور یا کنترل دسترسی Firestore در نظر گرفته شود.
+قفل حالت فروشگاه صرفاً محدودکننده UI/رفتار سمت کلاینت است و نباید به‌عنوان مرز امنیتی سرور در نظر گرفته شود.
 
 ## PWA و Offline
 
@@ -119,7 +119,7 @@ npm run test:browser
 ## V4 — نصب و آموزش سریع
 
 1. اجرای محلی: `python3 -m http.server 8080` و باز کردن `http://localhost:8080` (PWA نیاز به HTTP دارد).
-2. انتشار: همه‌ی فایل‌ها را روی هر هاست استاتیک (GitHub Pages، Netlify، Firebase Hosting) بگذارید.
+2. انتشار: همه‌ی فایل‌ها را روی هر هاست استاتیک (GitHub Pages، Netlify و ...) بگذارید.
 3. به‌روزرسانی از نسخه‌ی قبل: فایل‌ها را جایگزین کنید و برنامه را باز کنید. اطلاعات قبلی حفظ می‌شود؛ پیش از ارتقای ساختار، «نسخه‌ی ایمنی» ساخته می‌شود (منو ← امکانات جامع مالی ← پشتیبان‌گیری و بازیابی).
 4. تست: `npm run validate && npm test && npm run test:v4` (برای `test:v4` و `test:browser` باید `npm i -D playwright && npx playwright install chromium`).
 
@@ -131,4 +131,4 @@ npm run test:browser
 - `src/v4/v4-ui.js` — اتصال به منو، داشبورد، تنظیمات و `render()`.
 - `src/v4/v4.css` — استایل. `tests/v4*.{mjs}` — تست‌ها.
 
-Firebase: نیازی به Backend جدید نیست. قوانین `firestore.rules` بدون تغییر است (داده‌ی V4 هنوز sync نمی‌شود).
+همگام‌سازی: داده‌ی V4 (بودجه، اهداف و ...) هنوز sync نمی‌شود.
