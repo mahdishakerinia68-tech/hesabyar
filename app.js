@@ -888,7 +888,14 @@ function fillSettingsSync(){
 }
 const SYNC_PAIR_ERRORS={bad_code:"کد اشتباه است یا منقضی شده. در ربات /start بزن و کد تازه بگیر.",too_many_attempts:"تلاش‌های ناموفق زیاد بود؛ چند دقیقه بعد دوباره امتحان کن.",not_allowed:"دسترسی این حساب هنوز توسط مدیر تایید نشده است.",device_limit:"تعداد گوشی‌های متصل به سقف رسیده. در ربات /devices و /revoke را بزن."};
 async function connectFromSettings(){
-  const server=($("settingsSyncServer")?.value||"").trim().replace(/\/+$/,"");
+  // آدرس را آزادانه بپذیر: با /admin یا مسیر دیگر، بدون https://، با فاصله یا نویسه‌ی نامرئی؛ فقط origin نگه داشته می‌شود.
+  let rawServer=($("settingsSyncServer")?.value||"").replace(/[\s\u200c\u200e\u200f]/g,"");
+  if(rawServer&&!/^[a-z][a-z0-9+.-]*:\/\//i.test(rawServer))rawServer="https://"+rawServer;
+  let server="";
+  try{const u=new URL(rawServer);if(u.protocol==="https:"&&u.hostname.includes("."))server=u.origin}catch(e){}
+  if(!server)return alert("آدرس سرور خوانده نشد.\nآدرس Worker را از Cloudflare کپی کن؛ مثل:\nhttps://hesabyar-sync.xxxx.workers.dev");
+  if(!server.endsWith(".workers.dev"))return alert("فعلاً فقط آدرس‌های workers.dev پشتیبانی می‌شوند (برای دامنه‌ی شخصی باید CSP در index.html عوض شود).");
+  if($("settingsSyncServer"))$("settingsSyncServer").value=server;
   const code=toEnDigits($("settingsSyncCode")?.value||"").replace(/\D/g,"");
   const pass=$("settingsSyncPass")?.value||"";
   if(!/^https:\/\/[^\s/]+$/i.test(server))return alert("آدرس سرور باید با https:// شروع شود و مسیر نداشته باشد.\nمثل: https://hesabyar-sync.xxxx.workers.dev");
