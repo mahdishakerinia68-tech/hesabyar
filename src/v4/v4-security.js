@@ -68,7 +68,7 @@
       '<label class="v4-field"><span>قفل خودکار پس از بی‌فعالیتی</span><select id="v4-autolock">' + [[0, 'خاموش'], [1, '۱ دقیقه'], [5, '۵ دقیقه'], [10, '۱۰ دقیقه'], [30, '۳۰ دقیقه']].map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === m ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></label>' +
       '<button class="primary" type="button" onclick="V4Security.saveSettings()">ذخیره‌ی تنظیم قفل خودکار</button>' +
       (issues.length ? '<div class="hint">' + issues.slice(0, 4).map(function (i) { return V.esc(i.where + ': ' + i.msg); }).join('<br>') + '</div><button class="v4-btn danger" type="button" onclick="V4Security.repair()">ترمیم داده‌های V4 (با تأیید)</button>' : '') +
-      '<p class="hint">نکته‌ها: اطلاعات در حافظه‌ی IndexedDB همین دستگاه ذخیره می‌شود، نه به‌صورت متن ساده در localStorage. Backupها رمزنگاری‌شده‌اند. رمز پین/الگو فقط به‌صورت هش ذخیره می‌شود. همگام‌سازی Firebase فقط با ورود کاربر و قوانین Firestore محدودشده کار می‌کند.</p></div>');
+      '<p class="hint">نکته‌ها: اطلاعات در حافظه‌ی IndexedDB همین دستگاه ذخیره می‌شود، نه به‌صورت متن ساده در localStorage. Backupها رمزنگاری‌شده‌اند. رمز پین/الگو فقط به‌صورت هش ذخیره می‌شود. همگام‌سازی فقط با کد یک‌بارمصرف ربات تلگرام انجام می‌شود و داده‌ها قبل از ارسال با «رمز همگام‌سازی» رمزنگاری می‌شوند.</p></div>');
   };
   S.saveSettings = function () { S.setMinutes($('v4-autolock').value); last = Date.now(); root.closeModal(); if (root.V4UI) root.V4UI.flash('ذخیره شد ✓'); };
   S.repair = function () {

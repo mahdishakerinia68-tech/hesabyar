@@ -3,7 +3,7 @@
 (function (root) {
   'use strict';
   var V4 = root.V4 = root.V4 || {};
-  V4.VERSION = 'pro1.11.0';
+  V4.VERSION = 'pro1.12.0';
   V4.SCHEMA = 5;
   V4.SECTIONS = ['budgets', 'goals', 'savings', 'assets', 'shared', 'events'];
 
