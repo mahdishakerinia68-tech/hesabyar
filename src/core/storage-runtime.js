@@ -18,7 +18,7 @@
 
   var DB_NAME = 'hesabdar-v4';
   var DB_VERSION = 1;
-  var APP_VERSION = 'pro1.11';
+  var APP_VERSION = 'pro1.12';
   var MAX_SNAPSHOT_BYTES = 9 * 1024 * 1024;
   var RECORD_STORES = [
     'accounts', 'transactions', 'invoices', 'customers', 'products', 'people',
