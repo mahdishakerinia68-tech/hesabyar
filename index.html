@@ -26,7 +26,7 @@
     <button id="menuBtn" class="menu-trigger" aria-label="باز کردن منو" aria-haspopup="true" aria-expanded="false" aria-controls="menuModal">⋯</button>
     <img class="app-logo" src="logo.png" alt="حساب‌یار">
     <div class="top-bar-titles">
-      <h1>حساب‌یار <span class="version-pill" id="versionPill">pro1.12</span></h1>
+      <h1>حساب‌یار <span class="version-pill" id="versionPill">pro1.13</span></h1>
       <div id="syncBadge" class="sync-badge">☁️ آفلاین</div>
     </div>
   </div>
@@ -303,7 +303,8 @@
       </button>
       <div class="accordion-body">
         <div id="syncWho" class="hint">این گوشی هنوز وصل نیست.</div>
-        <input id="settingsSyncServer" type="url" inputmode="url" placeholder="آدرس سرور (https://….workers.dev)" autocomplete="off" dir="ltr">
+        <input id="settingsSyncServer" type="url" inputmode="url" placeholder="آدرس سرور (https://….workers.dev)" value="https://hesabyar-sync.mahdishakerinia112.workers.dev" autocomplete="off" dir="ltr">
+        <button type="button" class="primary" onclick="openSyncBot()">🤖 گرفتن کد از ربات تلگرام (@hesabyar1bot)</button>
         <input id="settingsSyncCode" type="text" inputmode="numeric" maxlength="8" placeholder="کد ۶ رقمی ربات (در ربات /start بزن)" autocomplete="one-time-code">
         <input id="settingsSyncPass" type="password" placeholder="رمز همگام‌سازی (حداقل ۸ کاراکتر؛ روی هر دو گوشی یکی)" autocomplete="new-password">
         <div class="settings-actions">
@@ -368,7 +369,7 @@
     </div>
 
   </div>
-  <p class="hint settings-footer">نسخه <span id="appVersionText">pro1.12</span> • پشتیبان رمزنگاری‌شده • اتصال دو گوشی • تقویم شمسی کامل</p>
+  <p class="hint settings-footer">نسخه <span id="appVersionText">pro1.13</span> • پشتیبان رمزنگاری‌شده • اتصال دو گوشی • تقویم شمسی کامل</p>
   <p class="hint">تغییرات روی این گوشی ذخیره می‌شود و در صورت اتصال به ربات تلگرام با گوشی دوم ادغام می‌گردد.</p>
 </section>
 
@@ -466,7 +467,7 @@
 <script src="src/v4/v4-ui.js"></script>
 <script>
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("sw.js?v=pro1.12", {
+  navigator.serviceWorker.register("sw.js?v=pro1.13", {
     updateViaCache: "none"
   }).catch(console.error);
 }

@@ -1,6 +1,6 @@
 const KEY="hesabdar-v35";
 const LEGACY_KEYS=["hesabdar-v40","hesabdar-v20","hesabdar-v11"];
-const APP_VERSION="pro1.12";
+const APP_VERSION="pro1.13";
 const AUTO_BACKUP_ENABLED_KEY="hesabdar-auto-backup-enabled-v2";
 const AUTO_BACKUP_MS=6*60*60*1000;
 const APP_MODE_KEY="hesabdar-app-mode-v1";
@@ -106,6 +106,9 @@ function openAppModeSheet(){
 const DEVICE_ID_KEY="hesabdar-device-id-v1";
 const SYNC_STATE_KEY="hesabdar-tgsync-v1";
 const SYNC_PASS_KEY="hesabdar-tgsync-pass-v1";
+/* pro1.13: آدرس پیش‌فرض سرور همگام‌سازی و ربات تلگرام برای گرفتن کد اتصال */
+const SYNC_DEFAULT_SERVER="https://hesabyar-sync.mahdishakerinia112.workers.dev";
+const SYNC_BOT_URL="https://t.me/hesabyar1bot";
 const SYNC_POLL_MS=20000;
 const SYNC_PUSH_DELAY_MS=15000;
 let sync={user:null,ready:false,busy:false,rerun:false,hydrating:false,saving:false,timer:null,pushTimer:null,listeners:false,version:0,lastErrorCode:"",dirty:new Map()};
@@ -658,7 +661,7 @@ const SYNC_KEYS=["accounts","transactions","people","customers","products","remi
 function syncErr(code,message){const e=new Error(message);e.code=code;return e}
 function syncState(){try{return JSON.parse(localStorage.getItem(SYNC_STATE_KEY)||"null")||{}}catch{return {}}}
 function saveSyncState(p){const s={...syncState(),...p};try{localStorage.setItem(SYNC_STATE_KEY,JSON.stringify(s))}catch(e){console.warn("sync state",e)}return s}
-function syncServer(){return String(syncState().server||"").trim().replace(/\/+$/,"")}
+function syncServer(){return String(syncState().server||SYNC_DEFAULT_SERVER).trim().replace(/\/+$/,"")}
 function syncPassword(){try{return localStorage.getItem(SYNC_PASS_KEY)||""}catch{return ""}}
 function stopSyncTimers(){if(sync.timer){clearInterval(sync.timer);sync.timer=null}if(sync.pushTimer){clearTimeout(sync.pushTimer);sync.pushTimer=null}}
 function syncDropLocal(msg){
@@ -880,16 +883,21 @@ function syncDeviceName(){
 }
 function fillSettingsSync(){
   const st=syncState();
-  const s=$("settingsSyncServer");if(s&&document.activeElement!==s)s.value=st.server||"";
+  const s=$("settingsSyncServer");if(s&&document.activeElement!==s)s.value=st.server||SYNC_DEFAULT_SERVER;
   const w=$("syncWho");
   if(w)w.textContent=st.token&&st.tgId?("✅ وصل به حساب تلگرام: "+(st.name||"")+" ("+st.tgId+")"):"این گوشی هنوز وصل نیست.";
   const pass=$("settingsSyncPass");if(pass&&st.token)pass.value="";
   const code=$("settingsSyncCode");if(code&&st.token)code.value="";
 }
 const SYNC_PAIR_ERRORS={bad_code:"کد اشتباه است یا منقضی شده. در ربات /start بزن و کد تازه بگیر.",too_many_attempts:"تلاش‌های ناموفق زیاد بود؛ چند دقیقه بعد دوباره امتحان کن.",not_allowed:"دسترسی این حساب هنوز توسط مدیر تایید نشده است.",device_limit:"تعداد گوشی‌های متصل به سقف رسیده. در ربات /devices و /revoke را بزن."};
+function openSyncBot(){
+  try{const w=window.open(SYNC_BOT_URL,"_blank","noopener");if(w)return}catch(e){}
+  location.href=SYNC_BOT_URL;
+}
 async function connectFromSettings(){
   // آدرس را آزادانه بپذیر: با /admin یا مسیر دیگر، بدون https://، با فاصله یا نویسه‌ی نامرئی؛ فقط origin نگه داشته می‌شود.
   let rawServer=($("settingsSyncServer")?.value||"").replace(/[\s\u200c\u200e\u200f]/g,"");
+  if(!rawServer)rawServer=SYNC_DEFAULT_SERVER;
   if(rawServer&&!/^[a-z][a-z0-9+.-]*:\/\//i.test(rawServer))rawServer="https://"+rawServer;
   let server="";
   try{const u=new URL(rawServer);if(u.protocol==="https:"&&u.hostname.includes("."))server=u.origin}catch(e){}
@@ -2303,12 +2311,12 @@ function notesWeekTableHTML(){
   const start=notesWeekStart(notesWeekOffset);
   const t=new Date();t.setHours(0,0,0,0);
   const j0=gregorianToJalali(start.getFullYear(),start.getMonth()+1,start.getDate());
-  const j6d=new Date(start.getTime()+6*86400000);
+  const j6d=new Date(start.getFullYear(),start.getMonth(),start.getDate()+6);
   const j6=gregorianToJalali(j6d.getFullYear(),j6d.getMonth()+1,j6d.getDate());
   const rangeLabel=`${toFaDigits(j0[2])} ${PERSIAN_MONTHS[j0[1]-1]} تا ${toFaDigits(j6[2])} ${PERSIAN_MONTHS[j6[1]-1]} ${toFaDigits(j6[0])}`;
   const rows=[];
   for(let i=0;i<7;i++){
-    const day=new Date(start.getTime()+i*86400000);
+    const day=new Date(start.getFullYear(),start.getMonth(),start.getDate()+i);
     const jd=gregorianToJalali(day.getFullYear(),day.getMonth()+1,day.getDate());
     const isToday=day.getTime()===t.getTime();
     /* v1.4 fix: وقتی همه‌ی آیتم‌های زیرمجموعه‌ی یک یادداشت تیک می‌خوردند (انجام
@@ -2319,7 +2327,7 @@ function notesWeekTableHTML(){
      * قبل همیشه نمایش داده می‌شوند. */
     const dayNotes=data.notes.filter(n=>{if(!noteOccursOnDay(n,day))return false;const items=n.items||[];if(items.length&&items.every(x=>x.done))return false;return true}).map(n=>({kind:"note",id:n.id,title:n.title,date:n.date,order:n.order??0}));
     const dayReminders=(data.reminders||[]).filter(r=>!r.sourceNoteId&&!r.sourcePersonId&&r.date&&reminderOccursOnDay(r,day)).map(r=>({kind:"reminder",id:r.id,title:r.title,date:r.date,order:r.order??0}));
-    const dayPeople=personDueItemsOnDay(day).map(pp=>({kind:"person",id:pp.id,title:pp.title,date:null,order:0,ptype:pp.type}));
+    const dayPeople=personDueItemsOnDay(day).map(pp=>({kind:"person",id:pp.id,title:pp.title,date:pp.date||null,order:0,ptype:pp.type}));
     /* اولویت‌بندی برنامه‌های هر روز بر اساس ساعت: هرچه زودتر، بالاتر؛ اگر ساعتی
        ثبت نشده باشد آخر لیست همان روز قرار می‌گیرد و ترتیب قبلی (order) حفظ می‌شود. */
     const dayItems=dayNotes.concat(dayReminders).concat(dayPeople).map(it=>{const d=it.date?localDateFromInput(it.date):null;return {...it,mins:d?d.getHours()*60+d.getMinutes():Infinity}}).sort((a,b)=>a.mins-b.mins||a.order-b.order);
@@ -2509,7 +2517,7 @@ async function syncAllChecksToReminders(){let changed=false;const checkIds=new S
  * قبل هر قسط را یک ماه بعد از قسط قبلی می‌گذارد) و برای هر کدام یک یادآوری
  * جدا ساخته می‌شود؛ اگر قسطی نباشد، همان یک سررسید کلی خبر می‌دهد. با
  * پرداخت هر قسط (یا تسویه‌ی کامل)، یادآوری همان مورد به‌خودی‌خود حذف می‌شود. */
-function personDueDateISO(dateStr){const d=localDateFromInput(dateStr);if(!d)return null;d.setHours(9,0,0,0);return d.toISOString()}
+function personDueDateISO(dateStr){const d=dueToDate(dateStr);if(!d)return null;if(!dueHasTime(dateStr))d.setHours(9,0,0,0);return d.toISOString()}
 async function upsertRemindersForPerson(p,renderAfter=true){
  if(!p?.id)return;
  const linked=(data.reminders||[]).filter(x=>x.sourcePersonId===p.id);
@@ -2545,14 +2553,35 @@ function openWeeklyPerson(id){
  if(p.installments?.items?.length){openInstallments(id);return;}
  openPerson(id);
 }
+/* pro1.13: تاریخ سررسید بدهی/قسط به هر شکلی که ذخیره شده باشد خوانده می‌شود:
+ * «YYYY-MM-DD»، ISO با ساعت، تاریخ شمسی («۱۴۰۵/۰۷/۰۴» با ارقام فارسی) یا شمسی همراه ساعت.
+ * قبلاً رشته‌ی شمسی با new Date() به سال ۱۴۰۵ میلادی می‌رفت و آن بدهی در هیچ هفته‌ای دیده نمی‌شد؛
+ * و مقدار دارای ساعت/منطقه‌ی زمانی هم ممکن بود یک روز جابه‌جا شود. */
+function dueToDate(v){
+ if(!v)return null;
+ if(v instanceof Date)return Number.isNaN(v.getTime())?null:v;
+ const raw=toEnDigits(String(v)).trim();
+ const m=raw.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})(?:[T\s]+(\d{1,2}):(\d{2}))?/);
+ if(m&&+m[1]<1700){const g=jalaliToGregorian(+m[1],+m[2],+m[3]);return new Date(g[0],g[1]-1,g[2],m[4]?+m[4]:12,m[5]?+m[5]:0,0,0)}
+ return localDateFromInput(raw);
+}
+function dueHasTime(v){return /[T\s]\d{1,2}:\d{2}/.test(toEnDigits(String(v||"")))}
 function personDueItemsOnDay(day){
  const y=day.getFullYear(),m=day.getMonth(),d=day.getDate();
  const out=[];
  for(const p of data.people||[]){
+  if(!p||typeof p!=="object")continue;
   const wanted=[];
-  if(p.installments?.items?.length){for(const it of p.installments.items){if(!it.paid&&it.due)wanted.push({due:it.due,amount:it.amount})}}
+  if(p.installments?.items?.length){for(const it of p.installments.items){if(it&&!it.paid&&(it.due||p.due))wanted.push({due:it.due||p.due,amount:it.amount})}}
   else if(p.due){const remaining=Math.max(0,(Number(p.amount)||0)-(Number(p.paid)||0));if(remaining>0)wanted.push({due:p.due,amount:remaining})}
-  for(const w of wanted){const dd=localDateFromInput(w.due);if(!dd||Number.isNaN(dd.getTime()))continue;if(dd.getFullYear()===y&&dd.getMonth()===m&&dd.getDate()===d)out.push({id:p.id,title:`${p.name} • ${money(w.amount)}`,type:p.type})}
+  for(const w of wanted){
+   const dd=dueToDate(w.due);if(!dd||Number.isNaN(dd.getTime()))continue;
+   if(dd.getFullYear()===y&&dd.getMonth()===m&&dd.getDate()===d){
+    const pad=n=>String(n).padStart(2,"0");
+    const date=dueHasTime(w.due)?`${dd.getFullYear()}-${pad(dd.getMonth()+1)}-${pad(dd.getDate())}T${pad(dd.getHours())}:${pad(dd.getMinutes())}`:null;
+    out.push({id:p.id,title:`${p.name} • ${money(w.amount)}`,type:p.type,date});
+   }
+  }
  }
  return out;
 }

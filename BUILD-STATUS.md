@@ -1,8 +1,8 @@
-# Build verification — pro1.12
+# Build verification — pro1.13
 
 ## اجرا و پاس‌شده در محیط ساخت
 - `npm run validate` (syntax + security-check) ✔
-- `npm test` (واحد + ایستا + repeat + v4 + `tests/sync.test.mjs` + smoke) ✔
+- `npm test` (واحد + ایستا + repeat + v4 + `tests/sync.test.mjs` + `tests/weekly-person.test.mjs` + smoke) ✔
 - `tests/sync.test.mjs`: دو «گوشی» (vm جدا) با Worker واقعی و KV شبیه‌سازی‌شده — اتصال با کد، کد اشتباه، رمز همگام‌سازی اشتباه، دوطرفه، تداخل هم‌زمان (409)، حذف، آفلاین، بازیابی از فایل (epoch)، قطع دسترسی گوشی، رمزنگاری بودن داده روی سرور ✔
 
 ## اجرا نشده

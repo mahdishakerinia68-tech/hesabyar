@@ -4,8 +4,8 @@
 
 ## وضعیت انتشار
 
-- Release: `pro1.12` (schema 5)
-- Package version: `1.0.0-pro1.12`
+- Release: `pro1.13` (schema 5)
+- Package version: `1.0.0-pro1.13`
 - Storage اصلی: IndexedDB با ذخیره اتمیک snapshot
 - Cloud sync: اختیاری، با ربات تلگرام + Cloudflare Worker (پوشه‌ی `server/`)
 - Android: Capacitor 7 + Java 17 در CI
